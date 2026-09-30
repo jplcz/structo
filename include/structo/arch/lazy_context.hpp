@@ -11,6 +11,63 @@
 #include <reloco/allocator.hpp>
 #include <reloco/error.hpp>
 
+/*
+                              [ Thread Creation ]
+                                      |
+                                      | on_thread_construct() (eager)
+                                      v
+                             +-----------------+
+                             |  UNINITIALIZED  | <----+
+                             | (RAM Allocated) |      | on_thread_remote_sync()
+                             +-----------------+      | (marks dirty=true,
+                                      |               |  keeps initialized=false)
+                                      | on_trap()     |
+             +------------------------+---------------+
+             |
+             | [First Use: init_context() / restore if dirty]
+             v
++------------------------+      on_thread_leave()       +------------------------+
+|     ACTIVE_SILICON     | ---------------------------> |     CACHED_SILICON     |
+|   (HW Enabled on C)    |                              |   (HW Disabled on C)   |
+|                        | <--------------------------- |                        |
+| - active_on_cpu[C]==ctx|  on_thread_enter() on core C | - active_on_cpu[C]==ctx|
+| - last_cpu == C        |  OR on_trap() on core C      | - last_cpu == C        |
+| - dirty == false       |  (ZERO register reload!)     | - RAM is 100% in sync  |
++------------------------+                              +------------------------+
+    |           ^                                                    |
+    |           |                                                    | Another thread traps
+    |           | on_trap() on core K                                | on core C (eviction)
+    |           | (or after migration)                               | OR migration to core K
+    |           | [restore_context()]                                v
+    |           |                                       +------------------------+
+    |           +-------------------------------------- |      EVICTED_SYNC      |
+    |                                                   |    (Valid in Memory)   |
+    | on_thread_local_sync()                            |                        |
+    | (saves to RAM, disables HW,                       | - active_on_cpu[C]!=ctx|
+    |  sets last_cpu = invalid)                         |   (or last_cpu==inv)   |
+    |                                                   | - dirty == false       |
+    +-------------------------------------------------> +------------------------+
+                                                                     |
+                                                                     | on_thread_remote_sync()
+                                                                     | (e.g. ptrace / debugger)
+                                                                     v
+                                                        +------------------------+
+                                                        |     EVICTED_DIRTY      |
+                                                        |    (Memory Mutated)    |
+                                                        |                        |
+                                                        | - dirty == true        |
+                                                        | - last_cpu == invalid  |
+                                                        +------------------------+
+                                                                     |
+                                  on_trap()                          |
+                                  [restore_context(), dirty = false] |
+                                  +----------------------------------+
+                                  |
+                                  v
+                        [ ACTIVE_SILICON ]
+
+*/
+
 namespace structo::arch {
 
 template <typename Traits, typename CpuId> class lazy_context_switcher;
