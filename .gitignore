@@ -50,3 +50,4 @@ build*
 
 # Vagrant (local BSD verification, see docs/bsd-vagrant-testing.md)
 .vagrant/
+.frama-c
