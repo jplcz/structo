@@ -1,0 +1,375 @@
+# SPDX-FileCopyrightText: 2026 Jarosław Pelczar <jarek@jpelczar.com>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+
+cmake_minimum_required(VERSION 3.20)
+project(jplcz_structo VERSION 0.1.0 LANGUAGES CXX)
+
+if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    set(JPLCZ_STRUCTO_IS_TOP_LEVEL ON)
+else()
+    set(JPLCZ_STRUCTO_IS_TOP_LEVEL OFF)
+endif()
+
+set(JPLCZ_STRUCTO_DEVELOPMENT_DEFAULT ${JPLCZ_STRUCTO_IS_TOP_LEVEL})
+
+option(JPLCZ_STRUCTO_ENABLE_STRICT_WARNINGS
+    "Enable comprehensive GCC and Clang warnings" ${JPLCZ_STRUCTO_DEVELOPMENT_DEFAULT})
+option(JPLCZ_STRUCTO_ENABLE_UNSAFE_BUFFER_USAGE
+    "Enable Clang unsafe buffer usage diagnostics" OFF)
+option(JPLCZ_STRUCTO_ENABLE_WERROR
+    "Enable build with -Werror" OFF)
+option(JPLCZ_STRUCTO_BUILD_TESTS
+    "Build test suite" ${JPLCZ_STRUCTO_DEVELOPMENT_DEFAULT})
+option(JPLCZ_STRUCTO_BUILD_EXAMPLES
+    "Build example apps" ${JPLCZ_STRUCTO_DEVELOPMENT_DEFAULT})
+option(JPLCZ_STRUCTO_BUILD_HEADER_CHECKS
+    "Compile all public headers under each supported C++ standard"
+    ${JPLCZ_STRUCTO_DEVELOPMENT_DEFAULT})
+option(JPLCZ_STRUCTO_INSTALL
+    "Install jplcz_structo headers and CMake package metadata"
+    ${JPLCZ_STRUCTO_IS_TOP_LEVEL})
+
+# Included unconditionally (not only under JPLCZ_STRUCTO_INSTALL), and
+# harmlessly idempotent if a parent build already included it, purely to
+# make GNUInstallDirs' CMAKE_INSTALL_* cache variables available as
+# defaults for the JPLCZ_STRUCTO_INSTALL_* overrides immediately below --
+# these are consulted by every install() destination further down,
+# regardless of JPLCZ_STRUCTO_INSTALL's own value at this point in the
+# file (option() processing order). Mirrors reloco's/microfmt's own
+# JPLCZ_*_INSTALL_*DIR block.
+include(GNUInstallDirs)
+
+# Each defaults to the plain GNUInstallDirs value, but can be overridden
+# independently of CMAKE_INSTALL_PREFIX/CMAKE_INSTALL_*, e.g. by a custom
+# RTOS/hypervisor/SDK build tree that already repurposes the standard
+# CMAKE_INSTALL_INCLUDEDIR/CMAKE_INSTALL_DATADIR cache variables for its
+# own unrelated headers/CMake packages and needs structo installed under
+# a distinct path instead.
+#
+# Cache type STRING, not PATH, deliberately -- see reloco/microfmt's own
+# CMakeLists.txt for the full rationale (a PATH-typed cache entry set
+# from a bare `-DVAR=value` collapses to a cwd-relative absolute path,
+# breaking the relative $<INSTALL_INTERFACE:...> usage below).
+set(JPLCZ_STRUCTO_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}" CACHE STRING
+    "Install destination for structo's public headers (relative to \
+CMAKE_INSTALL_PREFIX unless absolute)")
+set(JPLCZ_STRUCTO_INSTALL_DOCDIR "${CMAKE_INSTALL_DOCDIR}" CACHE STRING
+    "Install destination for structo's README/LICENSE/docs/ (relative \
+to CMAKE_INSTALL_PREFIX unless absolute)")
+set(JPLCZ_STRUCTO_INSTALL_CMAKEDIR "${CMAKE_INSTALL_DATADIR}/cmake/jplcz_structo" CACHE STRING
+    "Install destination for jplcz_structo's CMake package config/\
+targets/version files (relative to CMAKE_INSTALL_PREFIX unless \
+absolute)")
+
+if(JPLCZ_STRUCTO_ENABLE_STRICT_WARNINGS OR JPLCZ_STRUCTO_ENABLE_UNSAFE_BUFFER_USAGE OR
+   JPLCZ_STRUCTO_BUILD_HEADER_CHECKS OR JPLCZ_STRUCTO_BUILD_TESTS)
+    include(CheckCXXCompilerFlag)
+
+    if(MSVC)
+        check_cxx_compiler_flag("/std:c++latest"
+            JPLCZ_STRUCTO_COMPILER_SUPPORTS_CXX23)
+    else()
+        check_cxx_compiler_flag("-std=c++23"
+            JPLCZ_STRUCTO_COMPILER_SUPPORTS_CXX23)
+    endif()
+
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        check_cxx_compiler_flag("-Wunsafe-buffer-usage"
+            JPLCZ_STRUCTO_COMPILER_SUPPORTS_WUNSAFE_BUFFER_USAGE)
+    endif()
+endif()
+
+# jplcz_reloco dependency
+#
+# jplcz_reloco provides the hardened container / lifetime-safety /
+# OS-development primitives (fdt_reader/fdt_index/fdt_memory,
+# region_set/phys_addr, checked containers, ...) that jplcz_structo's
+# kernel/hypervisor/trusted-boundary building blocks are composed from.
+# Callers that already vendor or pin a specific reloco checkout can point
+# JPLCZ_STRUCTO_RELOCO_SOURCE_DIR at it; otherwise it is fetched from its
+# GitHub repository at a pinned commit. Mirrors microfmt's own
+# JPLCZ_MICROFMT_RELOCO_* block (microfmt/CMakeLists.txt) exactly.
+#
+# If a parent project already brought in jplcz_reloco itself (e.g. its own
+# `add_subdirectory(path/to/reloco)` before `add_subdirectory(path/to/structo)`,
+# or its own earlier FetchContent_MakeAvailable(jplcz_reloco)), the
+# jplcz_reloco::reloco target already exists by the time this file runs:
+# skip fetching/declaring it a second time and reuse the parent's target
+# as-is instead of silently overriding it.
+if(NOT TARGET jplcz_reloco::reloco)
+    set(JPLCZ_STRUCTO_RELOCO_SOURCE_DIR "" CACHE PATH
+        "Path to a local jplcz_reloco checkout to use instead of fetching it")
+    # Allow the local checkout path to be supplied via an environment variable
+    # (e.g. for CI or shell profiles) without having to pass -D on every configure.
+    # The explicit CMake cache variable/-D option always takes precedence.
+    if(NOT JPLCZ_STRUCTO_RELOCO_SOURCE_DIR AND DEFINED ENV{JPLCZ_STRUCTO_RELOCO_SOURCE_DIR})
+        set(JPLCZ_STRUCTO_RELOCO_SOURCE_DIR "$ENV{JPLCZ_STRUCTO_RELOCO_SOURCE_DIR}" CACHE PATH
+            "Path to a local jplcz_reloco checkout to use instead of fetching it" FORCE)
+    endif()
+    set(JPLCZ_STRUCTO_RELOCO_GIT_REPOSITORY "https://github.com/jplcz/reloco.git" CACHE STRING
+        "Git repository to fetch jplcz_reloco from when JPLCZ_STRUCTO_RELOCO_SOURCE_DIR is unset")
+    set(JPLCZ_STRUCTO_RELOCO_GIT_TAG "master" CACHE STRING
+        "Git tag or commit to fetch jplcz_reloco from when JPLCZ_STRUCTO_RELOCO_SOURCE_DIR is unset")
+
+    include(FetchContent)
+    if(JPLCZ_STRUCTO_RELOCO_SOURCE_DIR)
+        FetchContent_Declare(
+            jplcz_reloco
+            SOURCE_DIR "${JPLCZ_STRUCTO_RELOCO_SOURCE_DIR}"
+        )
+    else()
+        FetchContent_Declare(
+            jplcz_reloco
+            GIT_REPOSITORY "${JPLCZ_STRUCTO_RELOCO_GIT_REPOSITORY}"
+            GIT_TAG "${JPLCZ_STRUCTO_RELOCO_GIT_TAG}"
+        )
+    endif()
+
+    # jplcz_reloco is consumed as a header-only build dependency: keep its own
+    # development targets (tests, header checks, strict warnings) out of the
+    # combined build, and mirror JPLCZ_STRUCTO_INSTALL so an installed
+    # jplcz_structo package also installs and exports the jplcz_reloco
+    # package it depends on.
+    set(JPLCZ_RELOCO_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(JPLCZ_RELOCO_BUILD_DEMOS OFF CACHE BOOL "" FORCE)
+    set(JPLCZ_RELOCO_BUILD_HEADER_CHECKS OFF CACHE BOOL "" FORCE)
+    set(JPLCZ_RELOCO_ENABLE_STRICT_WARNINGS OFF CACHE BOOL "" FORCE)
+    set(JPLCZ_RELOCO_INSTALL ${JPLCZ_STRUCTO_INSTALL} CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(jplcz_reloco)
+endif()
+
+# Header-only interface target
+add_library(jplcz_structo INTERFACE)
+target_compile_features(jplcz_structo INTERFACE cxx_std_17)
+target_compile_options(jplcz_structo INTERFACE
+    $<$<CXX_COMPILER_ID:MSVC>:/Zc:preprocessor>
+)
+set_target_properties(jplcz_structo PROPERTIES EXPORT_NAME structo)
+
+target_include_directories(jplcz_structo INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${JPLCZ_STRUCTO_INSTALL_INCLUDEDIR}>
+)
+
+target_link_libraries(jplcz_structo INTERFACE jplcz_reloco::reloco)
+
+add_library(jplcz_structo::structo ALIAS jplcz_structo)
+
+add_library(jplcz_structo_warnings INTERFACE)
+if(JPLCZ_STRUCTO_ENABLE_UNSAFE_BUFFER_USAGE AND
+   NOT JPLCZ_STRUCTO_COMPILER_SUPPORTS_WUNSAFE_BUFFER_USAGE)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        message(FATAL_ERROR
+            "JPLCZ_STRUCTO_ENABLE_UNSAFE_BUFFER_USAGE requires a compiler that supports "
+            "-Wunsafe-buffer-usage")
+    else()
+        set(JPLCZ_STRUCTO_ENABLE_UNSAFE_BUFFER_USAGE OFF)
+    endif()
+endif()
+
+if(JPLCZ_STRUCTO_ENABLE_STRICT_WARNINGS)
+    if(MSVC)
+        target_compile_options(jplcz_structo_warnings INTERFACE /W4)
+    else()
+        target_compile_options(jplcz_structo_warnings INTERFACE -Wall -Wextra -Wpedantic -Wshadow -Wconversion)
+    endif()
+endif()
+
+if(JPLCZ_STRUCTO_ENABLE_UNSAFE_BUFFER_USAGE AND JPLCZ_STRUCTO_COMPILER_SUPPORTS_WUNSAFE_BUFFER_USAGE)
+    target_compile_options(jplcz_structo_warnings INTERFACE -Wunsafe-buffer-usage)
+endif()
+
+if(JPLCZ_STRUCTO_ENABLE_WERROR)
+    if(MSVC)
+        target_compile_options(jplcz_structo_warnings INTERFACE /WX)
+    else()
+        target_compile_options(jplcz_structo_warnings INTERFACE -Werror)
+    endif()
+endif()
+
+if(JPLCZ_STRUCTO_BUILD_TESTS)
+    include(FetchContent)
+    FetchContent_Declare(
+        googletest
+        URL https://github.com/google/googletest/archive/refs/tags/v1.18.0.zip
+    )
+    # For Windows: Prevent overriding the parent project's compiler/linker settings
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+
+    enable_testing()
+    include(GoogleTest)
+
+    add_executable(jplcz_structo_tests
+        tests/test_boot_memory_map.cpp
+        tests/test_device_tree.cpp
+    )
+    target_link_libraries(jplcz_structo_tests PRIVATE
+        jplcz_structo jplcz_structo_warnings GTest::gtest_main)
+    target_include_directories(jplcz_structo_tests PRIVATE tests)
+    gtest_discover_tests(jplcz_structo_tests)
+endif()
+
+if(JPLCZ_STRUCTO_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()
+
+if(JPLCZ_STRUCTO_BUILD_HEADER_CHECKS)
+    file(GLOB JPLCZ_STRUCTO_PUBLIC_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/*.hpp")
+
+    function(add_jplcz_structo_header_check std)
+        set(check_dir "${CMAKE_CURRENT_BINARY_DIR}/header_check_cxx${std}")
+        file(MAKE_DIRECTORY "${check_dir}")
+        set(sources "")
+        foreach(header ${JPLCZ_STRUCTO_PUBLIC_HEADERS})
+            get_filename_component(name "${header}" NAME_WE)
+            set(src "${check_dir}/${name}.cpp")
+            file(WRITE "${src}" "#include <structo/${name}.hpp>\n")
+            list(APPEND sources "${src}")
+        endforeach()
+        add_library(jplcz_structo_headers_cxx${std} OBJECT ${sources})
+        target_link_libraries(jplcz_structo_headers_cxx${std} PRIVATE jplcz_structo)
+        target_compile_features(jplcz_structo_headers_cxx${std} PRIVATE cxx_std_${std})
+    endfunction()
+
+    set(JPLCZ_STRUCTO_HEADER_CHECK_TARGETS
+        jplcz_structo_headers_cxx17
+        jplcz_structo_headers_cxx20
+    )
+    add_jplcz_structo_header_check(17)
+    add_jplcz_structo_header_check(20)
+    if(JPLCZ_STRUCTO_COMPILER_SUPPORTS_CXX23)
+        add_jplcz_structo_header_check(23)
+        list(APPEND JPLCZ_STRUCTO_HEADER_CHECK_TARGETS jplcz_structo_headers_cxx23)
+    endif()
+
+    add_custom_target(jplcz_structo_check_public_headers
+        DEPENDS ${JPLCZ_STRUCTO_HEADER_CHECK_TARGETS}
+    )
+endif()
+
+if(JPLCZ_STRUCTO_INSTALL)
+    # GNUInstallDirs was already include()d unconditionally near the
+    # JPLCZ_STRUCTO_INSTALL_*DIR option() block above; this second
+    # include() is harmless (idempotent) and kept so this block remains
+    # self-contained if ever reordered.
+    include(GNUInstallDirs)
+    include(CMakePackageConfigHelpers)
+
+    install(
+        TARGETS jplcz_structo
+        EXPORT jplcz_structoTargets
+        INCLUDES DESTINATION "${JPLCZ_STRUCTO_INSTALL_INCLUDEDIR}"
+    )
+
+    install(
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/"
+        DESTINATION "${JPLCZ_STRUCTO_INSTALL_INCLUDEDIR}"
+        COMPONENT Development
+    )
+
+    install(
+        FILES
+            "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
+            "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
+        DESTINATION "${JPLCZ_STRUCTO_INSTALL_DOCDIR}"
+        COMPONENT Documentation
+    )
+
+    install(
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/docs/"
+        DESTINATION "${JPLCZ_STRUCTO_INSTALL_DOCDIR}/docs"
+        COMPONENT Documentation
+    )
+
+    configure_package_config_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/jplcz_structoConfig.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/jplcz_structoConfig.cmake"
+        INSTALL_DESTINATION "${JPLCZ_STRUCTO_INSTALL_CMAKEDIR}"
+        NO_SET_AND_CHECK_MACRO
+        NO_CHECK_REQUIRED_COMPONENTS_MACRO
+    )
+
+    # Header-only INTERFACE library: the package config is architecture
+    # independent (no compiled binaries to match ABI/bitness against), so
+    # skip the platform check and install under share/, not lib/.
+    write_basic_package_version_file(
+        "${CMAKE_CURRENT_BINARY_DIR}/jplcz_structoConfigVersion.cmake"
+        VERSION "${PROJECT_VERSION}"
+        COMPATIBILITY SameMajorVersion
+        ARCH_INDEPENDENT
+    )
+
+    install(
+        EXPORT jplcz_structoTargets
+        FILE jplcz_structoTargets.cmake
+        NAMESPACE jplcz_structo::
+        DESTINATION "${JPLCZ_STRUCTO_INSTALL_CMAKEDIR}"
+        COMPONENT Development
+    )
+
+    install(
+        FILES
+            "${CMAKE_CURRENT_BINARY_DIR}/jplcz_structoConfig.cmake"
+            "${CMAKE_CURRENT_BINARY_DIR}/jplcz_structoConfigVersion.cmake"
+        DESTINATION "${JPLCZ_STRUCTO_INSTALL_CMAKEDIR}"
+        COMPONENT Development
+    )
+endif()
+
+if(JPLCZ_STRUCTO_IS_TOP_LEVEL AND JPLCZ_STRUCTO_INSTALL)
+    set(CPACK_PACKAGE_NAME "jplcz-structo")
+    set(CPACK_PACKAGE_VENDOR "Jaroslaw Pelczar")
+    set(CPACK_PACKAGE_CONTACT "Jaroslaw Pelczar <jarek@jpelczar.com>")
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
+        "Header-only OS/kernel/hypervisor building blocks (device-tree decoding, physical memory region management) built on jplcz_reloco")
+    set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/jplcz/structo")
+    set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+    set(CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
+    set(CPACK_PACKAGE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
+    set(CPACK_PACKAGE_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
+    set(CPACK_PACKAGE_INSTALL_DIRECTORY "jplcz_structo")
+    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+    set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+    set(CPACK_VERBATIM_VARIABLES ON)
+    set(CPACK_THREADS 0)
+
+    set(CPACK_SOURCE_GENERATOR "TGZ;ZIP")
+    set(CPACK_SOURCE_IGNORE_FILES
+        "/\\.git/"
+        "/\\.idea/"
+        "/\\.vscode/"
+        "/build[^/]*/"
+        "/cmake-build-[^/]*/"
+        "/_deps/"
+    )
+
+    # Header-only package: archives always work everywhere; DEB/RPM are added
+    # only when their packaging tools are available on the host.
+    set(CPACK_GENERATOR "TGZ;ZIP")
+
+    find_program(JPLCZ_STRUCTO_DPKG_DEB_EXECUTABLE dpkg-deb)
+    if(JPLCZ_STRUCTO_DPKG_DEB_EXECUTABLE)
+        list(APPEND CPACK_GENERATOR "DEB")
+    endif()
+
+    find_program(JPLCZ_STRUCTO_RPMBUILD_EXECUTABLE rpmbuild)
+    if(JPLCZ_STRUCTO_RPMBUILD_EXECUTABLE)
+        list(APPEND CPACK_GENERATOR "RPM")
+    endif()
+
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${CPACK_PACKAGE_CONTACT}")
+    set(CPACK_DEBIAN_PACKAGE_SECTION "libdevel")
+    set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "${CPACK_PACKAGE_HOMEPAGE_URL}")
+    set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "all")
+    set(CPACK_DEBIAN_FILE_NAME "DEB-DEFAULT")
+
+    set(CPACK_RPM_PACKAGE_LICENSE "BSD-2-Clause")
+    set(CPACK_RPM_PACKAGE_URL "${CPACK_PACKAGE_HOMEPAGE_URL}")
+    set(CPACK_RPM_PACKAGE_ARCHITECTURE "noarch")
+    set(CPACK_RPM_FILE_NAME "RPM-DEFAULT")
+    set(CPACK_RPM_PACKAGE_DESCRIPTION "${CPACK_PACKAGE_DESCRIPTION_SUMMARY}")
+
+    include(CPack)
+endif()
