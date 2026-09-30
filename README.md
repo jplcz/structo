@@ -22,13 +22,24 @@ MMU exists.
 
 ## What's here
 
-| Header | Type(s) | One-line summary |
-|---|---|---|
-| [`boot_memory_map.hpp`](include/structo/boot_memory_map.hpp) | `boot_memory_map<Capacity, PhysInt>` | Decodes a DTB's `/memory`/`/reserved-memory` description into full/free `reloco::region_set`s, plus `try_largest_free_region()` to seed a first-stage allocator |
-| [`device_tree.hpp`](include/structo/device_tree.hpp) | `device_tree`, `device_tree_storage<NodeCapacity, PhandleCapacity, StackDepth>` | Caller-owned-storage bundle of `reloco::fdt::fdt_reader` + `fdt_index`, plus `/chosen` node conveniences (`try_bootargs()`, `try_stdout_path()`) |
+See [docs/reference.md](docs/reference.md) for the full per-header
+reference (one page per header, linked from there) covering every public
+type. A few highlights, demonstrated in [examples/](examples):
 
-See [docs/reference.md](docs/reference.md) for the full per-type reference
-and [examples/](examples) for runnable demos of both headers.
+- **[`boot_memory_map_demo.cpp`](examples/boot_memory_map_demo.cpp)** --
+  decodes a DTB's `/memory`/`/reserved-memory` description into full/free
+  `reloco::region_set`s with `structo::boot_memory_map::try_from_dtb()`,
+  then finds the largest free region with `try_largest_free_region()` --
+  the two queries a first-stage allocator needs before a heap exists.
+- **[`device_tree_demo.cpp`](examples/device_tree_demo.cpp)** -- opens a
+  DTB into a caller-owned-storage `structo::device_tree` and reads its
+  `/chosen` node's `bootargs`/`stdout-path` properties, the first two
+  things almost every kernel/hypervisor boot path looks for.
+
+Both build on the OS-development building blocks moved in from
+`jplcz_reloco` (typed physical addresses/pages, scatter-gather
+translation, and the Flattened Device Tree reader/writer/index), each
+documented on its own [docs/](docs) page.
 
 ## Using structo
 

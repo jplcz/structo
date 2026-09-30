@@ -14,45 +14,40 @@ exists and where.
 |---|---|---|
 | `boot_memory_map.hpp` | `boot_memory_map<Capacity, PhysInt>` | Fixed-capacity physical memory map (`full`/`free` `reloco::region_set`s) decoded from a devicetree blob via `reloco::fdt::try_extract_memory`; `try_from_dtb()` builds it in one call, `try_largest_free_region()`/`free_bytes()` answer the two queries a first-stage allocator needs |
 | `device_tree.hpp` | `device_tree`, `device_tree_storage<NodeCapacity, PhandleCapacity, StackDepth>` | `reloco::fdt::fdt_reader` + `reloco::fdt::fdt_index` bundle over caller-owned `device_tree_storage`; `try_open()` builds both from a blob, `try_find_property()`/`try_bootargs()`/`try_stdout_path()` cover the `/chosen`-node lookups a boot path reaches for first |
+| `compat_sg.hpp` | `sg_descriptor_layout<StorageType, PfnField, OffsetField, LengthField, LastFlagField, HeaderSize>`, `chained_sg_layout<StorageType, PfnField, OffsetField, LengthField, LastFlagField, ChainFlagField, HeaderSize>`, `compact_sg_codec<Layout, PageTraits, SpaceTag>`, `chained_sg_codec<Layout, PageTraits, SpaceTag>`, `two_level_sg_codec<L1Layout, L2Layout, PageTraits, SpaceTag>` | Compile-time scatter-gather descriptor layouts and codecs for compact, chained, and two-level representations |
+| `phys_addr.hpp` | `default_phys_space`, `host_phys_space`, `guest_phys_space`, `dma_bus_space`, `secure_phys_space`, `nonsecure_phys_space`, `root_phys_space`, `realm_phys_space`, `phys_addr<T, SpaceTag, PhysInt>`, `dmap_mapper<VirtBase, PhysSize, ExpectedSpace, PhysBase>`, `dmap_ptr<T, Mapper, PhysInt>` | Typed physical addresses, address-space tags, and direct-map pointer conversion |
+| `pfn_translator.hpp` | `phys_pfn<SpaceTag, PageTraits, PhysInt>` | Typed physical page-frame number and address conversion |
+| `phys_page.hpp` | `page_traits<Size, Shift>`, `os_traits_base<Derived, OsPage>`, `page_view<PageTraits, OsTraits>` | Page-size traits and an OS-page-backed physical page view |
+| `phys_translator.hpp` | `phys_translator<Policy>` | Policy-based virtual/physical address translator |
+| `region_set.hpp` | `memory_region<PhysInt>`, `region_set<Capacity, PhysInt>` | Fixed-capacity collection of physical memory regions |
+| `sg_list.hpp` | `sg_entry<SpaceTag, PhysInt>`, `sg_list<Container>` | Scatter-gather entries and container |
+| `sg_translator.hpp` | `sg_translator` | Policy-based scatter-gather translator |
+| `fdt_reader.hpp` | `fdt_reader`, `mem_reserve_iterator` | Bounds-checked, `iterator_adaptor`-based read-only view over a caller-owned Flattened Device Tree (DTB) span, yielding `result<fdt_event>` per struct-block token |
+| `fdt_writer.hpp` | `fdt_writer` | Move-only, fallibly-constructed streaming writer for Flattened Device Tree (DTB, `/dts-v1/`) blobs into a caller-owned span, with sticky error propagation |
+| `fdt_index.hpp` | `fdt_index<Container>`, `fdt_index_node`, `fdt_index_phandle_entry`, `fdt_index_child_iterator<NodeContainer>`, `fdt_index_property_iterator` | Random-access index over an `fdt_reader` blob, built once (iteratively, never recursively) into caller-supplied `Container<T>` buffers, giving `O(1)` parent lookup and child iteration without descending into subtrees, plus `O(log n)` phandle-to-node lookup |
+| `fdt_memory.hpp` | `try_extract_memory` | Extracts a devicetree's physical memory description straight off `fdt_reader`'s single-pass streaming API (no `fdt_index`, safe to call very early in boot) into caller-provided `region_set`s |
 
-## `boot_memory_map<Capacity, PhysInt>`
+## structo's own headers
 
-```cpp
-auto map = structo::boot_memory_map<32>::try_from_dtb(dtb_blob);
-if (!map) { /* handle map.error() */ }
+- [`boot_memory_map.md`](boot_memory_map.md) -- DTB-derived physical memory map
+- [`device_tree.md`](device_tree.md) -- `fdt_reader`/`fdt_index` bundle with `/chosen` helpers
 
-for (auto &region : map->free) { /* hand region.base/region.size to the allocator */ }
+## OS-development building blocks (from `jplcz_reloco`)
 
-auto seed = map->try_largest_free_region();
-```
+The twelve headers below were moved from `jplcz_reloco` into
+`jplcz_structo`'s own `include/structo/` and re-homed into the `structo`
+namespace (each file adds `using namespace reloco;` so unmoved reloco
+types remain reachable unqualified). Each has its own reference page:
 
-- `try_from_dtb(reloco::span<const std::byte>)` parses the blob with
-  `reloco::fdt::fdt_reader::try_create` and extracts its memory
-  description with `reloco::fdt::try_extract_memory` in one call. Fails
-  with `error::not_found` if no `/memory`-class node exists, or whatever
-  error a malformed `reg` property or a too-small `Capacity` reports.
-- `try_largest_free_region()` returns the single biggest `free` region
-  (`error::not_found` if `free` is empty).
-- `free_bytes()` sums every `free` region's size.
-
-## `device_tree` / `device_tree_storage<NodeCapacity, PhandleCapacity, StackDepth>`
-
-```cpp
-structo::device_tree_storage<128> storage; // size from a known node-count bound
-auto dt = structo::device_tree::try_open(dtb_blob, storage);
-if (!dt) { /* handle dt.error() */ }
-
-auto bootargs = dt->try_bootargs();     // "/chosen"'s "bootargs" property
-auto console  = dt->try_stdout_path();  // "/chosen"'s "stdout-path" property
-auto prop     = dt->try_find_property("/soc/uart@9000000", "clock-frequency");
-```
-
-- `device_tree_storage` owns the `reloco::array`-backed node/phandle/
-  build-scratch buffers `reloco::fdt::fdt_index::try_build` requires;
-  size each capacity from a known bound on the target's DTB.
-- `try_open(blob, storage)` builds both the `fdt_reader` and the
-  `fdt_index` over `storage` in one call.
-- `try_find_property(path, name)` resolves `path` with
-  `fdt_index::find_by_path` then looks up a direct property by name.
-- `try_bootargs()`/`try_stdout_path()` are `try_find_property("/chosen",
-  ...)` shorthands returning the property's string value.
+- [`compat_sg.md`](compat_sg.md) -- scatter-gather compatibility codecs
+- [`phys_addr.md`](phys_addr.md) -- typed physical addresses and direct-map pointers
+- [`pfn_translator.md`](pfn_translator.md) -- typed physical page-frame numbers
+- [`phys_page.md`](phys_page.md) -- page-size traits and OS-page views
+- [`phys_translator.md`](phys_translator.md) -- policy-based address translation
+- [`region_set.md`](region_set.md) -- physical memory region collections
+- [`sg_list.md`](sg_list.md) -- scatter-gather entries and lists
+- [`sg_translator.md`](sg_translator.md) -- policy-based scatter-gather translation
+- [`fdt_reader.md`](fdt_reader.md) -- Flattened Device Tree reader
+- [`fdt_writer.md`](fdt_writer.md) -- Flattened Device Tree writer
+- [`fdt_index.md`](fdt_index.md) -- random-access Flattened Device Tree index
+- [`fdt_memory.md`](fdt_memory.md) -- devicetree physical memory extraction

@@ -204,6 +204,17 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
     add_executable(jplcz_structo_tests
         tests/test_boot_memory_map.cpp
         tests/test_device_tree.cpp
+        tests/test_phys_addr.cpp
+        tests/test_phys_page.cpp
+        tests/test_phys_translator.cpp
+        tests/test_region_set.cpp
+        tests/test_sg_list.cpp
+        tests/test_sg_translation.cpp
+        tests/test_fdt_reader.cpp
+        tests/test_fdt_writer.cpp
+        tests/test_fdt_index.cpp
+        tests/test_fdt_memory.cpp
+        tests/test_fdt_real_world.cpp
     )
     target_link_libraries(jplcz_structo_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)
