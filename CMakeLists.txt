@@ -215,11 +215,26 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_fdt_index.cpp
         tests/test_fdt_memory.cpp
         tests/test_fdt_real_world.cpp
+        tests/test_buddy_allocator.cpp
+        tests/test_ipc_buffer.cpp
     )
     target_link_libraries(jplcz_structo_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)
     target_include_directories(jplcz_structo_tests PRIVATE tests)
     gtest_discover_tests(jplcz_structo_tests)
+
+    # tests/test_ipc_ring_fault_injection.cpp defines
+    # RELOCO_ENABLE_FAULT_INJECTION, which changes the *body* of
+    # reloco_ipc_ring.hpp's implicitly-inline (external/vague linkage)
+    # ipc_producer::write_slices()/ipc_consumer::read_slices() member
+    # functions. Linking that translation unit into the same binary as
+    # any other TU that includes reloco_ipc_ring.hpp *without* the macro
+    # (e.g. test_ipc_buffer.cpp, in jplcz_structo_tests) would be an ODR
+    # violation, so it gets its own, fully separate binary.
+    add_executable(jplcz_structo_ipc_ring_fault_injection_tests tests/test_ipc_ring_fault_injection.cpp)
+    target_link_libraries(jplcz_structo_ipc_ring_fault_injection_tests PRIVATE
+        jplcz_structo jplcz_structo_warnings GTest::gtest_main)
+    gtest_discover_tests(jplcz_structo_ipc_ring_fault_injection_tests)
 endif()
 
 if(JPLCZ_STRUCTO_BUILD_EXAMPLES)

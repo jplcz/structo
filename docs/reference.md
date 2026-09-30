@@ -26,6 +26,8 @@ exists and where.
 | `fdt_writer.hpp` | `fdt_writer` | Move-only, fallibly-constructed streaming writer for Flattened Device Tree (DTB, `/dts-v1/`) blobs into a caller-owned span, with sticky error propagation |
 | `fdt_index.hpp` | `fdt_index<Container>`, `fdt_index_node`, `fdt_index_phandle_entry`, `fdt_index_child_iterator<NodeContainer>`, `fdt_index_property_iterator` | Random-access index over an `fdt_reader` blob, built once (iteratively, never recursively) into caller-supplied `Container<T>` buffers, giving `O(1)` parent lookup and child iteration without descending into subtrees, plus `O(log n)` phandle-to-node lookup |
 | `fdt_memory.hpp` | `try_extract_memory` | Extracts a devicetree's physical memory description straight off `fdt_reader`'s single-pass streaming API (no `fdt_index`, safe to call very early in boot) into caller-provided `region_set`s |
+| `buddy_allocator.hpp` | `buddy_allocator<FreeList, OsPage, MaxOrder>` | Power-of-two buddy page allocator over a caller-supplied intrusive free list and `OsPage` type, with DMA/hardware-constrained and greedy allocation variants |
+| `reloco_ipc_ring.h` / `reloco_ipc_ring.hpp` | `reloco_ipc_spsc_page`, `reloco_ipc_producer`, `reloco_ipc_consumer` (C ABI); `reloco::ipc_producer`, `reloco::ipc_consumer` (C++ wrapper) | Cross-process, allocation-free single-producer/single-consumer byte-stream ring buffer over a shared-memory page; usable standalone from a Linux/FreeBSD kernel module, with a zero-copy typestate-checked C++ transaction API |
 
 ## structo's own headers
 
@@ -34,10 +36,12 @@ exists and where.
 
 ## OS-development building blocks (from `jplcz_reloco`)
 
-The twelve headers below were moved from `jplcz_reloco` into
-`jplcz_structo`'s own `include/structo/` and re-homed into the `structo`
-namespace (each file adds `using namespace reloco;` so unmoved reloco
-types remain reachable unqualified). Each has its own reference page:
+The headers below were moved from `jplcz_reloco` into `jplcz_structo`'s
+own `include/structo/`. Most were re-homed into the `structo` namespace
+(each such file adds `using namespace reloco;` so unmoved reloco types
+remain reachable unqualified); `reloco_ipc_ring.h`/`.hpp` kept their
+original `reloco_ipc_*`/`reloco::` naming untouched, per explicit
+instruction. Each has its own reference page:
 
 - [`compat_sg.md`](compat_sg.md) -- scatter-gather compatibility codecs
 - [`phys_addr.md`](phys_addr.md) -- typed physical addresses and direct-map pointers
@@ -51,3 +55,5 @@ types remain reachable unqualified). Each has its own reference page:
 - [`fdt_writer.md`](fdt_writer.md) -- Flattened Device Tree writer
 - [`fdt_index.md`](fdt_index.md) -- random-access Flattened Device Tree index
 - [`fdt_memory.md`](fdt_memory.md) -- devicetree physical memory extraction
+- [`buddy_allocator.md`](buddy_allocator.md) -- power-of-two buddy page allocator
+- [`reloco_ipc_ring.md`](reloco_ipc_ring.md) -- cross-process SPSC IPC ring buffer
