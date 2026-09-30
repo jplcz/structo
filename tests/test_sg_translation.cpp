@@ -111,9 +111,9 @@ TEST(ChainedSgCodecTest, LinksPagesWhenDescriptorPageFills) {
   using packed_type = codec::packed_type;
   using paddr_type = codec::paddr_type;
   using entry_type = sg_entry<dma_bus_space, uint64_t>;
-  using page_type = std::array<packed_type, page_4k::page_size / sizeof(packed_type)>;
+  using page_type = reloco::array<packed_type, page_4k::page_size / sizeof(packed_type)>;
 
-  std::array<page_type, 2> pages{};
+  reloco::array<page_type, 2> pages{};
   uint64_t next_page_address = 0x1000;
   auto allocate = [&]() -> result<paddr_type> {
     const auto address = paddr_type{next_page_address};
@@ -159,9 +159,9 @@ TEST(TwoLevelSgCodecTest, RoundTripsRootAndLeafTables) {
   using packed_type = codec::l1_packed_type;
   using paddr_type = codec::paddr_type;
   using entry_type = sg_entry<dma_bus_space, uint64_t>;
-  using page_type = std::array<packed_type, page_4k::page_size / sizeof(packed_type)>;
+  using page_type = reloco::array<packed_type, page_4k::page_size / sizeof(packed_type)>;
 
-  std::array<page_type, 2> pages{};
+  reloco::array<page_type, 2> pages{};
   uint64_t next_page_address = 0x1000;
   auto allocate = [&]() -> result<paddr_type> {
     const auto address = paddr_type{next_page_address};

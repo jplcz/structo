@@ -217,6 +217,9 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_fdt_real_world.cpp
         tests/test_buddy_allocator.cpp
         tests/test_ipc_buffer.cpp
+        tests/test_lazy_context.cpp
+        tests/test_cpu_index.cpp
+        tests/test_hw_id_map.cpp
     )
     target_link_libraries(jplcz_structo_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)

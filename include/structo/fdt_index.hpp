@@ -31,20 +31,20 @@
  * node/phandle/depth count) with no allocation at all:
  *
  * @code
- * auto reader_made = reloco::fdt::fdt_reader::try_create(blob);
+ * auto reader_made = structo::fdt::fdt_reader::try_create(blob);
  * if (!reader_made)
  *   return reader_made.error();
  *
- * std::array<reloco::fdt::fdt_index_node, 64> node_storage{};
- * std::array<reloco::fdt::fdt_index_phandle_entry, 16> phandle_storage{};
- * std::array<reloco::fdt::detail::fdt_index_build_frame, 16> stack_storage{};
+ * reloco::array<structo::fdt::fdt_index_node, 64> node_storage{};
+ * reloco::array<structo::fdt::fdt_index_phandle_entry, 16> phandle_storage{};
+ * reloco::array<structo::fdt::detail::fdt_index_build_frame, 16> stack_storage{};
  *
- * using index_type = reloco::fdt::fdt_index<reloco::external_vector>;
+ * using index_type = structo::fdt::fdt_index<reloco::external_vector>;
  * auto index_made = index_type::try_build(
  *     *reader_made,
- *     reloco::external_vector<reloco::fdt::fdt_index_node>(reloco::span(node_storage)),
- *     reloco::external_vector<reloco::fdt::fdt_index_phandle_entry>(reloco::span(phandle_storage)),
- *     reloco::external_vector<reloco::fdt::detail::fdt_index_build_frame>(reloco::span(stack_storage)));
+ *     reloco::external_vector<structo::fdt::fdt_index_node>(reloco::span(node_storage)),
+ *     reloco::external_vector<structo::fdt::fdt_index_phandle_entry>(reloco::span(phandle_storage)),
+ *     reloco::external_vector<structo::fdt::detail::fdt_index_build_frame>(reloco::span(stack_storage)));
  * if (!index_made)
  *   return index_made.error();
  * auto index = std::move(index_made).value();
@@ -66,16 +66,16 @@
  * No floating point is used anywhere in this file.
  */
 
+#include "fdt_reader.hpp"
 #include <reloco/detail/assert.hpp>
-#include <reloco/detail/fdt_format.hpp>
 #include <reloco/error.hpp>
 #include <reloco/expected.hpp>
-#include "fdt_reader.hpp"
 #include <reloco/iterator.hpp>
 #include <reloco/lifetime.hpp>
 #include <reloco/optional.hpp>
 #include <reloco/span.hpp>
 #include <reloco/string_view.hpp>
+#include <structo/detail/fdt_format.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -157,8 +157,7 @@ template <typename C, typename T>
 struct has_fdt_index_container_shape<
     C, T,
     std::void_t<decltype(std::declval<C &>().size()), decltype(std::declval<C &>().empty()),
-                decltype(std::declval<C &>().clear()),
-                decltype(std::declval<C &>().try_push_back(std::declval<T>())),
+                decltype(std::declval<C &>().clear()), decltype(std::declval<C &>().try_push_back(std::declval<T>())),
                 decltype(std::declval<C &>().try_pop_back()), decltype(std::declval<C &>()[std::size_t{0}]),
                 decltype(std::declval<C &>().data())>>
     : std::bool_constant<std::is_convertible_v<decltype(std::declval<C &>().size()), std::size_t> &&
@@ -224,7 +223,7 @@ public:
   using item_type = result<fdt_property_view>;
 
   fdt_index_property_iterator(span<const std::byte> struct_region, span<const std::byte> strings_region,
-                               std::size_t start_offset) noexcept
+                              std::size_t start_offset) noexcept
       : struct_region_(struct_region), strings_region_(strings_region), cursor_(start_offset) {}
 
   [[nodiscard]] optional<item_type> next_impl() noexcept {
@@ -293,8 +292,7 @@ private:
  * index, phandle index, and the transient build-time stack); see
  * `detail::fdt_index_compatible_container` for the exact shape required.
  */
-template <template <typename T> class Container>
-class RELOCO_OWNER fdt_index {
+template <template <typename T> class Container> class RELOCO_OWNER fdt_index {
 public:
   using node_container = Container<fdt_index_node>;
   using phandle_container = Container<fdt_index_phandle_entry>;
@@ -325,7 +323,7 @@ public:
    * a previously-used, non-empty buffer is fine.
    */
   [[nodiscard]] static result<fdt_index> try_build(const fdt_reader &reader, node_container nodes,
-                                                    phandle_container phandles, frame_container scratch) noexcept {
+                                                   phandle_container phandles, frame_container scratch) noexcept {
     nodes.clear();
     phandles.clear();
     scratch.clear();
@@ -605,8 +603,9 @@ public:
   [[nodiscard]] optional<std::size_t> find_by_phandle(uint32_t phandle) const noexcept {
     const span<const fdt_index_phandle_entry> view(phandles_.data(), phandles_.size());
     const fdt_index_phandle_entry needle{phandle, 0};
-    auto found = view.binary_search_by(
-        needle, [](const fdt_index_phandle_entry &a, const fdt_index_phandle_entry &b) { return a.phandle < b.phandle; });
+    auto found = view.binary_search_by(needle, [](const fdt_index_phandle_entry &a, const fdt_index_phandle_entry &b) {
+      return a.phandle < b.phandle;
+    });
     if (!found)
       return nullopt;
     return optional<std::size_t>(view[*found].node);

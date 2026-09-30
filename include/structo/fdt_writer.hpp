@@ -30,16 +30,16 @@
  * No floating point is used anywhere in this file.
  */
 
+#include <cstdint>
+#include <cstring>
 #include <reloco/detail/assert.hpp>
-#include <reloco/detail/fdt_format.hpp>
 #include <reloco/error.hpp>
 #include <reloco/expected.hpp>
 #include <reloco/int_ops.hpp>
 #include <reloco/lifetime.hpp>
 #include <reloco/span.hpp>
 #include <reloco/string_view.hpp>
-#include <cstdint>
-#include <cstring>
+#include <structo/detail/fdt_format.hpp>
 
 namespace structo::fdt {
 
@@ -75,7 +75,7 @@ RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
  * Usage:
  * @code
  * std::byte storage[4096];
- * auto made = reloco::fdt::fdt_writer::try_create(reloco::span<std::byte>(storage, sizeof(storage)));
+ * auto made = structo::fdt::fdt_writer::try_create(reloco::span<std::byte>(storage, sizeof(storage)));
  * if (!made)
  *   return made.error();
  * auto w = std::move(made).value();
@@ -277,8 +277,8 @@ public:
    * blob), if any node was left open, or if the span had no room for the
    * trailing `FDT_END` marker.
    */
-  [[nodiscard]] result<span<const std::byte>> finish() & noexcept
-      RELOCO_CALLABLE_WHEN("unconsumed", "consumed") RELOCO_SET_TYPESTATE(consumed) {
+  [[nodiscard]] result<span<const std::byte>> finish() & noexcept RELOCO_CALLABLE_WHEN("unconsumed", "consumed")
+      RELOCO_SET_TYPESTATE(consumed) {
     if (finished_)
       return out_.subspan(0, final_total_size_); // Idempotent: mirrors microfmt::cbor's writers' closed_ guard.
     if (auto r = check_ok(); !r)

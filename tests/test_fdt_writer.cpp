@@ -5,11 +5,11 @@
 #include <gtest/gtest.h>
 #include <structo/fdt_writer.hpp>
 
-#include <array>
 #include <cstring>
+#include <reloco/array.hpp>
 
-using structo::error;
-using structo::span;
+using reloco::error;
+using reloco::span;
 using structo::fdt::fdt_writer;
 
 namespace {
@@ -26,12 +26,12 @@ uint32_t read_be32(span<const std::byte> blob, std::size_t offset) {
 // `structo::fdt::detail::read_cstring`'s own pointer-arithmetic + explicit
 // unsafe-buffer-usage opt-out, since the bound (`i - offset`, computed by
 // the preceding bounds-checked scan) is already proven safe.
-structo::string_view read_cstring(span<const std::byte> blob, std::size_t offset) {
+reloco::string_view read_cstring(span<const std::byte> blob, std::size_t offset) {
   std::size_t i = offset;
   while (i < blob.size() && blob[i] != std::byte{0})
     ++i;
   RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
-  structo::string_view result(reinterpret_cast<const char *>(blob.data() + offset), i - offset);
+  reloco::string_view result(reinterpret_cast<const char *>(blob.data() + offset), i - offset);
   RELOCO_END_UNSAFE_BUFFER_USAGE
   return result;
 }
@@ -39,14 +39,14 @@ structo::string_view read_cstring(span<const std::byte> blob, std::size_t offset
 } // namespace
 
 TEST(FdtWriterTest, TryCreateRejectsSpanTooSmallForFixedOverhead) {
-  std::array<std::byte, 8> storage{};
+  reloco::array<std::byte, 8> storage{};
   auto made = fdt_writer::try_create(span<std::byte>(storage.data(), storage.size()));
   ASSERT_FALSE(made);
   EXPECT_EQ(made.error(), error::allocation_failed);
 }
 
 TEST(FdtWriterTest, EmptyRootNodeProducesValidHeader) {
-  std::array<std::byte, 256> storage{};
+  reloco::array<std::byte, 256> storage{};
   auto made = fdt_writer::try_create(span<std::byte>(storage.data(), storage.size()));
   ASSERT_TRUE(made);
   fdt_writer w = std::move(made).value();
@@ -64,7 +64,7 @@ TEST(FdtWriterTest, EmptyRootNodeProducesValidHeader) {
 }
 
 TEST(FdtWriterTest, MemReserveEntryIsWrittenBeforeStructBlock) {
-  std::array<std::byte, 256> storage{};
+  reloco::array<std::byte, 256> storage{};
   auto made = fdt_writer::try_create(span<std::byte>(storage.data(), storage.size()));
   ASSERT_TRUE(made);
   fdt_writer w = std::move(made).value();
@@ -88,7 +88,7 @@ TEST(FdtWriterTest, MemReserveEntryIsWrittenBeforeStructBlock) {
 }
 
 TEST(FdtWriterTest, MemReserveAfterStructStartedIsRejected) {
-  std::array<std::byte, 256> storage{};
+  reloco::array<std::byte, 256> storage{};
   auto made = fdt_writer::try_create(span<std::byte>(storage.data(), storage.size()));
   ASSERT_TRUE(made);
   fdt_writer w = std::move(made).value();
@@ -99,7 +99,7 @@ TEST(FdtWriterTest, MemReserveAfterStructStartedIsRejected) {
 }
 
 TEST(FdtWriterTest, UnbalancedNodesFailFinish) {
-  std::array<std::byte, 256> storage{};
+  reloco::array<std::byte, 256> storage{};
   auto made = fdt_writer::try_create(span<std::byte>(storage.data(), storage.size()));
   ASSERT_TRUE(made);
   fdt_writer w = std::move(made).value();
@@ -113,7 +113,7 @@ TEST(FdtWriterTest, UnbalancedNodesFailFinish) {
 }
 
 TEST(FdtWriterTest, EndNodeWithoutBeginNodeIsRejected) {
-  std::array<std::byte, 256> storage{};
+  reloco::array<std::byte, 256> storage{};
   auto made = fdt_writer::try_create(span<std::byte>(storage.data(), storage.size()));
   ASSERT_TRUE(made);
   fdt_writer w = std::move(made).value();
@@ -125,7 +125,7 @@ TEST(FdtWriterTest, EndNodeWithoutBeginNodeIsRejected) {
 }
 
 TEST(FdtWriterTest, PropertiesRoundTripThroughStructAndStringBlocks) {
-  std::array<std::byte, 512> storage{};
+  reloco::array<std::byte, 512> storage{};
   auto made = fdt_writer::try_create(span<std::byte>(storage.data(), storage.size()));
   ASSERT_TRUE(made);
   fdt_writer w = std::move(made).value();
@@ -176,7 +176,7 @@ TEST(FdtWriterTest, PropertiesRoundTripThroughStructAndStringBlocks) {
 }
 
 TEST(FdtWriterTest, DuplicatePropertyNamesShareOneStringTableEntry) {
-  std::array<std::byte, 512> storage{};
+  reloco::array<std::byte, 512> storage{};
   auto made = fdt_writer::try_create(span<std::byte>(storage.data(), storage.size()));
   ASSERT_TRUE(made);
   fdt_writer w = std::move(made).value();
@@ -200,11 +200,11 @@ TEST(FdtWriterTest, StructBlockOverflowFailsGracefully) {
   // Only enough room for the header + mem_rsvmap terminator + FDT_END; any
   // node/property write must fail with allocation_failed rather than
   // corrupting memory.
-  std::array<std::byte, 64> storage{};
+  reloco::array<std::byte, 64> storage{};
   auto made = fdt_writer::try_create(span<std::byte>(storage.data(), storage.size()));
   ASSERT_TRUE(made);
   fdt_writer w = std::move(made).value();
-  structo::result<void> res = structo::unexpected(error::allocation_failed);
+  reloco::result<void> res = reloco::unexpected(error::allocation_failed);
   for (int i = 0; i < 64; ++i) {
     res = w.begin_node("a-fairly-long-node-name-to-exhaust-the-span");
     if (!res)
@@ -215,12 +215,12 @@ TEST(FdtWriterTest, StructBlockOverflowFailsGracefully) {
 }
 
 TEST(FdtWriterTest, MidWriteFailureIsLatchedAndFinishFails) {
-  std::array<std::byte, 64> storage{};
+  reloco::array<std::byte, 64> storage{};
   auto made = fdt_writer::try_create(span<std::byte>(storage.data(), storage.size()));
   ASSERT_TRUE(made);
   fdt_writer w = std::move(made).value();
   // Fill the tiny span with node opens until one overflows the buffer.
-  structo::result<void> failure = structo::unexpected(error::allocation_failed);
+  reloco::result<void> failure = reloco::unexpected(error::allocation_failed);
   for (int i = 0; i < 64; ++i) {
     failure = w.begin_node("a-fairly-long-node-name-to-exhaust-the-span");
     if (!failure)
@@ -237,7 +237,7 @@ TEST(FdtWriterTest, MidWriteFailureIsLatchedAndFinishFails) {
 }
 
 TEST(FdtWriterTest, FinishTwiceFailsOnSecondCall) {
-  std::array<std::byte, 256> storage{};
+  reloco::array<std::byte, 256> storage{};
   auto made = fdt_writer::try_create(span<std::byte>(storage.data(), storage.size()));
   ASSERT_TRUE(made);
   fdt_writer w = std::move(made).value();

@@ -18,9 +18,9 @@
 #include <structo/fdt_index.hpp>
 #include <structo/fdt_reader.hpp>
 
-using structo::array;
-using structo::external_vector;
-using structo::span;
+using reloco::array;
+using reloco::external_vector;
+using reloco::span;
 using structo::fdt::fdt_index;
 using structo::fdt::fdt_index_node;
 using structo::fdt::fdt_index_phandle_entry;
@@ -40,7 +40,7 @@ struct real_world_index_storage {
   array<fdt_index_phandle_entry, 32> phandles{};
   array<build_frame, 16> stack{};
 
-  [[nodiscard]] structo::result<index_type> build(const fdt_reader &reader) {
+  [[nodiscard]] reloco::result<index_type> build(const fdt_reader &reader) {
     return index_type::try_build(
         reader, external_vector<fdt_index_node>(span<fdt_index_node>(nodes.data(), nodes.size())),
         external_vector<fdt_index_phandle_entry>(span<fdt_index_phandle_entry>(phandles.data(), phandles.size())),
@@ -129,7 +129,7 @@ TEST(FdtRealWorldTest, FindByPathNavigatesQemuVirtLayout) {
   EXPECT_TRUE(stdout_path->has_value());
 
   EXPECT_FALSE(idx.find_by_path("/no/such/node"));
-  EXPECT_EQ(idx.find_by_path("/no/such/node").error(), structo::error::not_found);
+  EXPECT_EQ(idx.find_by_path("/no/such/node").error(), reloco::error::not_found);
 }
 
 TEST(FdtRealWorldTest, EveryPhandleRoundTripsThroughFindByPhandle) {

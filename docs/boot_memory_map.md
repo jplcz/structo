@@ -18,8 +18,8 @@ auto seed = map->try_largest_free_region();
 ```
 
 - `try_from_dtb(reloco::span<const std::byte>)` parses the blob with
-  `reloco::fdt::fdt_reader::try_create` and extracts its memory
-  description with `reloco::fdt::try_extract_memory` in one call. Fails
+  `structo::fdt::fdt_reader::try_create` and extracts its memory
+  description with `structo::fdt::try_extract_memory` in one call. Fails
   with `error::not_found` if no `/memory`-class node exists, or whatever
   error a malformed `reg` property or a too-small `Capacity` reports.
 - `try_largest_free_region()` returns the single biggest `free` region

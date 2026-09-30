@@ -31,9 +31,9 @@ using node_vec = structo::external_vector<structo::fdt::fdt_index_node>;
 using phandle_vec = structo::external_vector<structo::fdt::fdt_index_phandle_entry>;
 using frame_vec = structo::external_vector<structo::fdt::detail::fdt_index_build_frame>;
 
-std::array<structo::fdt::fdt_index_node, 64> node_storage{};
-std::array<structo::fdt::fdt_index_phandle_entry, 32> phandle_storage{};
-std::array<structo::fdt::detail::fdt_index_build_frame, 16> stack_storage{};
+reloco::array<structo::fdt::fdt_index_node, 64> node_storage{};
+reloco::array<structo::fdt::fdt_index_phandle_entry, 32> phandle_storage{};
+reloco::array<structo::fdt::detail::fdt_index_build_frame, 16> stack_storage{};
 
 auto made = structo::fdt::fdt_index<structo::external_vector>::try_build(
     reader, node_vec(structo::span(node_storage)), phandle_vec(structo::span(phandle_storage)),

@@ -5,7 +5,7 @@
 #pragma once
 
 /** @file fdt_memory.hpp
- * @brief `reloco::fdt::try_extract_memory`: reads a devicetree's physical
+ * @brief `structo::fdt::try_extract_memory`: reads a devicetree's physical
  * memory description straight off a single-pass `fdt_reader` -- no
  * `fdt_index` build step, no per-node index buffers -- into two
  * caller-provided `reloco::region_set`s: one describing every byte of

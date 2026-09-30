@@ -7,8 +7,8 @@
 /** @file boot_memory_map.hpp
  * @brief `structo::boot_memory_map<Capacity, PhysInt>`: a caller-owned,
  * allocation-free physical memory map decoded straight from a Flattened
- * Device Tree (DTB) blob, built on `reloco::fdt::fdt_reader` +
- * `reloco::fdt::try_extract_memory` + `reloco::region_set`.
+ * Device Tree (DTB) blob, built on `structo::fdt::fdt_reader` +
+ * `structo::fdt::try_extract_memory` + `reloco::region_set`.
  *
  * This is the first thing a kernel/hypervisor boot path typically needs
  * once it has the raw DTB pointer handed to it by firmware/bootloader:
@@ -22,9 +22,9 @@
  * a first arena/buddy allocator before the rest of `free` is folded in.
  */
 
-#include <reloco/fdt_memory.hpp>
-#include <reloco/fdt_reader.hpp>
-#include <reloco/region_set.hpp>
+#include <structo/fdt_memory.hpp>
+#include <structo/fdt_reader.hpp>
+#include <structo/region_set.hpp>
 
 namespace structo {
 
@@ -39,23 +39,22 @@ namespace structo {
  * @tparam PhysInt Physical-address integer type (default: `uint64_t`).
  */
 template <std::size_t Capacity, typename PhysInt = std::uint64_t> struct boot_memory_map {
-  reloco::region_set<Capacity, PhysInt> full;
-  reloco::region_set<Capacity, PhysInt> free;
+  structo::region_set<Capacity, PhysInt> full;
+  structo::region_set<Capacity, PhysInt> free;
 
   /** @brief Parses @p dtb_blob as a Flattened Device Tree and extracts
    * its physical memory description. Fails with whatever error
-   * `reloco::fdt::fdt_reader::try_create` or
-   * `reloco::fdt::try_extract_memory` reports: a malformed/truncated
+   * `structo::fdt::fdt_reader::try_create` or
+   * `structo::fdt::try_extract_memory` reports: a malformed/truncated
    * blob, no `/memory`-class node, a malformed `reg` property, or
    * `Capacity` being too small for the blob's region count. */
-  [[nodiscard]] static reloco::result<boot_memory_map>
-  try_from_dtb(reloco::span<const std::byte> dtb_blob) noexcept {
-    auto reader = reloco::fdt::fdt_reader::try_create(dtb_blob);
+  [[nodiscard]] static reloco::result<boot_memory_map> try_from_dtb(reloco::span<const std::byte> dtb_blob) noexcept {
+    auto reader = structo::fdt::fdt_reader::try_create(dtb_blob);
     if (!reader)
       return reloco::unexpected(reader.error());
 
     boot_memory_map out;
-    auto extracted = reloco::fdt::try_extract_memory(*reader, out.full, out.free);
+    auto extracted = structo::fdt::try_extract_memory(*reader, out.full, out.free);
     if (!extracted)
       return reloco::unexpected(extracted.error());
 
@@ -66,7 +65,7 @@ template <std::size_t Capacity, typename PhysInt = std::uint64_t> struct boot_me
    * to seed a first-stage (arena/buddy) allocator from before the
    * remainder of `free` is folded in. Fails with `error::not_found` if
    * `free` is empty. */
-  [[nodiscard]] reloco::result<reloco::memory_region<PhysInt>> try_largest_free_region() const noexcept {
+  [[nodiscard]] reloco::result<structo::memory_region<PhysInt>> try_largest_free_region() const noexcept {
     if (free.empty())
       return reloco::unexpected(reloco::error::not_found);
 

@@ -35,7 +35,7 @@ void format_shared_page(void *memory, uint32_t capacity_bytes) {
 }
 
 struct SharedMemorySim {
-  alignas(RELOCO_IPC_CACHE_LINE) std::array<uint8_t, 4096> memory{};
+  alignas(RELOCO_IPC_CACHE_LINE) reloco::array<uint8_t, 4096> memory{};
   void *data() { return memory.data(); }
   reloco_ipc_spsc_page *get_page() { return std::launder(static_cast<reloco_ipc_spsc_page *>(data())); }
 };

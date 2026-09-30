@@ -6,8 +6,6 @@
 #include <structo/fdt_memory.hpp>
 #include <structo/fdt_writer.hpp>
 
-#include <array>
-
 using structo::error;
 using structo::region_set;
 using structo::result;
@@ -82,7 +80,7 @@ result<span<const std::byte>> build_full_tree(span<std::byte> storage) {
 } // namespace
 
 TEST(FdtMemoryTest, ExtractsFullAndFreeMemoryExcludingReservations) {
-  std::array<std::byte, 1024> storage{};
+  reloco::array<std::byte, 1024> storage{};
   auto blob = build_full_tree(span<std::byte>(storage.data(), storage.size()));
   ASSERT_TRUE(blob);
 
@@ -108,7 +106,7 @@ TEST(FdtMemoryTest, ExtractsFullAndFreeMemoryExcludingReservations) {
 }
 
 TEST(FdtMemoryTest, FailsWithNotFoundWhenNoMemoryClassNodePresent) {
-  std::array<std::byte, 256> storage{};
+  reloco::array<std::byte, 256> storage{};
   auto made = fdt_writer::try_create(span<std::byte>(storage.data(), storage.size()));
   ASSERT_TRUE(made);
   fdt_writer w = std::move(made).value();
@@ -129,7 +127,7 @@ TEST(FdtMemoryTest, FailsWithNotFoundWhenNoMemoryClassNodePresent) {
 }
 
 TEST(FdtMemoryTest, RecognizesSecureMemoryNodeByNameWithoutDeviceType) {
-  std::array<std::byte, 512> storage{};
+  reloco::array<std::byte, 512> storage{};
   auto made = fdt_writer::try_create(span<std::byte>(storage.data(), storage.size()));
   ASSERT_TRUE(made);
   fdt_writer w = std::move(made).value();
@@ -161,7 +159,7 @@ TEST(FdtMemoryTest, RecognizesSecureMemoryNodeByNameWithoutDeviceType) {
 }
 
 TEST(FdtMemoryTest, SecureMemoryNodeIsGatedBySecureStatusNotStatus) {
-  std::array<std::byte, 512> storage{};
+  reloco::array<std::byte, 512> storage{};
   auto made = fdt_writer::try_create(span<std::byte>(storage.data(), storage.size()));
   ASSERT_TRUE(made);
   fdt_writer w = std::move(made).value();
@@ -202,7 +200,7 @@ TEST(FdtMemoryTest, SecureMemoryNodeIsGatedBySecureStatusNotStatus) {
 }
 
 TEST(FdtMemoryTest, MemoryNodeWithNonOkayStatusOtherThanDisabledIsSkipped) {
-  std::array<std::byte, 512> storage{};
+  reloco::array<std::byte, 512> storage{};
   auto made = fdt_writer::try_create(span<std::byte>(storage.data(), storage.size()));
   ASSERT_TRUE(made);
   fdt_writer w = std::move(made).value();

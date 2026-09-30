@@ -28,7 +28,7 @@
  * point is used anywhere in this file.
  */
 
-#include <reloco/detail/fdt_format.hpp>
+#include <cstdint>
 #include <reloco/error.hpp>
 #include <reloco/expected.hpp>
 #include <reloco/iterator.hpp>
@@ -36,7 +36,7 @@
 #include <reloco/optional.hpp>
 #include <reloco/span.hpp>
 #include <reloco/string_view.hpp>
-#include <cstdint>
+#include <structo/detail/fdt_format.hpp>
 
 namespace structo::fdt {
 
@@ -162,7 +162,7 @@ private:
  *
  * Usage:
  * @code
- * auto made = reloco::fdt::fdt_reader::try_create(blob);
+ * auto made = structo::fdt::fdt_reader::try_create(blob);
  * if (!made)
  *   return made.error();
  * auto r = std::move(made).value();
@@ -175,9 +175,9 @@ private:
  *   if (!ev)
  *     return ev.error();
  *   switch (ev->kind) {
- *   case reloco::fdt::fdt_event_kind::begin_node: // ev->node_name
- *   case reloco::fdt::fdt_event_kind::end_node:
- *   case reloco::fdt::fdt_event_kind::property: // ev->prop.name / ev->prop.value
+ *   case structo::fdt::fdt_event_kind::begin_node: // ev->node_name
+ *   case structo::fdt::fdt_event_kind::end_node:
+ *   case structo::fdt::fdt_event_kind::property: // ev->prop.name / ev->prop.value
  *     break;
  *   }
  * }
@@ -285,7 +285,7 @@ private:
 
   if (*magic_r != magic)
     return unexpected(error::invalid_argument);
-  if (*version_r < reloco::fdt::last_comp_version)
+  if (*version_r < structo::fdt::last_comp_version)
     return unexpected(error::invalid_argument);
 
   const auto totalsize = static_cast<std::size_t>(*totalsize_r);
@@ -317,7 +317,7 @@ private:
   // Every DTB in the wild (u-boot, QEMU, `dtc`) emits version 17; accept
   // anything back to the last format revision that uses this fixed
   // 10-field, 40-byte header layout (see `detail/fdt_format.hpp`).
-  if (*version_r < reloco::fdt::last_comp_version)
+  if (*version_r < structo::fdt::last_comp_version)
     return unexpected(error::invalid_argument);
 
   const auto totalsize = static_cast<std::size_t>(*totalsize_r);
@@ -348,7 +348,7 @@ private:
     return unexpected(error::out_of_bounds);
 
   return fdt_reader(logical, *mem_rsvmap_region_r, *struct_region_r, *strings_region_r, *version_r,
-                     *last_comp_version_r, *boot_cpuid_r);
+                    *last_comp_version_r, *boot_cpuid_r);
 }
 
 [[nodiscard]] inline optional<fdt_reader::item_type> fdt_reader::next_impl() noexcept {

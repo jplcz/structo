@@ -4,14 +4,11 @@
 
 #include <gtest/gtest.h>
 #include <structo/device_tree.hpp>
-
-#include <reloco/fdt_writer.hpp>
-
-#include <array>
+#include <structo/fdt_writer.hpp>
 
 using reloco::span;
 using reloco::unexpected;
-using reloco::fdt::fdt_writer;
+using structo::fdt::fdt_writer;
 
 namespace {
 
@@ -78,7 +75,7 @@ reloco::result<reloco::span<const std::byte>> build_sample_tree(reloco::span<std
 } // namespace
 
 TEST(DeviceTreeTest, TryOpenBuildsIndexOverCallerOwnedStorage) {
-  std::array<std::byte, 4096> raw{};
+  reloco::array<std::byte, 4096> raw{};
   auto blob = build_sample_tree(span<std::byte>(raw.data(), raw.size()));
   ASSERT_TRUE(blob);
 
@@ -91,7 +88,7 @@ TEST(DeviceTreeTest, TryOpenBuildsIndexOverCallerOwnedStorage) {
 }
 
 TEST(DeviceTreeTest, TryBootargsReturnsChosenBootargs) {
-  std::array<std::byte, 4096> raw{};
+  reloco::array<std::byte, 4096> raw{};
   auto blob = build_sample_tree(span<std::byte>(raw.data(), raw.size()));
   ASSERT_TRUE(blob);
 
@@ -105,7 +102,7 @@ TEST(DeviceTreeTest, TryBootargsReturnsChosenBootargs) {
 }
 
 TEST(DeviceTreeTest, TryStdoutPathReturnsChosenStdoutPath) {
-  std::array<std::byte, 4096> raw{};
+  reloco::array<std::byte, 4096> raw{};
   auto blob = build_sample_tree(span<std::byte>(raw.data(), raw.size()));
   ASSERT_TRUE(blob);
 
@@ -119,7 +116,7 @@ TEST(DeviceTreeTest, TryStdoutPathReturnsChosenStdoutPath) {
 }
 
 TEST(DeviceTreeTest, TryFindPropertyFailsWhenPathMissing) {
-  std::array<std::byte, 4096> raw{};
+  reloco::array<std::byte, 4096> raw{};
   auto blob = build_sample_tree(span<std::byte>(raw.data(), raw.size()));
   ASSERT_TRUE(blob);
 

@@ -9,11 +9,11 @@
 #include <structo/fdt_writer.hpp>
 #include <reloco/vector.hpp>
 
-using structo::array;
-using structo::error;
-using structo::external_vector;
-using structo::span;
-using structo::vector;
+using reloco::array;
+using reloco::error;
+using reloco::external_vector;
+using reloco::span;
+using reloco::vector;
 using structo::fdt::fdt_index;
 using structo::fdt::fdt_index_npos;
 using structo::fdt::fdt_index_phandle_entry;
@@ -34,7 +34,7 @@ struct index_storage {
   array<fdt_index_phandle_entry, 16> phandles{};
   array<build_frame, 16> stack{};
 
-  [[nodiscard]] structo::result<index_type> build(const fdt_reader &reader) {
+  [[nodiscard]] reloco::result<index_type> build(const fdt_reader &reader) {
     return index_type::try_build(
         reader, external_vector<fdt_index_node>(span<fdt_index_node>(nodes.data(), nodes.size())),
         external_vector<fdt_index_phandle_entry>(span<fdt_index_phandle_entry>(phandles.data(), phandles.size())),

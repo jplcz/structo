@@ -6,11 +6,10 @@
 #include <structo/fdt_reader.hpp>
 #include <structo/fdt_writer.hpp>
 
-#include <array>
 #include <vector>
 
-using structo::error;
-using structo::span;
+using reloco::error;
+using reloco::span;
 using structo::fdt::fdt_event_kind;
 using structo::fdt::fdt_reader;
 using structo::fdt::fdt_writer;
@@ -51,7 +50,7 @@ std::vector<std::byte> build_sample_blob() {
 } // namespace
 
 TEST(FdtReaderTest, TryCreateRejectsSpanTooSmallForHeader) {
-  std::array<std::byte, 8> storage{};
+  reloco::array<std::byte, 8> storage{};
   auto made = fdt_reader::try_create(span<const std::byte>(storage.data(), storage.size()));
   ASSERT_FALSE(made);
   EXPECT_EQ(made.error(), error::out_of_bounds);
@@ -74,7 +73,7 @@ TEST(FdtReaderTest, TryCreateRejectsTruncatedBlob) {
 }
 
 TEST(FdtReaderTest, TryProbeSizeRejectsSpanTooSmallForHeader) {
-  std::array<std::byte, 8> storage{};
+  reloco::array<std::byte, 8> storage{};
   auto probed = fdt_reader::try_probe_size(span<const std::byte>(storage.data(), storage.size()));
   ASSERT_FALSE(probed);
   EXPECT_EQ(probed.error(), error::out_of_bounds);
@@ -95,8 +94,7 @@ TEST(FdtReaderTest, TryProbeSizeReturnsDeclaredTotalsizeFromJustTheHeaderPrefix)
   // the whole point: learn how much more to map/allocate before the rest
   // of the blob is even available.
   ASSERT_GE(blob.size(), structo::fdt::detail::header_size);
-  auto probed =
-      fdt_reader::try_probe_size(span<const std::byte>(blob.data(), structo::fdt::detail::header_size));
+  auto probed = fdt_reader::try_probe_size(span<const std::byte>(blob.data(), structo::fdt::detail::header_size));
   ASSERT_TRUE(probed);
   EXPECT_EQ(*probed, blob.size());
 
@@ -151,7 +149,7 @@ TEST(FdtReaderTest, StructureEventsRoundTripInDepthFirstOrder) {
     fdt_event_kind kind;
     const char *name; // node name (begin_node) or property name (property); unused for end_node.
   };
-  const std::array<expected_event, 9> expected = {{
+  const reloco::array<expected_event, 9> expected = {{
       {fdt_event_kind::begin_node, ""},
       {fdt_event_kind::property, "#address-cells"},
       {fdt_event_kind::property, "compatible"},
@@ -264,7 +262,7 @@ TEST(FdtReaderTest, UnknownTokenInStructBlockFailsThatEventThenExhausts) {
 }
 
 TEST(FdtReaderTest, UnbalancedEndNodeFailsThatEventThenExhausts) {
-  std::array<std::byte, 256> storage{};
+  reloco::array<std::byte, 256> storage{};
   auto made_writer = fdt_writer::try_create(span<std::byte>(storage.data(), storage.size()));
   auto w = std::move(made_writer).value();
   // A single, correctly-balanced empty root node; we then hand-splice an
@@ -295,7 +293,7 @@ TEST(FdtReaderTest, UnbalancedEndNodeFailsThatEventThenExhausts) {
   // FDT_BEGIN_NODE, name (4 padded bytes), FDT_END_NODE, FDT_END -- insert
   // the extra FDT_END_NODE right before the final FDT_END token.
   const std::size_t insert_at = off_dt_struct + size_dt_struct - 4;
-  const std::array<std::byte, 4> extra_end_node = {std::byte{0}, std::byte{0}, std::byte{0}, std::byte{2}};
+  const reloco::array<std::byte, 4> extra_end_node = {std::byte{0}, std::byte{0}, std::byte{0}, std::byte{2}};
   blob.insert(blob.begin() + static_cast<std::ptrdiff_t>(insert_at), extra_end_node.begin(), extra_end_node.end());
 
   // Fix up every header field that counts bytes at or after the insertion
@@ -338,7 +336,7 @@ TEST(FdtReaderTest, InteroperatesWithFdtWriterRoundTripAcrossMultipleSizes) {
   ASSERT_TRUE(w.property_u32("#address-cells", 2));
   for (int i = 0; i < 16; ++i) {
     std::string name = "node" + std::to_string(i);
-    ASSERT_TRUE(w.begin_node(structo::string_view(name.data(), name.size())));
+    ASSERT_TRUE(w.begin_node(reloco::string_view(name.data(), name.size())));
     ASSERT_TRUE(w.property_u32("#address-cells", static_cast<uint32_t>(i))); // shared string-table entry
     ASSERT_TRUE(w.end_node());
   }

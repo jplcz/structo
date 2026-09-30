@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <reloco/error.hpp>
 #include "phys_addr.hpp"
+#include <reloco/error.hpp>
 #include <reloco/vector.hpp>
 
 namespace structo {
@@ -93,7 +93,7 @@ private:
   Container c_;
 };
 
-/** @brief Propagates relocatability from an SG list's container element type. */
-template <typename T> struct is_trivially_relocatable<sg_list<T>> : is_trivially_relocatable<T> {};
-
 } // namespace structo
+
+/** @brief Propagates relocatability from an SG list's container element type. */
+template <typename T> struct reloco::is_trivially_relocatable<structo::sg_list<T>> : is_trivially_relocatable<T> {};

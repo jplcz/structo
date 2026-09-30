@@ -4,14 +4,11 @@
 
 #include <gtest/gtest.h>
 #include <structo/boot_memory_map.hpp>
-
-#include <reloco/fdt_writer.hpp>
-
-#include <array>
+#include <structo/fdt_writer.hpp>
 
 using reloco::span;
 using reloco::unexpected;
-using reloco::fdt::fdt_writer;
+using structo::fdt::fdt_writer;
 
 namespace {
 
@@ -68,7 +65,7 @@ reloco::result<reloco::span<const std::byte>> build_sample_tree(reloco::span<std
 } // namespace
 
 TEST(BootMemoryMapTest, TryFromDtbExtractsFullAndFreeRanges) {
-  std::array<std::byte, 1024> storage{};
+  reloco::array<std::byte, 1024> storage{};
   auto blob = build_sample_tree(span<std::byte>(storage.data(), storage.size()));
   ASSERT_TRUE(blob);
 
@@ -85,7 +82,7 @@ TEST(BootMemoryMapTest, TryFromDtbExtractsFullAndFreeRanges) {
 }
 
 TEST(BootMemoryMapTest, TryLargestFreeRegionReturnsTheOnlyRegion) {
-  std::array<std::byte, 1024> storage{};
+  reloco::array<std::byte, 1024> storage{};
   auto blob = build_sample_tree(span<std::byte>(storage.data(), storage.size()));
   ASSERT_TRUE(blob);
 
@@ -101,7 +98,7 @@ TEST(BootMemoryMapTest, TryLargestFreeRegionReturnsTheOnlyRegion) {
 
 TEST(BootMemoryMapTest, TryLargestFreeRegionFailsWhenEmpty) {
   // No /memory node at all: try_from_dtb itself fails with not_found.
-  std::array<std::byte, 256> storage{};
+  reloco::array<std::byte, 256> storage{};
   auto made = fdt_writer::try_create(span<std::byte>(storage.data(), storage.size()));
   ASSERT_TRUE(made);
   fdt_writer w = std::move(made).value();

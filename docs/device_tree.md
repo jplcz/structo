@@ -19,7 +19,7 @@ auto prop     = dt->try_find_property("/soc/uart@9000000", "clock-frequency");
 ```
 
 - `device_tree_storage` owns the `reloco::array`-backed node/phandle/
-  build-scratch buffers `reloco::fdt::fdt_index::try_build` requires;
+  build-scratch buffers `structo::fdt::fdt_index::try_build` requires;
   size each capacity from a known bound on the target's DTB.
 - `try_open(blob, storage)` builds both the `fdt_reader` and the
   `fdt_index` over `storage` in one call.

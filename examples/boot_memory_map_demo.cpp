@@ -8,14 +8,12 @@
 // from before any heap exists.
 
 #include <structo/boot_memory_map.hpp>
+#include <structo/fdt_writer.hpp>
 
-#include <reloco/fdt_writer.hpp>
-
-#include <array>
 #include <cstdio>
 
 using reloco::span;
-using reloco::fdt::fdt_writer;
+using structo::fdt::fdt_writer;
 
 namespace {
 
@@ -69,7 +67,7 @@ reloco::result<reloco::span<const std::byte>> build_demo_blob(reloco::span<std::
 } // namespace
 
 int main() {
-  std::array<std::byte, 1024> storage{};
+  reloco::array<std::byte, 1024> storage{};
   auto blob = build_demo_blob(span<std::byte>(storage.data(), storage.size()));
   if (!blob) {
     std::fprintf(stderr, "failed to build demo DTB\n");

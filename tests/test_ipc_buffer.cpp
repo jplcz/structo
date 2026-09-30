@@ -24,7 +24,7 @@ void format_shared_page(void *memory, uint32_t capacity_bytes) {
 }
 
 struct SharedMemorySim {
-  alignas(RELOCO_IPC_CACHE_LINE) std::array<uint8_t, 4096> memory{};
+  alignas(RELOCO_IPC_CACHE_LINE) reloco::array<uint8_t, 4096> memory{};
   void *data() { return memory.data(); }
   reloco_ipc_spsc_page *get_page() { return std::launder(static_cast<reloco_ipc_spsc_page *>(data())); }
 };
@@ -63,12 +63,12 @@ TEST(IpcRingBufferCppTest, BasicByteStreamWriteAndRead) {
   auto p = reloco::ipc_producer::create(sim.data(), 32).value();
   auto c = reloco::ipc_consumer::create(sim.data(), 32).value();
 
-  std::array<uint8_t, 4> in_data = {0xDE, 0xAD, 0xBE, 0xEF};
+  reloco::array<uint8_t, 4> in_data = {0xDE, 0xAD, 0xBE, 0xEF};
 
   // Write 4 bytes
   EXPECT_EQ(4, p.try_write(reloco::span<const uint8_t>(in_data.data(), in_data.size())).value());
 
-  std::array<uint8_t, 6> out_data = {0};
+  reloco::array<uint8_t, 6> out_data = {0};
 
   // try_read is strictly all-or-nothing: requesting 6 bytes when only 4
   // are available is a benign "not enough data yet" (Ok(0)), not a
