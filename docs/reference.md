@@ -31,6 +31,7 @@ exists and where.
 | `arch/cpu_index.hpp` | `cpu_index<Tag>`, `uniprocessor_tag` | Zero-overhead CRTP-style "which logical CPU is this" wrapper plus core operations (yield, WFE/SEV, BSP detection, hardware ID), delegated to a caller-provided `Tag` policy |
 | `arch/hw_id_map.hpp` | `hw_id_lut<HwId, MaxCpus, L1Size, Hash>`, `default_hw_id_hash` | Allocation-free, two-tier (hash-filtered L1 + sorted L2 fallback) lookup table mapping a hardware ID (e.g. MPIDR_EL1) to a logical CPU index |
 | `arch/lazy_context.hpp` | `lazy_context<Traits, CpuId>`, `lazy_context_switcher<Traits, CpuId>`, `static_per_cpu_storage<MaxCpus, Context, CpuId>` | Lazy/deferred per-thread coprocessor-state (FPU, vector registers, ...) context-switching framework, saving/restoring hardware state only on first trapped use |
+| `arch/per_cpu_ptr.hpp` | `per_cpu_ptr<Tag, T>` | Storage-free, type-safe resolver for a per-CPU `T*`, keyed by `Tag` and backed entirely by `Tag`'s own OS-specific per-CPU mechanism |
 | `sync/irq_guard.hpp` | `irq_guard<Traits>`, `irq_locked<T, Traits>`, `critical_section_token`, `with_irq_disabled` | RAII interrupt-disable guard, proof-token-gated data wrapper, and functional helper for interrupt-safe kernel code |
 
 ## structo's own headers
@@ -70,4 +71,5 @@ and live under `include/structo/arch/` and `include/structo/sync/`:
 - [`cpu_index.md`](cpu_index.md) -- logical-CPU resolution and core operations
 - [`hw_id_map.md`](hw_id_map.md) -- hardware-ID-to-CPU-index lookup table
 - [`lazy_context.md`](lazy_context.md) -- lazy per-thread coprocessor-state context switching
+- [`per_cpu_ptr.md`](per_cpu_ptr.md) -- storage-free, Tag-keyed per-CPU typed-pointer resolver
 - [`irq_guard.md`](irq_guard.md) -- RAII interrupt-disable guard and critical-section helpers
