@@ -220,6 +220,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_lazy_context.cpp
         tests/test_cpu_index.cpp
         tests/test_hw_id_map.cpp
+        tests/test_irq_guard.cpp
     )
     target_link_libraries(jplcz_structo_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)
