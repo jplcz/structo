@@ -88,6 +88,24 @@ and deliberately out of scope here, matching `io_space_ref.hpp`'s divide
 between address-tagging/bookkeeping and the backend-specific access
 itself.
 
+## Thread safety
+
+`asid_allocator` performs **no internal synchronization** -- `allocate()`,
+`release()`, and any generation rollover they trigger mutate shared state
+(the bitmap, the generation counter, the `active[]` tracking array) with
+no locking or atomics whatsoever, matching every other bookkeeping header
+in this library. A single instance may only be driven from one logical
+thread of execution at a time; concurrent callers (multiple cores
+context-switching at once, or an interrupt reentering a context switch
+already in progress) must serialize access themselves -- for instance by
+wrapping the instance in `structo::sync::irq_locked<asid_allocator<Tag,
+MaxActive>>` (single-core interrupt exclusion) composed with a
+caller-supplied cross-core spinlock when the allocator is shared across
+cores. This mirrors how real kernels guard their own ASID bookkeeping
+(e.g. Linux arm64's `cpu_asid_lock`) and keeps this header from forcing a
+synchronization policy -- or its cost -- onto callers (including
+single-core targets) that don't need one.
+
 ## API
 
 - `try_allocate(allocator_ref alloc, std::size_t asid_bits)` /

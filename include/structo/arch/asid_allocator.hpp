@@ -100,6 +100,26 @@
  * between address-tagging/bookkeeping and the backend-specific access
  * itself.
  *
+ * ## Thread safety
+ *
+ * `asid_allocator` has NO internal synchronization: `allocate()`,
+ * `release()`, and the generation rollover they may trigger all mutate
+ * shared state (the bitmap, the generation counter, and the `active[]`
+ * tracking array) without any locking or atomics, exactly like every
+ * other bookkeeping header in this library. A single instance is only
+ * safe to use from one logical thread of execution at a time; concurrent
+ * callers (e.g. multiple cores context-switching concurrently, or an
+ * interrupt handler reentering a context switch in progress) MUST
+ * serialize their own access externally -- for example by guarding the
+ * instance with `structo::sync::irq_locked<asid_allocator<Tag, MaxActive>>`
+ * (interrupt exclusion on a single core) composed with a caller-supplied
+ * cross-core spinlock where the allocator is shared across cores, which
+ * is exactly how real kernels guard their own ASID allocator state (e.g.
+ * Linux arm64's `cpu_asid_lock`). This is a deliberate design choice, not
+ * an oversight: baking a specific locking policy into this header would
+ * force every caller -- including single-core, uniprocessor-only
+ * embedded targets -- to pay for synchronization they may not need.
+ *
  * @code
  * // Probed once at boot, e.g. from ID_AA64MMFR0_EL1.ASIDBits.
  * std::size_t hw_asid_bits = probe_asid_bits();
