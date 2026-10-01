@@ -81,6 +81,23 @@
  *   arch_write_ttbr0_asid(mm.page_table_base, allocator.asid_of(mm.asid_ctx.asid()));
  * }
  *
+ * // Deactivation: switching this core away from `old_mm` to run
+ * // `new_mm` instead. There is NO separate "deactivate" call on
+ * // `old_mm.asid_ctx` -- no allocator call, no TLB action, and
+ * // `old_mm.asid_ctx`'s cached ASID plus its `cpu_targets()` bit for
+ * // `core_id` are deliberately left exactly as they are. That is what
+ * // lets a tagged TLB skip a flush entirely on this path: `old_mm`'s
+ * // entries stay cached, tagged with its ASID, ready for an instant,
+ * // flush-free `activate_mm()` later if it is scheduled back in. All of
+ * // the actual work is just `new_mm`'s own `activate_mm()` above,
+ * // overwriting the allocator's per-core slot for `core_id` -- which is
+ * // how `old_mm` implicitly stops being "the resident context on this
+ * // core" without any explicit call back into `old_mm.asid_ctx`.
+ * void switch_mm(allocator_type &allocator, mm_context &old_mm, mm_context &new_mm, std::size_t core_id) {
+ *   (void)old_mm; // nothing to do here -- see comment above
+ *   activate_mm(allocator, new_mm, core_id);
+ * }
+ *
  * // In-place mapping change (munmap/mprotect) while `mm` stays resident
  * // on any number of cores -- no allocator lock needed at all.
  * void flush_mm_mappings_smp(const allocator_type &allocator, const mm_context &mm) {

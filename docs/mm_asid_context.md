@@ -77,6 +77,11 @@ cookbook: the lock-free, embedded cpu mask.
   lock-free cpu mask. Returns `flush_required` (whether a generation
   rollover just happened) or `error::invalid_argument` if `cpu >=
   MaxActive`.
+- **Deactivation has no corresponding method at all.** Switching a core
+  away from one `mm_asid_context` to another requires no call on the
+  outgoing context -- not even `activate()` -- only `activate()` on the
+  *incoming* one. Leave the outgoing context's `asid()` and
+  `cpu_targets()` bit untouched; see the `switch_mm()` example below.
 - `release(allocator)` -- returns the ASID to `allocator`'s free pool.
   Performs no TLB action and does not clear `cpu_targets()` by design; the
   caller must flush (using `cpu_targets()`) *before* calling this.
@@ -107,6 +112,22 @@ void activate_mm(allocator_type &allocator, mm_context &mm, std::size_t core_id)
     arch_flush_tlb_all(); // global, non-tagged: a rollover just happened
   }
   arch_write_ttbr0_asid(mm.page_table_base, allocator.asid_of(mm.asid_ctx.asid()));
+}
+
+// Deactivation: switching this core away from `old_mm` to run `new_mm`
+// instead. There is NO separate "deactivate" call on `old_mm.asid_ctx` --
+// no allocator call, no TLB action, and `old_mm.asid_ctx`'s cached ASID
+// plus its `cpu_targets()` bit for `core_id` are deliberately left exactly
+// as they are. That is what lets a tagged TLB skip a flush entirely on
+// this path: `old_mm`'s entries stay cached, tagged with its ASID, ready
+// for an instant, flush-free `activate_mm()` later if it is scheduled
+// back in. All of the actual work is just `new_mm`'s own `activate_mm()`
+// above, overwriting the allocator's per-core slot for `core_id` -- which
+// is how `old_mm` implicitly stops being "the resident context on this
+// core" without any explicit call back into `old_mm.asid_ctx`.
+void switch_mm(allocator_type &allocator, mm_context &old_mm, mm_context &new_mm, std::size_t core_id) {
+  (void)old_mm; // nothing to do here -- see comment above
+  activate_mm(allocator, new_mm, core_id);
 }
 
 // In-place mapping change (munmap/mprotect) while `mm` stays resident on
