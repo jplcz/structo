@@ -119,4 +119,7 @@ See also: [`asid_allocator.md`](asid_allocator.md) (the architecture-
 agnostic-bookkeeping philosophy this header follows), [`target_ptr.md`](target_ptr.md)
 (the `target_ptr_space_traits<SpaceTag>` declared-but-undefined-hook
 pattern `page_table_entry_traits<Tag>` mirrors), [`phys_page.md`](phys_page.md)
-(`page_traits<Size, Shift>`, used here as the leaf-page-size parameter).
+(`page_traits<Size, Shift>`, used here as the leaf-page-size parameter),
+[`page_table_arch_configs.md`](page_table_arch_configs.md) (ready-made
+configs built from these primitives for ARM64, ARMv7-LPAE, RISC-V, and
+x86/x86-64).

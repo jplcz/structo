@@ -59,6 +59,62 @@ TEST_F(ArchPageTableTraitsTest, Arm64Level2ShapeMatchesTwoLevel30BitVa) {
   EXPECT_EQ(cfg::page_offset(va), va & 0xFFFu);
 }
 
+// --- ARM64 (VMSAv8-64), 16KB granule -----------------------------------
+
+TEST_F(ArchPageTableTraitsTest, Arm64Level1_16kShapeMatchesThreeLevel47BitVa) {
+  using cfg = structo::arch::arm64::level1_16k;
+  static_assert(cfg::level_count == 3);
+  static_assert(cfg::va_bits == 47);
+  static_assert(cfg::entry_count<0>() == 2048);
+  static_assert(cfg::entry_count<1>() == 2048);
+  static_assert(cfg::entry_count<2>() == 2048);
+  static_assert(!cfg::allows_leaf<0>()); // no level-1 block mapping for 16KB granule
+  static_assert(cfg::allows_leaf<1>());  // 32MB block
+
+  constexpr std::uint64_t va = 0x0000'3ab1'2345'6000ull;
+  EXPECT_EQ(cfg::index_of<0>(va), (va >> 36) & 0x7FFu);
+  EXPECT_EQ(cfg::index_of<1>(va), (va >> 25) & 0x7FFu);
+  EXPECT_EQ(cfg::index_of<2>(va), (va >> 14) & 0x7FFu);
+  EXPECT_EQ(cfg::page_offset(va), va & 0x3FFFu);
+}
+
+TEST_F(ArchPageTableTraitsTest, Arm64Level2_16kShapeMatchesTwoLevel36BitVa) {
+  using cfg = structo::arch::arm64::level2_16k;
+  static_assert(cfg::level_count == 2);
+  static_assert(cfg::va_bits == 36);
+  static_assert(cfg::entry_count<0>() == 2048);
+  static_assert(cfg::entry_count<1>() == 2048);
+  static_assert(cfg::allows_leaf<0>()); // 32MB block
+}
+
+// --- ARM64 (VMSAv8-64), 64KB granule -----------------------------------
+
+TEST_F(ArchPageTableTraitsTest, Arm64Level1_64kRootIsFoldedToSixIndexBits) {
+  using cfg = structo::arch::arm64::level1_64k;
+  static_assert(cfg::level_count == 3);
+  static_assert(cfg::va_bits == 48);
+  static_assert(cfg::entry_count<0>() == 64); // folded root: 6 index bits, not the full 13
+  static_assert(cfg::entry_count<1>() == 8192);
+  static_assert(cfg::entry_count<2>() == 8192);
+  static_assert(!cfg::allows_leaf<0>()); // no level-1 block mapping for 64KB granule
+  static_assert(cfg::allows_leaf<1>());  // 512MB block
+
+  constexpr std::uint64_t va = (40ull << 42) | (1000ull << 29) | (900ull << 16) | 0x456ull;
+  EXPECT_EQ(cfg::index_of<0>(va), 40u);
+  EXPECT_EQ(cfg::index_of<1>(va), 1000u);
+  EXPECT_EQ(cfg::index_of<2>(va), 900u);
+  EXPECT_EQ(cfg::page_offset(va), 0x456u);
+}
+
+TEST_F(ArchPageTableTraitsTest, Arm64Level2_64kShapeMatchesTwoLevel42BitVa) {
+  using cfg = structo::arch::arm64::level2_64k;
+  static_assert(cfg::level_count == 2);
+  static_assert(cfg::va_bits == 42);
+  static_assert(cfg::entry_count<0>() == 8192);
+  static_assert(cfg::entry_count<1>() == 8192);
+  static_assert(cfg::allows_leaf<0>()); // 512MB block
+}
+
 // --- ARMv7 LPAE, 4KB granule ------------------------------------------
 
 TEST_F(ArchPageTableTraitsTest, ArmLpaeLevel1RootHasOnlyTwoIndexBits) {
@@ -119,6 +175,13 @@ TEST_F(ArchPageTableTraitsTest, Sv48IndexDecompositionRoundTrips) {
   using cfg = structo::arch::riscv::sv48;
   constexpr std::uint64_t va = 0x0000'1234'5678'9abcull & ((std::uint64_t(1) << 48) - 1);
   auto rebuilt = reassemble_impl<cfg>(va, std::make_index_sequence<4>{});
+  EXPECT_EQ(rebuilt, va);
+}
+
+TEST_F(ArchPageTableTraitsTest, Arm64Level1_64kIndexDecompositionRoundTrips) {
+  using cfg = structo::arch::arm64::level1_64k;
+  constexpr std::uint64_t va = 0x0000'8765'4321'0abcull & ((std::uint64_t(1) << 48) - 1);
+  auto rebuilt = reassemble_impl<cfg>(va, std::make_index_sequence<3>{});
   EXPECT_EQ(rebuilt, va);
 }
 
