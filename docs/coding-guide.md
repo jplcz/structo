@@ -61,6 +61,54 @@ into as a header's test coverage expands. This is a convention for *new*
 tests going forward; it is not a mandate to retrofit every existing
 `TEST(...)` in `tests/**`.
 
+## Follow `reloco`'s memory-safe container patterns: the three-tier accessor system
+
+Any class `structo` defines that owns, indexes into, or otherwise guards
+access to data that *can* be invalid/absent/out-of-range (an empty slot,
+an out-of-bounds index, a not-yet-initialized value, a moved-from
+handle, ...) must follow the same tri-tier accessor convention
+`jplcz_reloco`'s own containers use (see e.g. `reloco::optional<T>`,
+`reloco::collection_view`, `reloco::cell`/`ref_cell`) rather than
+inventing a different one. The three tiers, in the order callers should
+reach for them:
+
+1. **Checked (default).** The plain, unprefixed accessor (`value()`,
+   `operator*`, `operator->`, `operator[]`, `get()`, ...) validates its
+   precondition with `RELOCO_ASSERT`/`RELOCO_ASSERT_MSG` and traps
+   (rather than invoking undefined behavior) if violated. This is what
+   ordinary call sites should use.
+2. **Fallible.** A `try_`-prefixed accessor (`try_value()`, `try_get()`,
+   `try_push_back()`, ...) returns `reloco::result<T>` (or
+   `reloco::optional<T>`/`reloco::result<std::reference_wrapper<T>>`
+   where appropriate) instead of trapping, for call sites that need to
+   handle the failure case as data rather than treat it as a
+   programming-error bug.
+3. **Unsafe.** An `unsafe_`-prefixed accessor (`unsafe_value()`,
+   `unsafe_ptr()`, `unsafe_get()`, ...) skips the tier-1 check entirely
+   (or downgrades it to a `RELOCO_DEBUG_ASSERT`, compiled out in
+   release) for the rare hot-path call site that has already
+   independently proven the precondition holds. It must be annotated
+   `RELOCO_UNSAFE_BUFFER_USAGE` so Clang's `-Wunsafe-buffer-usage`
+   flags any use of it, and its name must make the lack of a check
+   obvious at the call site.
+
+Any raw pointer/reference an accessor returns that aliases into the
+object's own storage (rather than transferring ownership) must be
+annotated `RELOCO_LIFETIMEBOUND` (from `reloco/lifetime.hpp`) so Clang
+can flag a dangling use when the result outlives the object it was
+borrowed from; a pointer that *does* transfer ownership should instead
+be annotated `RELOCO_OWNER` at the point it is produced and
+`RELOCO_POINTER`-style non-owning raw pointers used elsewhere, matching
+`reloco`'s own usage of these annotations (see `reloco/lifetime.hpp`).
+
+Not every class needs all three tiers -- a storage-free resolver like
+`per_cpu_ptr<Tag, T>` that only ever `static_cast`s an already-`void*`
+slot has nothing to assert about and is exempt -- but any class that
+*does* guard against an invalid/absent/out-of-range access must expose
+at least the checked tier, and should add the fallible and/or unsafe
+tiers once a real call site needs them (don't speculatively add an
+`unsafe_` accessor nobody uses yet).
+
 ## Headers with a trait/policy template parameter must show an example
 
 Any public header whose API is parameterized on a trait/policy type the
