@@ -108,6 +108,22 @@ template <typename Backend> struct hw_rng_traits;
 
 namespace detail {
 
+/**
+ * @brief Shared 64-bit avalanche-mixing finalizer (the `splitmix64`
+ * finalization step), reused by any backend/combinator in this library
+ * that needs to scramble a weak or structured 64-bit value (e.g. a raw
+ * timer counter, or several XOR-combined draws) into one that looks
+ * uniformly random bit-for-bit. This is *mixing*, not entropy
+ * generation: it cannot add entropy that wasn't already present in its
+ * input, it only spreads whatever entropy is present across every
+ * output bit and removes linear structure.
+ */
+[[nodiscard]] constexpr std::uint64_t avalanche_mix64(std::uint64_t z) noexcept {
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+  return z ^ (z >> 31);
+}
+
 template <typename Backend, typename = void> struct has_hw_rng_traits : std::false_type {};
 
 template <typename Backend>

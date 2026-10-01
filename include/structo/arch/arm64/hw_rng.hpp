@@ -57,6 +57,30 @@
  * `hw_rng_ref::try_generate64` retries up to its caller-chosen bound,
  * matching the Arm ARM's own guidance to retry a bounded number of
  * times on failure.
+ *
+ * ## Fallback: `CNTPCT_EL0`/`CNTVCT_EL0` jitter combiners
+ *
+ * `cntpct_rng` and `cntvct_rng` are **not** hardware entropy sources --
+ * the Generic Timer's physical (`CNTPCT_EL0`) and virtual
+ * (`CNTVCT_EL0`) counters are ordinary monotonic counters, fully
+ * predictable to any observer who knows roughly what time it is. They
+ * exist purely as a *last-resort fallback* for cores without
+ * `FEAT_RNG` (no `RNDR`/`RNDRRS`) and no other hardware entropy source
+ * available at all: each draw reads the counter, spins briefly, reads
+ * it again, and mixes the two readings and their delta through
+ * `hw::detail::avalanche_mix64`. The delta captures a small amount of
+ * genuine execution-timing jitter (cache misses, bus contention,
+ * interrupts landing mid-loop) -- weak, but not zero -- while the
+ * raw counter values contribute no real entropy at all on their own.
+ *
+ * **Never use `cntpct_rng`/`cntvct_rng` as your only randomness
+ * source.** They are intended to be wired into
+ * `hw::hw_rng_combinator` (`hw/rng_combinator.hpp`) alongside at least
+ * one real hardware source (or, failing that, several independent weak
+ * sources from unrelated subsystems) -- combining is what makes the
+ * small amount of jitter they do carry useful, matching the "if asked
+ * by the user to do so" opt-in framing: nothing in this library reaches
+ * for them automatically.
  */
 
 #include <structo/hw/rng.hpp>
@@ -70,6 +94,22 @@ struct rndr_rng {};
 
 /** @brief Zero-sized `hw_rng_traits` backend tag for the `RNDRRS` system register. */
 struct rndrrs_rng {};
+
+/**
+ * @brief Zero-sized `hw_rng_traits` backend tag for a weak,
+ * `CNTPCT_EL0`-jitter-based fallback source. See the @file-level
+ * "Fallback" section above -- combine with a real entropy source via
+ * `hw::hw_rng_combinator`, never use alone.
+ */
+struct cntpct_rng {};
+
+/**
+ * @brief Zero-sized `hw_rng_traits` backend tag for a weak,
+ * `CNTVCT_EL0`-jitter-based fallback source. See the @file-level
+ * "Fallback" section above -- combine with a real entropy source via
+ * `hw::hw_rng_combinator`, never use alone.
+ */
+struct cntvct_rng {};
 
 } // namespace structo::arch::arm64
 
@@ -135,6 +175,67 @@ template <> struct hw_rng_traits<structo::arch::arm64::rndrrs_rng> {
     if (!ok)
       return unexpected(error::try_again);
     return value;
+#else
+    return unexpected(error::unsupported_operation);
+#endif
+  }
+};
+
+template <> struct hw_rng_traits<structo::arch::arm64::cntpct_rng> {
+  /** @brief The Generic Timer is a mandatory AArch64 baseline feature; always `true`. */
+  [[nodiscard]] static bool is_available(structo::arch::arm64::cntpct_rng &) noexcept { return true; }
+
+  /**
+   * @brief Reads `CNTPCT_EL0` twice around a short spin, mixing both
+   * readings and their delta through `avalanche_mix64`. Never fails
+   * once compiled in (always returns a value) -- see the @file-level
+   * "Fallback" section for why this must still be combined with a real
+   * entropy source before use.
+   */
+  [[nodiscard]] static result<std::uint64_t> try_generate64(structo::arch::arm64::cntpct_rng &) noexcept {
+#if defined(__aarch64__)
+    std::uint64_t t0, t1;
+    asm volatile("isb\n\t"
+                 "mrs %0, cntpct_el0"
+                 : "=r"(t0));
+    // Spin briefly so the delta below captures execution-timing jitter
+    // (cache misses, bus contention, interrupts) rather than a fixed,
+    // fully predictable instruction count.
+    for (int i = 0; i < 8; ++i)
+      asm volatile("" ::: "memory"); // optimization barrier, not a real delay
+    asm volatile("isb\n\t"
+                 "mrs %0, cntpct_el0"
+                 : "=r"(t1));
+    return detail::avalanche_mix64(t0 ^ t1 ^ (t1 - t0));
+#else
+    return unexpected(error::unsupported_operation);
+#endif
+  }
+};
+
+template <> struct hw_rng_traits<structo::arch::arm64::cntvct_rng> {
+  /** @brief The Generic Timer is a mandatory AArch64 baseline feature; always `true`. */
+  [[nodiscard]] static bool is_available(structo::arch::arm64::cntvct_rng &) noexcept { return true; }
+
+  /**
+   * @brief Reads `CNTVCT_EL0` twice around a short spin, mixing both
+   * readings and their delta through `avalanche_mix64`. Never fails
+   * once compiled in (always returns a value) -- see the @file-level
+   * "Fallback" section for why this must still be combined with a real
+   * entropy source before use.
+   */
+  [[nodiscard]] static result<std::uint64_t> try_generate64(structo::arch::arm64::cntvct_rng &) noexcept {
+#if defined(__aarch64__)
+    std::uint64_t t0, t1;
+    asm volatile("isb\n\t"
+                 "mrs %0, cntvct_el0"
+                 : "=r"(t0));
+    for (int i = 0; i < 8; ++i)
+      asm volatile("" ::: "memory"); // optimization barrier, not a real delay
+    asm volatile("isb\n\t"
+                 "mrs %0, cntvct_el0"
+                 : "=r"(t1));
+    return detail::avalanche_mix64(t0 ^ t1 ^ (t1 - t0));
 #else
     return unexpected(error::unsupported_operation);
 #endif

@@ -149,11 +149,7 @@ public:
    * into all 4 state words via successive `splitmix64` draws (the
    * technique the reference implementation itself recommends).
    */
-  constexpr explicit xoshiro256ss(std::uint64_t seed) noexcept {
-    splitmix64 sm(seed);
-    for (auto &word : state_)
-      word = sm.next();
-  }
+  constexpr explicit xoshiro256ss(std::uint64_t seed) noexcept : xoshiro256ss(expand_seed(seed)) {}
 
   /**
    * @brief Draws 4 seed words directly from @p hw and constructs a
@@ -192,6 +188,15 @@ public:
 private:
   /** @brief Constructs directly from 4 already-random state words (used by `from_hw_rng`). */
   constexpr explicit xoshiro256ss(const std::array<std::uint64_t, 4> &state) noexcept : state_(state) {}
+
+  /** @brief Expands a single 64-bit seed into 4 state words via successive `splitmix64` draws. */
+  [[nodiscard]] static constexpr std::array<std::uint64_t, 4> expand_seed(std::uint64_t seed) noexcept {
+    splitmix64 sm(seed);
+    std::array<std::uint64_t, 4> state{};
+    for (auto &word : state)
+      word = sm.next();
+    return state;
+  }
 
   std::array<std::uint64_t, 4> state_;
 };

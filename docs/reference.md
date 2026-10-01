@@ -20,6 +20,8 @@ exists and where.
 | `io_address.hpp` | `default_io_space`, `port_io_space`, `device_io_space`, `secure_io_space`, `nonsecure_io_space`, `realm_io_space`, `hypervisor_io_space`, `io_address<T, SpaceTag, IoInt>`, `reg_traits<Size>`, `io_math` | Typed, tagged address into a device-register space (port I/O, MMIO, ARM device memory, ...); pure address tagging and compile-time-checked offset arithmetic, plus register-width-aware offset math, no I/O access itself |
 | `io_space_ref.hpp` | `io_space_ref<SpaceTag>`, `io_space_traits<Backend>` | Type-erased, non-owning handle performing fixed-width loads/stores and `rep insb`/`outsb`-style string I/O over an `io_address`, via a customizable backend |
 | `hw/uart_ref.hpp` | `structo::hw::uart_ref`, `structo::hw::uart_traits<Backend>`, `structo::hw::uart_config` | Type-erased, non-owning handle over a basic (interrupt-free, polled) UART's operations and settings -- configure/tx_ready/rx_ready/put_byte/get_byte/write/read_available -- via a customizable backend |
+| `hw/rng.hpp` | `structo::hw::hw_rng_ref`, `structo::hw::hw_rng_traits<Backend>` | Type-erased, non-owning handle over a hardware random/entropy source -- `try_generate64`/`try_generate32`/`try_fill`, with bounded retry on a backend's transient "not ready yet" condition -- via a customizable backend |
+| `hw/rng_combinator.hpp` | `structo::hw::hw_rng_combinator` | Combines several `hw_rng_ref` sources (e.g. a real hardware RNG plus weak fallback jitter sources) by `XOR`-folding every successful draw and avalanche-mixing the result; itself bindable through another `hw_rng_ref` |
 | `pfn_translator.hpp` | `phys_pfn<SpaceTag, PageTraits, PhysInt>` | Typed physical page-frame number and address conversion |
 | `phys_page.hpp` | `page_traits<Size, Shift>`, `os_traits_base<Derived, OsPage>`, `page_view<PageTraits, OsTraits>` | Page-size traits and an OS-page-backed physical page view |
 | `phys_translator.hpp` | `phys_translator<Policy>` | Policy-based virtual/physical address translator |
@@ -61,6 +63,11 @@ exists and where.
 | `arch/arm/mmu_regs.hpp` | `structo::arch::arm::{sctlr, ttbcr_short, ttbcr_lpae, ttbr0_short, ttbr1_short, ttbr0_lpae, ttbr1_lpae, contextidr, scr, nsacr, hcr, vtcr, vttbr}` | Parsed/built views of ARMv7-A MMU control registers (short-descriptor and LPAE), the TrustZone `SCR`/`NSACR` security-state configuration registers that select which banked copy is live, and the Virtualization Extensions' hypervisor stage-2 registers `HCR`/`VTCR`/`VTTBR`; `read()`/`write()` only compile for `__arm__` (not AArch64) |
 | `arch/riscv/mmu_regs.hpp` | `structo::arch::riscv::{satp, satp_mode}` | Parsed/built view of the RV64 `satp` CSR (Sv39/Sv48/Sv57 mode, ASID, root PPN); `read()`/`write()` only compile for `__riscv` |
 | `arch/x86/mmu_regs.hpp` | `structo::arch::x86::{cr0, cr3, cr4, efer}` | Parsed/built views of x86/x86-64 `CR0`/`CR3`/`CR4` and the `EFER` MSR; `read()`/`write()` only compile for `__i386__`/`__x86_64__` |
+| `arch/x86/hw_rng.hpp` | `structo::arch::x86::{rdrand_rng, rdseed_rng}` | `hw_rng_traits` backends for `RDRAND`/`RDSEED`, with `CPUID`-based `is_available()`; only compile their real asm for `__i386__`/`__x86_64__` |
+| `arch/arm64/hw_rng.hpp` | `structo::arch::arm64::{rndr_rng, rndrrs_rng, cntpct_rng, cntvct_rng}` | `hw_rng_traits` backends for `FEAT_RNG`'s `RNDR`/`RNDRRS` (`ID_AA64ISAR0_EL1`-based `is_available()`), plus weak `CNTPCT_EL0`/`CNTVCT_EL0` jitter-combiner fallbacks for cores without `FEAT_RNG`; only compile their real asm for `__aarch64__` |
+| `arch/arm/hw_rng.hpp` | `structo::arch::arm::{cntpct_rng, cntvct_rng}` | Weak `CNTPCT`/`CNTVCT` jitter-combiner fallback backends (ARMv7-A has no baseline hardware-RNG instruction); `ID_PFR1.GenTimer`-based `is_available()`; only compile their real asm for `__arm__` |
+| `arch/riscv/hw_rng.hpp` | `structo::arch::riscv::seed_rng` | `hw_rng_traits` backend for the RISC-V Zkr `seed` CSR, accumulating four 16-bit `ES16` samples per 64-bit draw per the architecture's `csrrw`-swap-with-zero protocol; only compiles its real asm for `__riscv` |
+| `prng.hpp` | `structo::prng::{splitmix64, xoshiro256ss, pcg32}` | Small, fast, deterministic pseudo-random generators, each directly seedable and each with a `from_hw_rng(hw_rng_ref, ...)` factory drawing its initial state from a hardware entropy source |
 | `sync/preemption_guard.hpp` | `preemption_guard<Traits>`, `preempt_locked<T, Traits>`, `preemption_disabled_token`, `with_preemption_disabled` | RAII preemption-disable guard, proof-token-gated data wrapper, and functional helper, mirroring `irq_guard` for scheduler preemption instead of interrupts |
 | `sync/core_pin_guard.hpp` | `core_pin_guard<Traits>`, `with_cpu_pinned` | RAII guard pinning the calling thread to its current CPU core for its lifetime (migration prevention, not interrupt/preemption exclusion), exposing which CPU it pinned to |
 | `sync/core_rendezvous_barrier.hpp` | `core_rendezvous_barrier<Traits>` | Reusable, spin-only SMP rendezvous point for exactly `num_cores` participants, invoking a caller-supplied callback once per spin iteration on every non-leader core while it waits |
@@ -74,6 +81,8 @@ exists and where.
 - [`io_address.md`](io_address.md) -- typed, tagged device-register addresses (port I/O, MMIO, ARM device memory)
 - [`io_space_ref.md`](io_space_ref.md) -- type-erased device-register read/write access over an `io_address`
 - [`uart_ref.md`](uart_ref.md) -- type-erased basic (polled) UART operations and settings, in `include/structo/hw/`
+- [`hw_rng.md`](hw_rng.md) -- type-erased hardware RNG handle, per-architecture backends, and the entropy-source combinator
+- [`prng.md`](prng.md) -- `splitmix64`/`xoshiro256ss`/`pcg32` pseudo-random generators, seedable from a hardware RNG
 
 ## OS-development building blocks (from `jplcz_reloco`)
 
