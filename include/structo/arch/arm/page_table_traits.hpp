@@ -13,12 +13,12 @@
  *
  * ARMv7-A has two entirely different, mutually exclusive page-table
  * encodings: the classic "short-descriptor" format (2-level, 32-bit
- * descriptors, no `page_table_entry_traits` here yet) and LPAE's "long-
- * descriptor" format (64-bit descriptors, same index-field shape as
- * ARM64's VMSAv8-64 since LPAE was VMSAv8's direct predecessor). Only
- * the latter is provided here; the namespace is named accordingly so a
- * future short-descriptor configuration can live alongside it as
- * `structo::arch::arm::short_descriptor` without any ambiguity.
+ * descriptors; see `structo::arch::arm::short_descriptor` below and
+ * `structo/arch/arm/pte_short.hpp` for its `page_table_entry_traits<Tag>`)
+ * and LPAE's "long-descriptor" format (64-bit descriptors, same index-
+ * field shape as ARM64's VMSAv8-64 since LPAE was VMSAv8's direct
+ * predecessor). Both are provided in this header, in their own
+ * namespaces, to keep their incompatible encodings unambiguous.
  *
  * ## Why "level 1" and "level 2"
  *
@@ -69,3 +69,31 @@ using level2 = page_table_levels<structo::page_4k, 30,
                                   >;
 
 } // namespace structo::arch::arm::lpae
+
+namespace structo::arch::arm::short_descriptor {
+
+/**
+ * @brief Classic ARMv7-A ("short-descriptor") 2-level configuration:
+ * a 4096-entry, 1MB-section-capable L1 table over the full 32-bit input
+ * address, and a 256-entry, 4KB-small-page L2 ("coarse") table.
+ *
+ * Unlike LPAE, the short-descriptor format's 32-bit descriptors have an
+ * **incompatible bit layout between L1 and L2** (not just a different
+ * meaning for one bit, as in LPAE/AArch64/x86) -- see
+ * `structo/arch/arm/pte_short.hpp`, which therefore uses two distinct
+ * `page_table_entry_traits<Tag>` specializations for this one table,
+ * rather than one shared Tag used at every level.
+ *
+ * 16MB supersections (a leaf replicated across 16 consecutive L1 slots)
+ * and 64KB large pages (replicated across 16 consecutive L2 slots) are
+ * out of scope, for the same reason flagged for AArch64/LPAE large-block
+ * variants: this one-index-one-slot model doesn't represent replicated
+ * descriptors. Only ordinary 1MB sections and 4KB small pages are
+ * modeled.
+ */
+using level1 = page_table_levels<structo::page_4k, 32,
+                                  page_table_level<12, 20, true>, // L1: may leaf-map a 1MB section; 4096 entries
+                                  page_table_level<8, 12, true>   // L2: always a 4KB small page; 256 entries (the coarse table itself is 1KB: 256 * 4-byte entries)
+                                  >;
+
+} // namespace structo::arch::arm::short_descriptor
