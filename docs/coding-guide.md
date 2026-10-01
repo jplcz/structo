@@ -22,6 +22,7 @@ doubt, follow `reloco`'s own documentation directly:
 | `RELOCO_LIFETIMEBOUND`/`RELOCO_OWNER`/`RELOCO_POINTER`/`RELOCO_UNSAFE_BUFFER_USAGE` and the rest of the Clang/GCC safety-annotation macros | [`lifetime-safety.md`](https://github.com/jplcz/reloco/blob/master/docs/lifetime-safety.md) |
 | `try_create`/factory-function patterns for types that cannot be default-constructed into a valid state | [`fallible-construction.md`](https://github.com/jplcz/reloco/blob/master/docs/fallible-construction.md) |
 | `is_trivially_relocatable<T>` and why it matters for zero-overhead moves | [`relocatable.md`](https://github.com/jplcz/reloco/blob/master/docs/relocatable.md) |
+| Sharing storage/dispatch logic behind a function-pointer-table engine resolved once per `T`/`Backend`, instead of duplicating it per instantiation | [`type-erased-base-containers.md`](https://github.com/jplcz/reloco/blob/master/docs/type-erased-base-containers.md) |
 
 If a local path to a `reloco` checkout is available, the same docs live at
 `$RELOCO_SOURCE_DIR/docs/*.md` (e.g.
@@ -144,6 +145,35 @@ at least the checked tier, and should add the fallible and/or unsafe
 tiers once a real call site needs them (don't speculatively add an
 `unsafe_` accessor nobody uses yet).
 
+## Type-erase a `*_ref` handle's backend behind one `vtable`, not a template per call site
+
+Every non-owning, runtime-polymorphic "erase the concrete backend"
+handle in `structo` (`io_space_ref<SpaceTag>`, `hw::uart_ref`,
+`hw::hw_rng_ref`, ...) follows the same shape `reloco`'s own vector
+family uses for the same reason -- see
+[`type-erased-base-containers.md`](https://github.com/jplcz/reloco/blob/master/docs/type-erased-base-containers.md)'s
+"Layer 1" `vector_operations` table: a small `struct vtable` of plain
+function pointers (`result<T> (*op)(void *ctx, ...) noexcept`),
+resolved **once per concrete `Backend` type** via a
+`template <typename Backend> static constexpr vtable s_vtbl`, never
+re-resolved per call. The ref itself stores only a `void *ctx_` plus a
+`const vtable *vtbl_` -- a two-word handle, no virtual base class, no
+RTTI, no allocation -- and every public method is a short, non-template
+forward through `vtbl_->op(ctx_, ...)`, falling back to
+`error::unsupported_operation` when unbound (`vtbl_ == nullptr`).
+
+This keeps per-`Backend` template bloat down to just the handful of
+`*_entry<Backend>` trampoline functions and the `s_vtbl<Backend>` table
+itself (mirroring `vector_operations`' `get_operations_for<T>()` and
+`type_operations`' `get_type_operations_for<T>()`): every other method on
+the ref -- any generic convenience built purely out of the mandatory
+operations, like `uart_ref::write()`/`read_available()` or a future
+`hw_rng_ref::try_fill()` -- is ordinary, non-template code compiled
+once, not once per bound `Backend`. When adding a new `*_ref` handle,
+follow `hw/uart_ref.hpp` as the concrete template (customization-point
+trait with SFINAE-detected optional members, `vtable`, `s_vtbl<Backend>`,
+unbound-safe forwarding methods) rather than inventing a new shape.
+
 ## Headers with a trait/policy template parameter must show an example
 
 Any public header whose API is parameterized on a trait/policy type the
@@ -159,3 +189,4 @@ prose description of the required member list. See
 "archetype" struct living in the header itself rather than a comment) is
 an equally acceptable alternative when a declarations-only type can fully
 capture the required shape.
+
