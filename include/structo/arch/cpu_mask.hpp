@@ -615,6 +615,29 @@ public:
     return atomic_find_and_set_from(0, order);
   }
 
+  /**
+   * @brief Takes a plain, non-atomic snapshot of the whole mask, loading
+   * each backing word with a single atomic `__atomic_load_n()`.
+   *
+   * Like every other `atomic_*` operation here, this is only atomic
+   * per-word, not whole-mask-atomic: for `MaxCpus > 64`, a concurrent
+   * writer can update one word in between this call reading two
+   * different words, so the result can be a mix of before- and
+   * after-update state across words. Useful for computing a TLB-shootdown
+   * target set (see `asid_allocator.hpp`'s SMP flush guide and
+   * `mm_asid_context.hpp`) from a concurrently-updated "which cores is
+   * this address space resident on" mask, where a slightly-stale
+   * (superset) snapshot is always safe -- flushing one CPU too many never
+   * causes incorrect behavior, only a wasted invalidation.
+   */
+  [[nodiscard]] cpu_mask atomic_snapshot(std::memory_order order = std::memory_order_seq_cst) const noexcept {
+    cpu_mask snapshot;
+    for (std::size_t i = 0; i < word_count; ++i) {
+      snapshot.words_[i] = atomic_word(i, order);
+    }
+    return snapshot;
+  }
+
   // ---------------------------------------------------------------------------
   // Whole-Mask Queries
   // ---------------------------------------------------------------------------
