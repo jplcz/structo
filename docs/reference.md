@@ -28,6 +28,10 @@ exists and where.
 | `fdt_memory.hpp` | `try_extract_memory` | Extracts a devicetree's physical memory description straight off `fdt_reader`'s single-pass streaming API (no `fdt_index`, safe to call very early in boot) into caller-provided `region_set`s |
 | `buddy_allocator.hpp` | `buddy_allocator<FreeList, OsPage, MaxOrder>` | Power-of-two buddy page allocator over a caller-supplied intrusive free list and `OsPage` type, with DMA/hardware-constrained and greedy allocation variants |
 | `reloco_ipc_ring.h` / `reloco_ipc_ring.hpp` | `reloco_ipc_spsc_page`, `reloco_ipc_producer`, `reloco_ipc_consumer` (C ABI); `reloco::ipc_producer`, `reloco::ipc_consumer` (C++ wrapper) | Cross-process, allocation-free single-producer/single-consumer byte-stream ring buffer over a shared-memory page; usable standalone from a Linux/FreeBSD kernel module, with a zero-copy typestate-checked C++ transaction API |
+| `arch/cpu_index.hpp` | `cpu_index<Tag>`, `uniprocessor_tag` | Zero-overhead CRTP-style "which logical CPU is this" wrapper plus core operations (yield, WFE/SEV, BSP detection, hardware ID), delegated to a caller-provided `Tag` policy |
+| `arch/hw_id_map.hpp` | `hw_id_lut<HwId, MaxCpus, L1Size, Hash>`, `default_hw_id_hash` | Allocation-free, two-tier (hash-filtered L1 + sorted L2 fallback) lookup table mapping a hardware ID (e.g. MPIDR_EL1) to a logical CPU index |
+| `arch/lazy_context.hpp` | `lazy_context<Traits, CpuId>`, `lazy_context_switcher<Traits, CpuId>`, `static_per_cpu_storage<MaxCpus, Context, CpuId>` | Lazy/deferred per-thread coprocessor-state (FPU, vector registers, ...) context-switching framework, saving/restoring hardware state only on first trapped use |
+| `sync/irq_guard.hpp` | `irq_guard<Traits>`, `irq_locked<T, Traits>`, `critical_section_token`, `with_irq_disabled` | RAII interrupt-disable guard, proof-token-gated data wrapper, and functional helper for interrupt-safe kernel code |
 
 ## structo's own headers
 
@@ -57,3 +61,13 @@ instruction. Each has its own reference page:
 - [`fdt_memory.md`](fdt_memory.md) -- devicetree physical memory extraction
 - [`buddy_allocator.md`](buddy_allocator.md) -- power-of-two buddy page allocator
 - [`reloco_ipc_ring.md`](reloco_ipc_ring.md) -- cross-process SPSC IPC ring buffer
+
+## Arch/sync building blocks (native to `jplcz_structo`)
+
+The headers below are native to `jplcz_structo` (not moved from reloco)
+and live under `include/structo/arch/` and `include/structo/sync/`:
+
+- [`cpu_index.md`](cpu_index.md) -- logical-CPU resolution and core operations
+- [`hw_id_map.md`](hw_id_map.md) -- hardware-ID-to-CPU-index lookup table
+- [`lazy_context.md`](lazy_context.md) -- lazy per-thread coprocessor-state context switching
+- [`irq_guard.md`](irq_guard.md) -- RAII interrupt-disable guard and critical-section helpers
