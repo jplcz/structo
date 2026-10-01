@@ -324,6 +324,19 @@ private:
  * CpuId>`: every member is `static` and operates purely on the `context_type&`
  * (or `context_type*`) passed in, so one `lazy_context_switcher` instantiation
  * drives every thread's context for a given `Traits`.
+ *
+ * @note Invariant: every pointer this class reads back via
+ * `Traits::get_active_context()` is used strictly for pointer-identity
+ * comparison (`== &ctx`/`== ctx`) against the caller-supplied context, and
+ * is never dereferenced -- the "active" context for a CPU may legitimately
+ * be stale (already torn down, reused, or on another thread's stack) by the
+ * time a given method runs, so only its identity, never its contents, may
+ * be assumed valid. Keep this invariant in mind if extending any method
+ * below: a method would need to become non-static and receive its context
+ * by pointer (so a null/invalid context can be represented and checked)
+ * only if it ever needed to dereference a `get_active_context()` result
+ * directly; none currently do.
+ *
  * @tparam Traits Policy defining hardware operations and `state_type`; see
  * the file-level docs above for the full required/optional interface and an
  * example implementation.
@@ -425,6 +438,7 @@ public:
       return false;
     }
 
+    // Identity-only: never dereferenced, only compared against &ctx below.
     context_type *active_on_cpu = static_cast<context_type *>(Traits::get_active_context(current_cpu));
     const CpuId prev_cpu = ctx.last_cpu();
 
@@ -484,6 +498,7 @@ public:
       return;
     }
 
+    // Identity-only: never dereferenced, only compared against ctx below.
     context_type *active_on_cpu = static_cast<context_type *>(Traits::get_active_context(current_cpu));
 
     // Save only if this context actually held the hardware registers on this CPU
@@ -520,6 +535,7 @@ public:
     // This context was last run on this CPU.
     // This CPU's last active user was this context.
     const bool was_last_on_cpu = (ctx->last_cpu() == current_cpu);
+    // Identity-only comparison; the returned pointer is never dereferenced.
     const bool cpu_has_this_ctx = (static_cast<context_type *>(Traits::get_active_context(current_cpu)) == ctx);
 
     if (was_last_on_cpu && cpu_has_this_ctx) {
@@ -547,6 +563,7 @@ public:
     }
 
     // Clear per-CPU pointer if this CPU recorded ctx as last resident
+    // (identity-only comparison; the returned pointer is never dereferenced).
     if (static_cast<context_type *>(Traits::get_active_context(current_cpu)) == ctx) {
       Traits::clear_active_context(current_cpu);
       if (Traits::is_enabled()) {
@@ -574,6 +591,7 @@ public:
       return;
     }
 
+    // Identity-only comparison; the returned pointer is never dereferenced.
     if (static_cast<context_type *>(Traits::get_active_context(current_cpu)) == ctx) {
       Traits::clear_active_context(current_cpu);
       if (Traits::is_enabled()) {
@@ -608,6 +626,7 @@ public:
    * subsequent kernel inspection or in-memory mutation (e.g. signal delivery).
    */
   static void on_thread_local_sync(context_type &ctx, CpuId current_cpu) noexcept {
+    // Identity-only: never dereferenced, only compared against &ctx below.
     context_type *active = static_cast<context_type *>(Traits::get_active_context(current_cpu));
 
     if (active == &ctx && Traits::is_enabled()) {
