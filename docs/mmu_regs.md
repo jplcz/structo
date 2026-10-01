@@ -48,7 +48,7 @@ sctlr.write();
 #endif
 ```
 
-## `structo/arch/arm64/mmu_regs.hpp` -- AArch64 EL1
+## `structo/arch/arm64/mmu_regs.hpp` -- AArch64 EL1, EL2, EL3
 
 - `sctlr_el1` -- MMU enable, D/I-cache enable, alignment checks, WXN.
 - `tcr_el1` -- T0SZ/T1SZ, TG0/TG1 granule, cacheability/shareability for
@@ -60,6 +60,76 @@ sctlr.write();
   (`Attr0..Attr7`), selected per PTE by `tcr_el1`'s `AttrIndx` field (see
   [`page_table_entry_fields.md`](page_table_entry_fields.md)'s
   `structo::arch::detail::vmsa::stage1_bits::attr_indx`).
+
+### TrustZone: `scr_el3`
+
+- `scr_el3` (Secure Configuration Register, EL3-only) -- `NS` (which
+  world the next lower exception level enters), `IRQ`/`FIQ`/`EA`
+  exception-routing-to-EL3 bits, `SMD` (disable `SMC`), `HCE` (enable
+  `HVC`), `SIF` (forbid Secure instruction fetch from Non-secure
+  memory), `RW` (next lower EL's execution state: AArch64 or AArch32),
+  `ST` (Secure EL1 access to the generic timer), and `TWI`/`TWE` (trap
+  `WFI`/`WFE` to EL3). This is the AArch64 analogue of ARMv7-A's `SCR`;
+  unlike `SCR`, it is not itself banked (EL3 has no "other world" copy
+  of its own state).
+
+```cpp
+using namespace structo::arch::arm64;
+
+scr_el3 s{};
+s.set_ns(true).set_rw(true).set_hyp_call_enabled(true); // next EL: Non-secure, AArch64, HVC usable
+```
+
+### Hypervisor stage-2 translation: `hcr_el2`, `vtcr_el2`, `vttbr_el2`
+
+The Armv8 Virtualization Extensions add a second, EL2-controlled
+translation stage -- guest ("intermediate") physical address to real
+physical address -- that every stage-1 (EL1/EL0) translation also
+passes through once enabled. These are the EL2 registers that bring
+that stage-2 translation up:
+
+- `hcr_el2` (Hypervisor Configuration Register) -- `VM` enables stage-2
+  translation; `SWIO`/`PTW`/`DC`/`BSU` adjust cache/barrier behavior
+  seen by EL1/EL0; `FMO`/`IMO`/`AMO` route physical interrupts/aborts to
+  EL2; `TWI`/`TWE`/`TSC`/`TTLB`/`TVM`/`TGE`/`TDZ`/`TRVM` trap assorted
+  EL1/EL0 operations (including EL1's own stage-1 MMU register writes,
+  via `TVM`/`TRVM`) to EL2; `HCD` disables `HVC`; `RW` picks EL1's
+  execution state; `CD`/`ID` (FEAT_VHE, `E2H=1` only) disable stage-1
+  cacheability for the EL2&0 translation regime; `E2H` (FEAT_VHE)
+  switches EL2 into the "EL2&0" regime. Only this MMU/trap-focused
+  subset is modeled -- the register also has many virtual-interrupt
+  -pending-state bits (`VF`/`VI`/`VSE`/`FB`) that are out of scope here.
+- `vtcr_el2` (Virtualization Translation Control Register) -- mirrors
+  `tcr_el1`'s shape for the single stage-2 range: `T0SZ`, `SL0`
+  (starting level), `IRGN0`/`ORGN0`/`SH0`, `TG0` (granule), `PS`
+  (physical address size), `VS` (16-bit VMID), `HA`/`HD`.
+- `vttbr_el2` (Virtualization Translation Table Base Register) -- stage-2
+  table root (`BADDR`) + `VMID` (tags stage-2 TLB entries per guest,
+  actual usable width is 8 or 16 bits per `vtcr_el2`'s `VS` bit) +
+  `CnP`; the stage-2 counterpart of `ttbr0_el1`.
+
+```cpp
+using namespace structo::arch::arm64;
+
+vtcr_el2 vtcr{};
+vtcr.set_t0sz(24).set_sl0(0b01).set_tg0(0).set_ps(0b001); // 40-bit IPA, 4 KB granule
+
+vttbr_el2 vttbr{};
+vttbr.set_base_addr(guest_table_phys_addr).set_vmid(guest_vmid);
+
+hcr_el2 hcr{};
+hcr.set_vm(true).set_tvm(true).set_rw(true); // enable stage 2, trap EL1 MMU-config writes, EL1 is AArch64
+
+#if defined(__aarch64__)
+vtcr.write();
+vttbr.write();
+hcr.write();
+#endif
+```
+
+See [`page_table_entry_fields.md`](page_table_entry_fields.md) (stage-2
+PTE field layouts, `structo::arch::arm64::lpae::stage2_tag` et al.) for
+the entries these registers' tables are made of.
 
 ## `structo/arch/arm/mmu_regs.hpp` -- ARMv7-A/AArch32
 
@@ -119,6 +189,42 @@ Both `scr` and `nsacr` are themselves Secure-only registers: a
 hardware (not modeled here -- this header only ever talks to the
 register currently selected by the executing world, same as everywhere
 else).
+
+### Hypervisor stage-2 translation: `hcr`, `vtcr`, `vttbr`
+
+The (Non-secure-only) Virtualization Extensions add the same kind of
+second, Hyp (PL2)-controlled translation stage as AArch64's
+`hcr_el2`/`vtcr_el2`/`vttbr_el2` above, just with the narrower 32-bit
+register encodings ARMv7-A uses:
+
+- `hcr` (Hypervisor Configuration Register) -- the same MMU/trap-focused
+  subset as `hcr_el2`, minus the AArch64-only `RW`/`CD`/`ID`/`E2H` bits
+  (ARMv7-A has no stage-1 execution-state choice or `E2H` regime).
+- `vtcr` (Virtualization Translation Control Register) -- `T0SZ`, `SL0`,
+  `IRGN0`/`ORGN0`/`SH0`; narrower than `vtcr_el2` since ARMv7-A LPAE
+  stage-2 has no alternate granule (no `TG0`-equivalent field).
+- `vttbr` (Virtualization Translation Table Base Register) -- 64-bit,
+  read/written as a register pair via `MRRC`/`MCRR p15, 6` (like
+  `ttbr0_lpae`/`ttbr1_lpae`): a 39-bit `BADDR` and an 8-bit `VMID`.
+
+```cpp
+using namespace structo::arch::arm;
+
+vtcr vtcr{};
+vtcr.set_t0sz(8).set_sl0(0b01); // configure stage-2 input size and starting level
+
+vttbr vttbr{};
+vttbr.set_base_addr(guest_table_phys_addr).set_vmid(guest_vmid);
+
+hcr h{};
+h.set_vm(true).set_tvm(true); // enable stage 2, trap EL1/PL1 MMU-config writes to Hyp mode
+
+#if defined(__arm__) && !defined(__aarch64__)
+vtcr.write();
+vttbr.write();
+h.write();
+#endif
+```
 
 ## `structo/arch/riscv/mmu_regs.hpp` -- RISC-V (RV64 only)
 

@@ -6,8 +6,10 @@
 /** @file mmu_regs.hpp
  * @brief Parsers/builders for ARMv7-A/AArch32 MMU control registers:
  * `SCTLR`, `TTBCR` (shared between the classic short-descriptor format
- * and LPAE), `TTBR0`/`TTBR1` (both formats), `CONTEXTIDR`, and the
- * TrustZone security-state configuration registers `SCR` and `NSACR`.
+ * and LPAE), `TTBR0`/`TTBR1` (both formats), `CONTEXTIDR`, the
+ * TrustZone security-state configuration registers `SCR` and `NSACR`,
+ * and the Virtualization Extensions' hypervisor/stage-2 registers
+ * `HCR`, `VTCR`, and `VTTBR`.
  *
  * ## TrustZone and MMU register banking
  *
@@ -24,6 +26,24 @@
  * to configure that world switch and what the Non-secure side is allowed
  * to touch.
  *
+ * ## Hypervisor stage-2 translation: `HCR`/`VTCR`/`VTTBR`
+ *
+ * The (Non-secure-only) Virtualization Extensions add a *second*
+ * translation stage at the Hyp (PL2) exception level -- guest
+ * ("intermediate") physical address to real physical address, the same
+ * two-stage scheme `structo::arch::arm::lpae::stage2_tag` entries (see
+ * `pte_stage2.hpp`) are walked under. `HCR.VM` turns stage-2 translation
+ * on, `VTCR` configures its input/output address size and
+ * cacheability/shareability exactly like `TTBCR_lpae` does for stage 1,
+ * and `VTTBR` (a 64-bit register, read/written as a pair via
+ * `MRRC`/`MCRR`, like LPAE's `TTBR0`/`TTBR1`) points at the root of the
+ * guest's stage-2 table, tagged with a VMID. Only the subset of `HCR`
+ * bits most relevant to bringing up or tearing down this translation
+ * (plus the handful of MMU-adjacent trap-to-Hyp controls a basic
+ * hypervisor needs, e.g. trapping EL1/PL1 writes to its own stage-1 MMU
+ * registers via `TVM`) is modeled; the many interrupt-virtualization
+ * bits are out of scope here.
+ *
  * ## Scope and split
  *
  * As with the AArch64 counterpart (`structo/arch/arm64/mmu_regs.hpp`),
@@ -32,13 +52,13 @@
  * This parse/build logic is pure bit arithmetic, fully host-testable.
  *
  * `read()`/`write()` round-trip a value type through the real coprocessor
- * register via `MRC`/`MCR p15` (or, for the 64-bit LPAE `TTBR0`/`TTBR1`,
- * `MRRC`/`MCRR p15`), compiled only for a genuine 32-bit ARM target
- * (`__arm__`, and not AArch64) -- on any other host this header still
- * defines every value type (cross-compiled header checks stay clean), it
- * just omits `read()`/`write()`. This is privileged access and cannot be
- * exercised from an unprivileged test process; only the pure parse/build
- * logic is unit tested.
+ * register via `MRC`/`MCR p15` (or, for the 64-bit LPAE `TTBR0`/`TTBR1`
+ * and `VTTBR`, `MRRC`/`MCRR p15`), compiled only for a genuine 32-bit ARM
+ * target (`__arm__`, and not AArch64) -- on any other host this header
+ * still defines every value type (cross-compiled header checks stay
+ * clean), it just omits `read()`/`write()`. This is privileged access
+ * and cannot be exercised from an unprivileged test process; only the
+ * pure parse/build logic is unit tested.
  *
  * ## Short-descriptor vs. LPAE
  *
@@ -66,10 +86,14 @@
  * scr s{};
  * s.set_ns(true).set_hyp_call_enabled(true); // switch the next world to Non-secure, allow HVC
  *
+ * hcr h{};
+ * h.set_vm(true).set_tvm(true); // enable stage 2, trap EL1 VM-config writes to Hyp mode
+ *
  * #if defined(__arm__) && !defined(__aarch64__)
  * tcr.write();
  * sc.write();
  * s.write();
+ * h.write();
  * #endif
  * @endcode
  */
@@ -619,6 +643,279 @@ struct nsacr {
 
   /** @brief Writes `raw` to the live `NSACR` register. Secure-only; not unit tested. */
   void write() const noexcept { asm volatile("mcr p15, 0, %0, c1, c1, 2" ::"r"(raw) : "memory"); }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/**
+ * @brief Named bit-field accessors for `HCR` (Hypervisor Configuration
+ * Register, Virtualization Extensions). Only accessible from Hyp (PL2)
+ * mode. Only the subset most relevant to bringing up or tearing down
+ * stage-2 translation and basic EL1/PL1-trapping is modeled; the many
+ * interrupt-virtualization bits are out of scope here.
+ */
+struct hcr_bits {
+  using vm = pte_bit_field<0, 1, std::uint32_t>;    //!< Bit 0: enable stage-2 translation.
+  using swio = pte_bit_field<1, 1, std::uint32_t>;  //!< Bit 1: Set/Way Invalidation Override (PL1 set/way cache ops behave as invalidate-only).
+  using ptw = pte_bit_field<2, 1, std::uint32_t>;   //!< Bit 2: Protected Table Walk (a stage-1 walk stepping on a stage-2 Device mapping faults).
+  using fmo = pte_bit_field<3, 1, std::uint32_t>;   //!< Bit 3: physical FIQ routed to Hyp mode.
+  using imo = pte_bit_field<4, 1, std::uint32_t>;   //!< Bit 4: physical IRQ routed to Hyp mode.
+  using amo = pte_bit_field<5, 1, std::uint32_t>;   //!< Bit 5: physical external abort routed to Hyp mode.
+  using dc = pte_bit_field<12, 1, std::uint32_t>;   //!< Bit 12: Default Cacheability (forces cacheable when PL0/PL1 stage-1 is disabled).
+  using bsu = pte_bit_field<10, 2, std::uint32_t>;   //!< Bits [11:10]: Barrier Shareability Upgrade for PL1/PL0 DSB/DMB.
+  using twi = pte_bit_field<13, 1, std::uint32_t>;  //!< Bit 13: `WFI` from PL1/PL0 traps to Hyp mode.
+  using twe = pte_bit_field<14, 1, std::uint32_t>;  //!< Bit 14: `WFE` from PL1/PL0 traps to Hyp mode.
+  using tsc = pte_bit_field<19, 1, std::uint32_t>;  //!< Bit 19: `SMC` from PL1 traps to Hyp mode.
+  using ttlb = pte_bit_field<25, 1, std::uint32_t>; //!< Bit 25: PL1 TLB maintenance instructions trap to Hyp mode.
+  using tvm = pte_bit_field<26, 1, std::uint32_t>;  //!< Bit 26: PL1 writes to its own stage-1 MMU control registers trap to Hyp mode.
+  using tge = pte_bit_field<27, 1, std::uint32_t>;  //!< Bit 27: Trap General Exceptions -- routes PL0 exceptions to Hyp mode and disables PL1&0 stage-1 translation for PL0.
+  using tdz = pte_bit_field<28, 1, std::uint32_t>;  //!< Bit 28: `DC ZVA` from PL1/PL0 traps to Hyp mode.
+  using hcd = pte_bit_field<29, 1, std::uint32_t>;  //!< Bit 29: Hyp Call Disable (traps `HVC` wherever it would otherwise be usable).
+  using trvm = pte_bit_field<30, 1, std::uint32_t>; //!< Bit 30: PL1 reads of its own stage-1 MMU control registers trap to Hyp mode.
+};
+
+/**
+ * @brief Parsed/built view of `HCR`: whether stage-2 translation is
+ * enabled (`VM`), which PL1 MMU-configuration accesses trap to Hyp
+ * mode, and the related barrier/cache-maintenance override bits a basic
+ * hypervisor needs when bringing a guest's stage-2 mapping up or down.
+ */
+struct hcr {
+  std::uint32_t raw{0};
+
+  [[nodiscard]] static constexpr hcr from_raw(std::uint32_t value) noexcept { return hcr{value}; }
+
+  [[nodiscard]] constexpr bool vm() const noexcept { return hcr_bits::vm::test(raw); }
+  constexpr hcr &set_vm(bool value) noexcept {
+    raw = hcr_bits::vm::set_bit(raw, value);
+    return *this;
+  }
+
+  [[nodiscard]] constexpr bool set_way_invalidation_override() const noexcept { return hcr_bits::swio::test(raw); }
+  constexpr hcr &set_set_way_invalidation_override(bool value) noexcept {
+    raw = hcr_bits::swio::set_bit(raw, value);
+    return *this;
+  }
+
+  [[nodiscard]] constexpr bool protected_table_walk() const noexcept { return hcr_bits::ptw::test(raw); }
+  constexpr hcr &set_protected_table_walk(bool value) noexcept {
+    raw = hcr_bits::ptw::set_bit(raw, value);
+    return *this;
+  }
+
+  [[nodiscard]] constexpr bool fiq_to_hyp() const noexcept { return hcr_bits::fmo::test(raw); }
+  constexpr hcr &set_fiq_to_hyp(bool value) noexcept {
+    raw = hcr_bits::fmo::set_bit(raw, value);
+    return *this;
+  }
+
+  [[nodiscard]] constexpr bool irq_to_hyp() const noexcept { return hcr_bits::imo::test(raw); }
+  constexpr hcr &set_irq_to_hyp(bool value) noexcept {
+    raw = hcr_bits::imo::set_bit(raw, value);
+    return *this;
+  }
+
+  [[nodiscard]] constexpr bool external_abort_to_hyp() const noexcept { return hcr_bits::amo::test(raw); }
+  constexpr hcr &set_external_abort_to_hyp(bool value) noexcept {
+    raw = hcr_bits::amo::set_bit(raw, value);
+    return *this;
+  }
+
+  [[nodiscard]] constexpr bool default_cacheability() const noexcept { return hcr_bits::dc::test(raw); }
+  constexpr hcr &set_default_cacheability(bool value) noexcept {
+    raw = hcr_bits::dc::set_bit(raw, value);
+    return *this;
+  }
+
+  [[nodiscard]] constexpr unsigned barrier_shareability_upgrade() const noexcept {
+    return hcr_bits::bsu::get(raw);
+  }
+  constexpr hcr &set_barrier_shareability_upgrade(unsigned value) noexcept {
+    raw = hcr_bits::bsu::set(raw, value);
+    return *this;
+  }
+
+  [[nodiscard]] constexpr bool trap_wfi() const noexcept { return hcr_bits::twi::test(raw); }
+  constexpr hcr &set_trap_wfi(bool value) noexcept {
+    raw = hcr_bits::twi::set_bit(raw, value);
+    return *this;
+  }
+
+  [[nodiscard]] constexpr bool trap_wfe() const noexcept { return hcr_bits::twe::test(raw); }
+  constexpr hcr &set_trap_wfe(bool value) noexcept {
+    raw = hcr_bits::twe::set_bit(raw, value);
+    return *this;
+  }
+
+  [[nodiscard]] constexpr bool trap_smc() const noexcept { return hcr_bits::tsc::test(raw); }
+  constexpr hcr &set_trap_smc(bool value) noexcept {
+    raw = hcr_bits::tsc::set_bit(raw, value);
+    return *this;
+  }
+
+  [[nodiscard]] constexpr bool trap_tlb_maintenance() const noexcept { return hcr_bits::ttlb::test(raw); }
+  constexpr hcr &set_trap_tlb_maintenance(bool value) noexcept {
+    raw = hcr_bits::ttlb::set_bit(raw, value);
+    return *this;
+  }
+
+  [[nodiscard]] constexpr bool tvm() const noexcept { return hcr_bits::tvm::test(raw); }
+  constexpr hcr &set_tvm(bool value) noexcept {
+    raw = hcr_bits::tvm::set_bit(raw, value);
+    return *this;
+  }
+
+  [[nodiscard]] constexpr bool trap_general_exceptions() const noexcept { return hcr_bits::tge::test(raw); }
+  constexpr hcr &set_trap_general_exceptions(bool value) noexcept {
+    raw = hcr_bits::tge::set_bit(raw, value);
+    return *this;
+  }
+
+  [[nodiscard]] constexpr bool trap_dc_zva() const noexcept { return hcr_bits::tdz::test(raw); }
+  constexpr hcr &set_trap_dc_zva(bool value) noexcept {
+    raw = hcr_bits::tdz::set_bit(raw, value);
+    return *this;
+  }
+
+  [[nodiscard]] constexpr bool hyp_call_disabled() const noexcept { return hcr_bits::hcd::test(raw); }
+  constexpr hcr &set_hyp_call_disabled(bool value) noexcept {
+    raw = hcr_bits::hcd::set_bit(raw, value);
+    return *this;
+  }
+
+  [[nodiscard]] constexpr bool trap_vm_reads() const noexcept { return hcr_bits::trvm::test(raw); }
+  constexpr hcr &set_trap_vm_reads(bool value) noexcept {
+    raw = hcr_bits::trvm::set_bit(raw, value);
+    return *this;
+  }
+
+#if defined(__arm__) && !defined(__aarch64__)
+  /** @brief Reads the live `HCR` register. Hyp-mode-only; not unit tested. */
+  [[nodiscard]] static hcr read() noexcept {
+    std::uint32_t value;
+    asm volatile("mrc p15, 4, %0, c1, c1, 0" : "=r"(value));
+    return hcr{value};
+  }
+
+  /** @brief Writes `raw` to the live `HCR` register. Hyp-mode-only; not unit tested. */
+  void write() const noexcept { asm volatile("mcr p15, 4, %0, c1, c1, 0" ::"r"(raw) : "memory"); }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/**
+ * @brief Named bit-field accessors for `VTCR` (Virtualization
+ * Translation Control Register). Only the architecturally stable,
+ * conservative subset of fields is modeled (see `vtcr_el2_bits` in the
+ * AArch64 header for the analogous, more extensively documented
+ * fields); ARMv7 LPAE stage-2 has no alternate granule, so there is no
+ * `TG0`-equivalent field here.
+ */
+struct vtcr_bits {
+  using t0sz = pte_bit_field<0, 4, std::uint32_t>;   //!< Bits [3:0]: stage-2 input (guest-physical) address size.
+  using sl0 = pte_bit_field<6, 2, std::uint32_t>;     //!< Bits [7:6]: stage-2 starting level of translation.
+  using irgn0 = pte_bit_field<8, 2, std::uint32_t>;   //!< Bits [9:8]: stage-2 table-walk inner cacheability.
+  using orgn0 = pte_bit_field<10, 2, std::uint32_t>;  //!< Bits [11:10]: stage-2 table-walk outer cacheability.
+  using sh0 = pte_bit_field<12, 2, std::uint32_t>;    //!< Bits [13:12]: stage-2 table-walk shareability.
+};
+
+/**
+ * @brief Parsed/built view of `VTCR`: input address size, starting
+ * level, and cacheability/shareability attributes for stage-2
+ * (guest-physical-to-physical) translation -- the stage-2 counterpart of
+ * `TTBCR` (LPAE mode).
+ */
+struct vtcr {
+  std::uint32_t raw{0};
+
+  [[nodiscard]] static constexpr vtcr from_raw(std::uint32_t value) noexcept { return vtcr{value}; }
+
+  [[nodiscard]] constexpr unsigned t0sz() const noexcept { return vtcr_bits::t0sz::get(raw); }
+  constexpr vtcr &set_t0sz(unsigned value) noexcept {
+    raw = vtcr_bits::t0sz::set(raw, value);
+    return *this;
+  }
+
+  [[nodiscard]] constexpr unsigned sl0() const noexcept { return vtcr_bits::sl0::get(raw); }
+  constexpr vtcr &set_sl0(unsigned value) noexcept {
+    raw = vtcr_bits::sl0::set(raw, value);
+    return *this;
+  }
+
+  [[nodiscard]] constexpr unsigned irgn0() const noexcept { return vtcr_bits::irgn0::get(raw); }
+  constexpr vtcr &set_irgn0(unsigned value) noexcept {
+    raw = vtcr_bits::irgn0::set(raw, value);
+    return *this;
+  }
+
+  [[nodiscard]] constexpr unsigned orgn0() const noexcept { return vtcr_bits::orgn0::get(raw); }
+  constexpr vtcr &set_orgn0(unsigned value) noexcept {
+    raw = vtcr_bits::orgn0::set(raw, value);
+    return *this;
+  }
+
+  [[nodiscard]] constexpr unsigned sh0() const noexcept { return vtcr_bits::sh0::get(raw); }
+  constexpr vtcr &set_sh0(unsigned value) noexcept {
+    raw = vtcr_bits::sh0::set(raw, value);
+    return *this;
+  }
+
+#if defined(__arm__) && !defined(__aarch64__)
+  /** @brief Reads the live `VTCR` register. Hyp-mode-only; not unit tested. */
+  [[nodiscard]] static vtcr read() noexcept {
+    std::uint32_t value;
+    asm volatile("mrc p15, 4, %0, c2, c1, 2" : "=r"(value));
+    return vtcr{value};
+  }
+
+  /** @brief Writes `raw` to the live `VTCR` register. Hyp-mode-only; not unit tested. */
+  void write() const noexcept { asm volatile("mcr p15, 4, %0, c2, c1, 2" ::"r"(raw) : "memory"); }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Named bit-field accessors for `VTTBR` (Virtualization Translation Table Base Register). */
+struct vttbr_bits {
+  using baddr = pte_bit_field<1, 39>; //!< Bits [39:1]: stage-2 translation table base address.
+  using vmid = pte_bit_field<48, 8>;  //!< Bits [55:48]: Virtual Machine ID.
+};
+
+/**
+ * @brief Parsed/built view of `VTTBR`: the root of the current guest's
+ * stage-2 translation table, tagged with a VMID -- the stage-2
+ * counterpart of LPAE's `TTBR0`.
+ */
+struct vttbr {
+  std::uint64_t raw{0};
+
+  [[nodiscard]] static constexpr vttbr from_raw(std::uint64_t value) noexcept { return vttbr{value}; }
+
+  [[nodiscard]] constexpr std::uint64_t base_addr() const noexcept { return vttbr_bits::baddr::get(raw) << 1; }
+  /** @brief Sets the stage-2 translation table base address. `addr`'s bit 0 must be `0` (masked off regardless). */
+  constexpr vttbr &set_base_addr(std::uint64_t addr) noexcept {
+    raw = vttbr_bits::baddr::set(raw, addr >> 1);
+    return *this;
+  }
+
+  [[nodiscard]] constexpr std::uint8_t vmid() const noexcept {
+    return static_cast<std::uint8_t>(vttbr_bits::vmid::get(raw));
+  }
+  constexpr vttbr &set_vmid(std::uint8_t value) noexcept {
+    raw = vttbr_bits::vmid::set(raw, value);
+    return *this;
+  }
+
+#if defined(__arm__) && !defined(__aarch64__)
+  /** @brief Reads the live `VTTBR` register pair. Hyp-mode-only; not unit tested. */
+  [[nodiscard]] static vttbr read() noexcept {
+    std::uint32_t lo, hi;
+    asm volatile("mrrc p15, 6, %0, %1, c2" : "=r"(lo), "=r"(hi));
+    return vttbr{(static_cast<std::uint64_t>(hi) << 32) | lo};
+  }
+
+  /** @brief Writes `raw` to the live `VTTBR` register pair. Hyp-mode-only; not unit tested. */
+  void write() const noexcept {
+    std::uint32_t lo = static_cast<std::uint32_t>(raw);
+    std::uint32_t hi = static_cast<std::uint32_t>(raw >> 32);
+    asm volatile("mcrr p15, 6, %0, %1, c2" ::"r"(lo), "r"(hi) : "memory");
+  }
 #endif // defined(__arm__) && !defined(__aarch64__)
 };
 

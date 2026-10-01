@@ -109,6 +109,114 @@ TEST_F(MmuRegsTest, Arm64MairIndependentlyAddressesEachAttrByte) {
   EXPECT_EQ(mair.attr(2), 0u); // untouched
 }
 
+TEST_F(MmuRegsTest, Arm64ScrEl3RoundTripsTrustZoneWorldSwitchAndRoutingBits) {
+  using namespace structo::arch::arm64;
+  scr_el3 s{};
+  s.set_ns(true)
+      .set_irq_to_el3(true)
+      .set_fiq_to_el3(false)
+      .set_external_abort_to_el3(true)
+      .set_secure_monitor_call_disabled(false)
+      .set_hyp_call_enabled(true)
+      .set_secure_instruction_fetch(false)
+      .set_rw(true)
+      .set_secure_el1_timer_access(true)
+      .set_trap_wfi_to_el3(false)
+      .set_trap_wfe_to_el3(true);
+  EXPECT_TRUE(s.ns());
+  EXPECT_TRUE(s.irq_to_el3());
+  EXPECT_FALSE(s.fiq_to_el3());
+  EXPECT_TRUE(s.external_abort_to_el3());
+  EXPECT_FALSE(s.secure_monitor_call_disabled());
+  EXPECT_TRUE(s.hyp_call_enabled());
+  EXPECT_FALSE(s.secure_instruction_fetch());
+  EXPECT_TRUE(s.rw());
+  EXPECT_TRUE(s.secure_el1_timer_access());
+  EXPECT_FALSE(s.trap_wfi_to_el3());
+  EXPECT_TRUE(s.trap_wfe_to_el3());
+}
+
+TEST_F(MmuRegsTest, Arm64HcrEl2RoundTripsStage2AndTrapControlBits) {
+  using namespace structo::arch::arm64;
+  hcr_el2 h{};
+  h.set_vm(true)
+      .set_set_way_invalidation_override(true)
+      .set_protected_table_walk(false)
+      .set_fiq_to_el2(true)
+      .set_irq_to_el2(true)
+      .set_serror_to_el2(false)
+      .set_default_cacheability(true)
+      .set_barrier_shareability_upgrade(0b10)
+      .set_trap_wfi(true)
+      .set_trap_wfe(false)
+      .set_trap_smc(true)
+      .set_trap_tlb_maintenance(false)
+      .set_tvm(true)
+      .set_trap_general_exceptions(false)
+      .set_trap_dc_zva(true)
+      .set_hyp_call_disabled(false)
+      .set_trap_vm_reads(true)
+      .set_rw(true)
+      .set_cacheability_disabled(true)
+      .set_instruction_cacheability_disabled(true)
+      .set_e2h(true);
+  EXPECT_TRUE(h.vm());
+  EXPECT_TRUE(h.set_way_invalidation_override());
+  EXPECT_FALSE(h.protected_table_walk());
+  EXPECT_TRUE(h.fiq_to_el2());
+  EXPECT_TRUE(h.irq_to_el2());
+  EXPECT_FALSE(h.serror_to_el2());
+  EXPECT_TRUE(h.default_cacheability());
+  EXPECT_EQ(h.barrier_shareability_upgrade(), 0b10u);
+  EXPECT_TRUE(h.trap_wfi());
+  EXPECT_FALSE(h.trap_wfe());
+  EXPECT_TRUE(h.trap_smc());
+  EXPECT_FALSE(h.trap_tlb_maintenance());
+  EXPECT_TRUE(h.tvm());
+  EXPECT_FALSE(h.trap_general_exceptions());
+  EXPECT_TRUE(h.trap_dc_zva());
+  EXPECT_FALSE(h.hyp_call_disabled());
+  EXPECT_TRUE(h.trap_vm_reads());
+  EXPECT_TRUE(h.rw());
+  EXPECT_TRUE(h.cacheability_disabled());
+  EXPECT_TRUE(h.instruction_cacheability_disabled());
+  EXPECT_TRUE(h.e2h());
+}
+
+TEST_F(MmuRegsTest, Arm64VtcrEl2RoundTripsEveryNamedField) {
+  using namespace structo::arch::arm64;
+  vtcr_el2 t{};
+  t.set_t0sz(24)
+      .set_sl0(0b01)
+      .set_irgn0(0b11)
+      .set_orgn0(0b10)
+      .set_sh0(0b01)
+      .set_tg0(0b00)
+      .set_ps(0b010)
+      .set_vmid_16bit(true)
+      .set_hw_access_flag(true)
+      .set_hw_dirty_state(false);
+  EXPECT_EQ(t.t0sz(), 24u);
+  EXPECT_EQ(t.sl0(), 0b01u);
+  EXPECT_EQ(t.irgn0(), 0b11u);
+  EXPECT_EQ(t.orgn0(), 0b10u);
+  EXPECT_EQ(t.sh0(), 0b01u);
+  EXPECT_EQ(t.tg0(), 0b00u);
+  EXPECT_EQ(t.ps(), 0b010u);
+  EXPECT_TRUE(t.vmid_16bit());
+  EXPECT_TRUE(t.hw_access_flag());
+  EXPECT_FALSE(t.hw_dirty_state());
+}
+
+TEST_F(MmuRegsTest, Arm64VttbrEl2RoundTripsBaseAddrAndVmid) {
+  using namespace structo::arch::arm64;
+  vttbr_el2 v{};
+  v.set_base_addr(0x1'2345'6000ull).set_vmid(0xbeefu).set_common_not_private(true);
+  EXPECT_EQ(v.base_addr(), 0x1'2345'6000ull);
+  EXPECT_EQ(v.vmid(), 0xbeefu);
+  EXPECT_TRUE(v.common_not_private());
+}
+
 // --- ARM32 ------------------------------------------------------------
 
 TEST_F(MmuRegsTest, Arm32SctlrRoundTripsNamedBits) {
@@ -232,6 +340,64 @@ TEST_F(MmuRegsTest, Arm32NsacrGrantsAndRevokesPerCoprocessorNonSecureAccess) {
   n.set_nsd32_disabled(true).set_nsase_disabled(true);
   EXPECT_TRUE(n.nsd32_disabled());
   EXPECT_TRUE(n.nsase_disabled());
+}
+
+TEST_F(MmuRegsTest, Arm32HcrRoundTripsStage2AndTrapControlBits) {
+  using namespace structo::arch::arm;
+  hcr h{};
+  h.set_vm(true)
+      .set_set_way_invalidation_override(true)
+      .set_protected_table_walk(false)
+      .set_fiq_to_hyp(true)
+      .set_irq_to_hyp(true)
+      .set_external_abort_to_hyp(false)
+      .set_default_cacheability(true)
+      .set_barrier_shareability_upgrade(0b11)
+      .set_trap_wfi(true)
+      .set_trap_wfe(false)
+      .set_trap_smc(true)
+      .set_trap_tlb_maintenance(false)
+      .set_tvm(true)
+      .set_trap_general_exceptions(false)
+      .set_trap_dc_zva(true)
+      .set_hyp_call_disabled(false)
+      .set_trap_vm_reads(true);
+  EXPECT_TRUE(h.vm());
+  EXPECT_TRUE(h.set_way_invalidation_override());
+  EXPECT_FALSE(h.protected_table_walk());
+  EXPECT_TRUE(h.fiq_to_hyp());
+  EXPECT_TRUE(h.irq_to_hyp());
+  EXPECT_FALSE(h.external_abort_to_hyp());
+  EXPECT_TRUE(h.default_cacheability());
+  EXPECT_EQ(h.barrier_shareability_upgrade(), 0b11u);
+  EXPECT_TRUE(h.trap_wfi());
+  EXPECT_FALSE(h.trap_wfe());
+  EXPECT_TRUE(h.trap_smc());
+  EXPECT_FALSE(h.trap_tlb_maintenance());
+  EXPECT_TRUE(h.tvm());
+  EXPECT_FALSE(h.trap_general_exceptions());
+  EXPECT_TRUE(h.trap_dc_zva());
+  EXPECT_FALSE(h.hyp_call_disabled());
+  EXPECT_TRUE(h.trap_vm_reads());
+}
+
+TEST_F(MmuRegsTest, Arm32VtcrRoundTripsEveryNamedField) {
+  using namespace structo::arch::arm;
+  vtcr t{};
+  t.set_t0sz(8).set_sl0(0b01).set_irgn0(0b11).set_orgn0(0b10).set_sh0(0b01);
+  EXPECT_EQ(t.t0sz(), 8u);
+  EXPECT_EQ(t.sl0(), 0b01u);
+  EXPECT_EQ(t.irgn0(), 0b11u);
+  EXPECT_EQ(t.orgn0(), 0b10u);
+  EXPECT_EQ(t.sh0(), 0b01u);
+}
+
+TEST_F(MmuRegsTest, Arm32VttbrRoundTripsBaseAddrAndVmid) {
+  using namespace structo::arch::arm;
+  vttbr v{};
+  v.set_base_addr(0x1234'5000ull).set_vmid(0x42u);
+  EXPECT_EQ(v.base_addr(), 0x1234'5000ull);
+  EXPECT_EQ(v.vmid(), 0x42u);
 }
 
 // --- RISC-V -----------------------------------------------------------
