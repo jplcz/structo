@@ -45,6 +45,12 @@ exists and where.
 | `arch/arm/page_table_traits.hpp` | `structo::arch::arm::lpae::{level1, level2}` | Ready-made `page_table_levels<...>` configs for ARMv7 with the Large Physical Address Extension (LPAE), 4KB granule (LPAE's only granule) |
 | `arch/riscv/page_table_traits.hpp` | `structo::arch::riscv::{sv39, sv48, sv57}` | Ready-made `page_table_levels<...>` configs for RISC-V Sv39/Sv48/Sv57, where every level (including the root) allows an early-terminating leaf PTE |
 | `arch/x86/page_table_traits.hpp` | `structo::arch::x86::{i386, pae, long_mode_4level, long_mode_5level}` | Ready-made `page_table_levels<...>` configs for x86/x86-64 paging modes, with huge-page-capable levels expressed via `AllowsLeaf` |
+| `arch/pte_field.hpp` | `pte_bit_field<LowBit, NumBits, Int>` | Generic named-bit-field primitive (`get`/`set`/`test`/`set_bit`) every per-architecture PTE field descriptor header below is built from |
+| `arch/arm64/pte_stage1.hpp`, `arch/arm64/pte_stage2.hpp` | `structo::arch::arm64::{stage1_ns_tag, stage1_secure_tag, stage1_secure_el2_tag, stage2_tag, stage2_secure_tag}` (+ `page_table_entry_traits<>` specializations) | Real `page_table_entry_traits<Tag>` specializations for AArch64 stage-1/stage-2 VMSA descriptors, covering Non-secure, Secure (TrustZone), Secure EL2 (sEL2), and hypervisor-staging (stage-2) regimes, with leaf/block `final_level` selection |
+| `arch/arm/pte_stage1.hpp`, `arch/arm/pte_stage2.hpp` | `structo::arch::arm::lpae::{stage1_ns_tag, stage1_secure_tag, stage2_tag}` | ARMv7-LPAE equivalents of the above (bit-for-bit compatible format, 4KB-only granule, no sEL2 equivalent) |
+| `arch/riscv/pte.hpp` | `structo::arch::riscv::{pte_tag, pte_g_stage_tag}` | `page_table_entry_traits<Tag>` specializations for RISC-V's single shared S-stage/G-stage PTE bit layout |
+| `arch/x86/pte.hpp` | `structo::arch::x86::{pte_tag, npt_tag}` | `page_table_entry_traits<Tag>` specializations for ordinary x86/x86-64 paging and AMD NPT (identical bit layout), including the PS-vs-PAT bit-7 `final_level` caveat |
+| `arch/x86/pte_ept.hpp` | `structo::arch::x86::ept_tag` | `page_table_entry_traits<Tag>` specialization for Intel EPT's distinct encoding (no dedicated present bit; derived from R/W/X) |
 | `arch/lazy_context.hpp` | `lazy_context<Traits, CpuId>`, `lazy_context_switcher<Traits, CpuId>`, `static_per_cpu_storage<MaxCpus, Context, CpuId>` | Lazy/deferred per-thread coprocessor-state (FPU, vector registers, ...) context-switching framework, saving/restoring hardware state only on first trapped use |
 | `arch/per_cpu_ptr.hpp` | `per_cpu_ptr<Tag, T>` | Storage-free, type-safe resolver for a per-CPU `T*`, keyed by `Tag` and backed entirely by `Tag`'s own OS-specific per-CPU mechanism |
 | `arch/per_thread_ptr.hpp` | `per_thread_ptr<Tag, T>` | Storage-free, type-safe resolver for the *running thread's own* `T*`, keyed by `Tag`; exposes no explicit-thread accessor by design |
@@ -102,6 +108,7 @@ and live under `include/structo/arch/` and `include/structo/sync/`:
 - [`page_table_range.md`](page_table_range.md) -- forward-/Rust-iterable adapter walking one page-table level's caller-supplied span over a virtual-address range
 - [`page_table_occupancy.md`](page_table_occupancy.md) -- O(1) live-entry counter enabling release of now-empty page tables during an unmap walk
 - [`page_table_arch_configs.md`](page_table_arch_configs.md) -- ready-made `page_table_levels<...>` configs for ARM64, ARMv7-LPAE, RISC-V, and x86/x86-64, across every translation granule each architecture supports
+- [`page_table_entry_fields.md`](page_table_entry_fields.md) -- per-architecture `page_table_entry_traits<Tag>` specializations with named field accessors, covering TrustZone/Secure, sEL2, and hypervisor-staging (stage-2/NPT/EPT) regimes
 - [`fdt_cpu_map.md`](fdt_cpu_map.md) -- devicetree `/cpus` early CPU-index resolution into an `hw_id_lut`
 - [`lazy_context.md`](lazy_context.md) -- lazy per-thread coprocessor-state context switching
 - [`per_cpu_ptr.md`](per_cpu_ptr.md) -- storage-free, Tag-keyed per-CPU typed-pointer resolver

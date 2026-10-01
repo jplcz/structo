@@ -122,4 +122,6 @@ pattern `page_table_entry_traits<Tag>` mirrors), [`phys_page.md`](phys_page.md)
 (`page_traits<Size, Shift>`, used here as the leaf-page-size parameter),
 [`page_table_arch_configs.md`](page_table_arch_configs.md) (ready-made
 configs built from these primitives for ARM64, ARMv7-LPAE, RISC-V, and
-x86/x86-64).
+x86/x86-64), [`page_table_entry_fields.md`](page_table_entry_fields.md)
+(real `page_table_entry_traits<Tag>` specializations with named field
+accessors for each of those architectures).
