@@ -26,6 +26,7 @@ exists and where.
 | `fdt_writer.hpp` | `fdt_writer` | Move-only, fallibly-constructed streaming writer for Flattened Device Tree (DTB, `/dts-v1/`) blobs into a caller-owned span, with sticky error propagation |
 | `fdt_index.hpp` | `fdt_index<Container>`, `fdt_index_node`, `fdt_index_phandle_entry`, `fdt_index_child_iterator<NodeContainer>`, `fdt_index_property_iterator` | Random-access index over an `fdt_reader` blob, built once (iteratively, never recursively) into caller-supplied `Container<T>` buffers, giving `O(1)` parent lookup and child iteration without descending into subtrees, plus `O(log n)` phandle-to-node lookup |
 | `fdt_memory.hpp` | `try_extract_memory` | Extracts a devicetree's physical memory description straight off `fdt_reader`'s single-pass streaming API (no `fdt_index`, safe to call very early in boot) into caller-provided `region_set`s |
+| `arch/fdt_cpu_map.hpp` | `try_populate_hw_id_lut_from_fdt` | Decodes a devicetree's `/cpus` node straight off `fdt_reader`'s single-pass streaming API (no `fdt_index`, safe to call before any CPU index exists) into a caller-provided `hw_id_lut`, assigning sequential logical CPU indices in devicetree order |
 | `buddy_allocator.hpp` | `buddy_allocator<FreeList, OsPage, MaxOrder>` | Power-of-two buddy page allocator over a caller-supplied intrusive free list and `OsPage` type, with DMA/hardware-constrained and greedy allocation variants |
 | `reloco_ipc_ring.h` / `reloco_ipc_ring.hpp` | `reloco_ipc_spsc_page`, `reloco_ipc_producer`, `reloco_ipc_consumer` (C ABI); `reloco::ipc_producer`, `reloco::ipc_consumer` (C++ wrapper) | Cross-process, allocation-free single-producer/single-consumer byte-stream ring buffer over a shared-memory page; usable standalone from a Linux/FreeBSD kernel module, with a zero-copy typestate-checked C++ transaction API |
 | `arch/cpu_index.hpp` | `cpu_index<Tag>`, `uniprocessor_tag` | Zero-overhead CRTP-style "which logical CPU is this" wrapper plus core operations (yield, WFE/SEV, BSP detection, hardware ID), delegated to a caller-provided `Tag` policy |
@@ -35,6 +36,8 @@ exists and where.
 | `arch/per_thread_ptr.hpp` | `per_thread_ptr<Tag, T>` | Storage-free, type-safe resolver for the *running thread's own* `T*`, keyed by `Tag`; exposes no explicit-thread accessor by design |
 | `arch/per_domain_ptr.hpp` | `per_domain_ptr<Tag, T>` | Storage-free, type-safe resolver for a per-domain `T*` (e.g. Arm RME World ID), keyed by `Tag` and backed entirely by `Tag`'s own per-domain mechanism |
 | `sync/irq_guard.hpp` | `irq_guard<Traits>`, `irq_locked<T, Traits>`, `critical_section_token`, `with_irq_disabled` | RAII interrupt-disable guard, proof-token-gated data wrapper, and functional helper for interrupt-safe kernel code |
+| `sync/preemption_guard.hpp` | `preemption_guard<Traits>`, `preempt_locked<T, Traits>`, `preemption_disabled_token`, `with_preemption_disabled` | RAII preemption-disable guard, proof-token-gated data wrapper, and functional helper, mirroring `irq_guard` for scheduler preemption instead of interrupts |
+| `sync/core_pin_guard.hpp` | `core_pin_guard<Traits>`, `with_cpu_pinned` | RAII guard pinning the calling thread to its current CPU core for its lifetime (migration prevention, not interrupt/preemption exclusion), exposing which CPU it pinned to |
 
 ## structo's own headers
 
@@ -72,8 +75,11 @@ and live under `include/structo/arch/` and `include/structo/sync/`:
 
 - [`cpu_index.md`](cpu_index.md) -- logical-CPU resolution and core operations
 - [`hw_id_map.md`](hw_id_map.md) -- hardware-ID-to-CPU-index lookup table
+- [`fdt_cpu_map.md`](fdt_cpu_map.md) -- devicetree `/cpus` early CPU-index resolution into an `hw_id_lut`
 - [`lazy_context.md`](lazy_context.md) -- lazy per-thread coprocessor-state context switching
 - [`per_cpu_ptr.md`](per_cpu_ptr.md) -- storage-free, Tag-keyed per-CPU typed-pointer resolver
 - [`per_thread_ptr.md`](per_thread_ptr.md) -- storage-free, Tag-keyed current-thread-only typed-pointer resolver
 - [`per_domain_ptr.md`](per_domain_ptr.md) -- storage-free, Tag-keyed per-domain (e.g. Arm RME World ID) typed-pointer resolver
 - [`irq_guard.md`](irq_guard.md) -- RAII interrupt-disable guard and critical-section helpers
+- [`preemption_guard.md`](preemption_guard.md) -- RAII preemption-disable guard and critical-section helpers
+- [`core_pin_guard.md`](core_pin_guard.md) -- RAII CPU-core pinning guard preventing migration

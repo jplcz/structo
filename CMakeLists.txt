@@ -279,7 +279,10 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_lazy_context.cpp
         tests/test_cpu_index.cpp
         tests/test_hw_id_map.cpp
+        tests/test_fdt_cpu_map.cpp
         tests/test_irq_guard.cpp
+        tests/test_preemption_guard.cpp
+        tests/test_core_pin_guard.cpp
         tests/test_per_cpu_ptr.cpp
         tests/test_per_thread_ptr.cpp
         tests/test_per_domain_ptr.cpp
