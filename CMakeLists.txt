@@ -268,6 +268,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_target_ptr.cpp
         tests/test_io_address.cpp
         tests/test_io_space_ref.cpp
+        tests/test_uart_ref.cpp
         tests/test_phys_translator.cpp
         tests/test_region_set.cpp
         tests/test_sg_list.cpp
@@ -316,15 +317,16 @@ if(JPLCZ_STRUCTO_BUILD_EXAMPLES)
 endif()
 
 if(JPLCZ_STRUCTO_BUILD_HEADER_CHECKS)
-    # Recurse into every public subdirectory (arch/, sync/, ...) alongside the
-    # top-level headers; include/structo/detail/ is deliberately excluded --
-    # it holds private implementation headers, never included directly by
-    # consumers, and is not part of the public API surface this target
-    # verifies.
+    # Recurse into every public subdirectory (arch/, sync/, hw/, ...)
+    # alongside the top-level headers; include/structo/detail/ is
+    # deliberately excluded -- it holds private implementation headers,
+    # never included directly by consumers, and is not part of the public
+    # API surface this target verifies.
     file(GLOB JPLCZ_STRUCTO_PUBLIC_HEADERS CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/arch/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/sync/*.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/hw/*.hpp"
     )
 
     function(add_jplcz_structo_header_check std)
