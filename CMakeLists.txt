@@ -281,6 +281,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_hw_id_map.cpp
         tests/test_irq_guard.cpp
         tests/test_per_cpu_ptr.cpp
+        tests/test_per_thread_ptr.cpp
     )
     target_link_libraries(jplcz_structo_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)
