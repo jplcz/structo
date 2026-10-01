@@ -39,6 +39,7 @@ exists and where.
 | `sync/preemption_guard.hpp` | `preemption_guard<Traits>`, `preempt_locked<T, Traits>`, `preemption_disabled_token`, `with_preemption_disabled` | RAII preemption-disable guard, proof-token-gated data wrapper, and functional helper, mirroring `irq_guard` for scheduler preemption instead of interrupts |
 | `sync/core_pin_guard.hpp` | `core_pin_guard<Traits>`, `with_cpu_pinned` | RAII guard pinning the calling thread to its current CPU core for its lifetime (migration prevention, not interrupt/preemption exclusion), exposing which CPU it pinned to |
 | `sync/core_rendezvous_barrier.hpp` | `core_rendezvous_barrier<Traits>` | Reusable, spin-only SMP rendezvous point for exactly `num_cores` participants, invoking a caller-supplied callback once per spin iteration on every non-leader core while it waits |
+| `sync/early_rendezvous_barrier.h` / `.hpp` | `structo_early_rendezvous_wait`, `early_rendezvous_wait<Traits>` | Trivial, GCC/Clang-only, purely-static-storage SMP rendezvous barrier (plain C struct + `__atomic_*` builtins) usable before `.init_array`/global constructors have run |
 
 ## structo's own headers
 
@@ -85,3 +86,4 @@ and live under `include/structo/arch/` and `include/structo/sync/`:
 - [`preemption_guard.md`](preemption_guard.md) -- RAII preemption-disable guard and critical-section helpers
 - [`core_pin_guard.md`](core_pin_guard.md) -- RAII CPU-core pinning guard preventing migration
 - [`core_rendezvous_barrier.md`](core_rendezvous_barrier.md) -- spin-only SMP rendezvous barrier with on-spin callback
+- [`early_rendezvous_barrier.md`](early_rendezvous_barrier.md) -- purely-static-storage boot-phase SMP rendezvous barrier (C struct + compiler atomic builtins)
