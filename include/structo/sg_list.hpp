@@ -6,6 +6,7 @@
 
 #include "phys_addr.hpp"
 #include <reloco/error.hpp>
+#include <reloco/lifetime.hpp>
 #include <reloco/vector.hpp>
 
 namespace structo {
@@ -86,8 +87,10 @@ public:
     return c_.try_push_back({paddr, length});
   }
 
-  [[nodiscard]] Container &base() noexcept { return c_; }
-  [[nodiscard]] const Container &base() const noexcept { return c_; }
+  /** @brief Borrows the underlying container directly (e.g. for capacity queries the adapter does not expose). */
+  [[nodiscard]] Container &base() & noexcept RELOCO_LIFETIMEBOUND { return c_; }
+  /** @copydoc base() & */
+  [[nodiscard]] const Container &base() const & noexcept RELOCO_LIFETIMEBOUND { return c_; }
 
 private:
   Container c_;

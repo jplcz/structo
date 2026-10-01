@@ -11,6 +11,25 @@ and tests. See [docs/reference.md](reference.md) for the per-header API map
 and the [README](../README.md) for the project's dependency-resolution
 conventions.
 
+`structo` is a consumer of [`jplcz_reloco`](https://github.com/jplcz/reloco)
+and inherits its standards rather than defining its own in parallel. When in
+doubt, follow `reloco`'s own documentation directly:
+
+| Topic | `reloco` doc |
+|---|---|
+| Tri-tier (`checked`/`try_`/`unsafe_`) accessors, rvalue-access blocking, the full container template | [`container-contract.md`](https://github.com/jplcz/reloco/blob/master/docs/container-contract.md) |
+| Why hardened/fallible containers exist; the `std::` -> `reloco::` type table | [`hardened-containers.md`](https://github.com/jplcz/reloco/blob/master/docs/hardened-containers.md) |
+| `RELOCO_LIFETIMEBOUND`/`RELOCO_OWNER`/`RELOCO_POINTER`/`RELOCO_UNSAFE_BUFFER_USAGE` and the rest of the Clang/GCC safety-annotation macros | [`lifetime-safety.md`](https://github.com/jplcz/reloco/blob/master/docs/lifetime-safety.md) |
+| `try_create`/factory-function patterns for types that cannot be default-constructed into a valid state | [`fallible-construction.md`](https://github.com/jplcz/reloco/blob/master/docs/fallible-construction.md) |
+| `is_trivially_relocatable<T>` and why it matters for zero-overhead moves | [`relocatable.md`](https://github.com/jplcz/reloco/blob/master/docs/relocatable.md) |
+
+If a local path to a `reloco` checkout is available, the same docs live at
+`$RELOCO_SOURCE_DIR/docs/*.md` (e.g.
+`JPLCZ_STRUCTO_RELOCO_SOURCE_DIR/docs/container-contract.md`, see the
+[README](../README.md)'s dependency-resolution section for how that variable
+is resolved) -- prefer that copy if it may be newer than the link above.
+
+
 ## No `std::` containers in main code or examples
 
 `include/structo/**` and `examples/**` must not reference non-trivial
@@ -63,6 +82,13 @@ tests going forward; it is not a mandate to retrofit every existing
 
 ## Follow `reloco`'s memory-safe container patterns: the three-tier accessor system
 
+This section summarizes the convention as applied in `structo`; see
+`reloco`'s [`container-contract.md`](https://github.com/jplcz/reloco/blob/master/docs/container-contract.md)
+for the authoritative copy-paste template/checklist and
+[`hardened-containers.md`](https://github.com/jplcz/reloco/blob/master/docs/hardened-containers.md)
+for the user-facing rationale -- `structo` follows these verbatim rather
+than defining a competing convention.
+
 Any class `structo` defines that owns, indexes into, or otherwise guards
 access to data that *can* be invalid/absent/out-of-range (an empty slot,
 an out-of-bounds index, a not-yet-initialized value, a moved-from
@@ -99,7 +125,16 @@ can flag a dangling use when the result outlives the object it was
 borrowed from; a pointer that *does* transfer ownership should instead
 be annotated `RELOCO_OWNER` at the point it is produced and
 `RELOCO_POINTER`-style non-owning raw pointers used elsewhere, matching
-`reloco`'s own usage of these annotations (see `reloco/lifetime.hpp`).
+`reloco`'s own usage of these annotations (see `reloco/lifetime.hpp` and
+[`lifetime-safety.md`](https://github.com/jplcz/reloco/blob/master/docs/lifetime-safety.md)
+for the full macro reference). A class exposing container-like,
+`&`-aliasing accessors (`operator[]`, `front()`/`back()`, `data()`,
+`begin()`/`end()`, or a `base()`-style escape hatch into an owned
+container) should additionally ref-qualify those accessors `&`/`const &`
+(or use `RELOCO_BLOCK_RVALUE_ACCESS`, from `reloco/rvalue_safety.hpp`, for
+a type that exposes the exact member-name surface that macro targets) so
+a borrow can never be taken from a temporary -- see `sg_list::base()` for
+an example of the ref-qualified form.
 
 Not every class needs all three tiers -- a storage-free resolver like
 `per_cpu_ptr<Tag, T>` that only ever `static_cast`s an already-`void*`
