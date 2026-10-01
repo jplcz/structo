@@ -35,6 +35,7 @@ exists and where.
 | `reloco_ipc_ring.h` / `reloco_ipc_ring.hpp` | `reloco_ipc_spsc_page`, `reloco_ipc_producer`, `reloco_ipc_consumer` (C ABI); `reloco::ipc_producer`, `reloco::ipc_consumer` (C++ wrapper) | Cross-process, allocation-free single-producer/single-consumer byte-stream ring buffer over a shared-memory page; usable standalone from a Linux/FreeBSD kernel module, with a zero-copy typestate-checked C++ transaction API |
 | `arch/cpu_index.hpp` | `cpu_index<Tag>`, `uniprocessor_tag` | Zero-overhead CRTP-style "which logical CPU is this" wrapper plus core operations (yield, WFE/SEV, BSP detection, hardware ID), delegated to a caller-provided `Tag` policy |
 | `arch/hw_id_map.hpp` | `hw_id_lut<HwId, MaxCpus, L1Size, Hash>`, `default_hw_id_hash` | Allocation-free, two-tier (hash-filtered L1 + sorted L2 fallback) lookup table mapping a hardware ID (e.g. MPIDR_EL1) to a logical CPU index |
+| `arch/asid_allocator.hpp` | `asid_allocator<Tag, MaxActive>`, `tagged_asid<Tag>`, `process_asid_tag`, `vmid_tag` | Generation-counted bitmap ASID/VMID/PCID allocator (runtime ASID width, allocator-backed bitmap storage), returning an opaque, per-Tag `tagged_asid<Tag>` handle that cannot be confused between a process ASID and a VM's VMID |
 | `arch/lazy_context.hpp` | `lazy_context<Traits, CpuId>`, `lazy_context_switcher<Traits, CpuId>`, `static_per_cpu_storage<MaxCpus, Context, CpuId>` | Lazy/deferred per-thread coprocessor-state (FPU, vector registers, ...) context-switching framework, saving/restoring hardware state only on first trapped use |
 | `arch/per_cpu_ptr.hpp` | `per_cpu_ptr<Tag, T>` | Storage-free, type-safe resolver for a per-CPU `T*`, keyed by `Tag` and backed entirely by `Tag`'s own OS-specific per-CPU mechanism |
 | `arch/per_thread_ptr.hpp` | `per_thread_ptr<Tag, T>` | Storage-free, type-safe resolver for the *running thread's own* `T*`, keyed by `Tag`; exposes no explicit-thread accessor by design |
@@ -85,6 +86,7 @@ and live under `include/structo/arch/` and `include/structo/sync/`:
 
 - [`cpu_index.md`](cpu_index.md) -- logical-CPU resolution and core operations
 - [`hw_id_map.md`](hw_id_map.md) -- hardware-ID-to-CPU-index lookup table
+- [`asid_allocator.md`](asid_allocator.md) -- generation-counted bitmap ASID/VMID allocator with a tagged, opaque context-ID handle
 - [`fdt_cpu_map.md`](fdt_cpu_map.md) -- devicetree `/cpus` early CPU-index resolution into an `hw_id_lut`
 - [`lazy_context.md`](lazy_context.md) -- lazy per-thread coprocessor-state context switching
 - [`per_cpu_ptr.md`](per_cpu_ptr.md) -- storage-free, Tag-keyed per-CPU typed-pointer resolver

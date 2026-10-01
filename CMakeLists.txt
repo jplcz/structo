@@ -292,6 +292,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_per_cpu_ptr.cpp
         tests/test_per_thread_ptr.cpp
         tests/test_per_domain_ptr.cpp
+        tests/test_asid_allocator.cpp
     )
     target_link_libraries(jplcz_structo_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)
