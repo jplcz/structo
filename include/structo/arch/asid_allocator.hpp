@@ -120,22 +120,241 @@
  * force every caller -- including single-core, uniprocessor-only
  * embedded targets -- to pay for synchronization they may not need.
  *
+ * ## Bridging to an `mm_context`-like structure
+ *
+ * A real kernel's per-address-space structure (Linux's `mm_context_t`,
+ * a hypervisor's per-VM `vmid` field, etc.) should cache exactly one
+ * `context_id` across its whole lifetime and drive it through three
+ * distinct events -- *activation* (context switch in), *deactivation*
+ * (context switch out), and *destruction* (the address space itself goes
+ * away) -- which are NOT symmetric with `allocate()`/`release()`:
+ *
+ *   - **Activation** (`switch_mm`/`vcpu_load`-equivalent) is the ONLY time
+ *     `allocate()` is called, passing the context's own cached ID back in
+ *     as `prev` so an ID still valid in the current generation is reused
+ *     for free. `flush_required` tells you whether a rollover just
+ *     invalidated every outstanding ASID hardware-side; if so, a
+ *     **global, non-tagged** TLB invalidation is mandatory before loading
+ *     the (possibly numerically-recycled) ASID -- a rollover means some
+ *     *other* address space may already have been handed the very same
+ *     raw ASID bits in the new generation, so any stale entries still
+ *     tagged with that number from the old generation would otherwise be
+ *     wrongly treated as belonging to the new owner.
+ *   - **Deactivation** (switching away to run something else) requires NO
+ *     allocator call and NO TLB action at all -- this is the entire point
+ *     of a tagged TLB: entries stay cached, tagged with this context's
+ *     ASID, ready for an instant, flush-free reactivation later. Simply
+ *     leave the cached `context_id` as-is.
+ *   - **Destruction** (process/VM exit) is the ONLY time `release()` is
+ *     called, returning the bit to circulation; do not call it on a plain
+ *     deactivation; and after a `release()`, a **tagged** (this-ASID-only)
+ *     TLB invalidation should be issued so the now-reusable hardware ASID
+ *     doesn't serve stale translations to whichever context is handed
+ *     that number next.
+ *
+ * A context that merely *changes its own mappings* in place (e.g.
+ * `munmap`/`mprotect`) without being deactivated or destroyed needs
+ * neither `allocate()` nor `release()` -- only a **tagged** flush of its
+ * own ASID, which (unlike the rollover's global flush) leaves every other
+ * address space's cached TLB entries untouched.
+ *
  * @code
  * // Probed once at boot, e.g. from ID_AA64MMFR0_EL1.ASIDBits.
  * std::size_t hw_asid_bits = probe_asid_bits();
  *
- * auto maker = structo::arch::asid_allocator<structo::arch::process_asid_tag, 8>::try_create(hw_asid_bits);
+ * using allocator_type = structo::arch::asid_allocator<structo::arch::process_asid_tag, 8>;
+ * auto maker = allocator_type::try_create(hw_asid_bits);
  * if (!maker) { panic("out of memory sizing the ASID bitmap"); }
  * auto allocator = std::move(maker.value());
  *
- * // On a context switch into `task` on logical core `core_id`:
- * auto alloc_res = allocator.allocate(core_id, task.asid);
- * if (!alloc_res) { panic("ASID space exhausted"); } // unreachable in practice
- * task.asid = alloc_res.value().id;
- * if (alloc_res.value().flush_required) {
- *   arch_flush_tlb_all(); // architecture-specific, not this header's concern
+ * struct mm_context {
+ *   allocator_type::context_id asid{}; // default-constructed: invalid, never activated
+ *   // ... page tables, VMAs, etc.
+ * };
+ *
+ * // Activation: context switch INTO `mm` on logical core `core_id`.
+ * void activate_mm(mm_context &mm, std::size_t core_id) {
+ *   auto alloc_res = allocator.allocate(core_id, mm.asid);
+ *   if (!alloc_res) { panic("ASID space exhausted"); } // unreachable in practice
+ *   mm.asid = alloc_res.value().id;
+ *   if (alloc_res.value().flush_required) {
+ *     arch_flush_tlb_all(); // global, non-tagged: a rollover just happened
+ *   }
+ *   arch_write_ttbr0_asid(mm.page_table_base, allocator.asid_of(mm.asid));
  * }
- * arch_write_ttbr0_asid(allocator.asid_of(task.asid)); // the one sanctioned decode
+ *
+ * // Deactivation: switching away to run something else. No allocator
+ * // call, no TLB flush -- `mm.asid` simply stays cached as-is.
+ * void deactivate_mm(mm_context &) {}
+ *
+ * // Destruction: the address space itself is being torn down.
+ * void mm_exit(mm_context &mm) {
+ *   auto asid = allocator.asid_of(mm.asid); // decode before releasing
+ *   allocator.release(mm.asid);
+ *   mm.asid = {};
+ *   arch_flush_tlb_asid(asid); // tagged: only this now-reusable ASID's entries
+ * }
+ *
+ * // In-place mapping change (e.g. munmap) while `mm` stays resident.
+ * void flush_mm_mappings(mm_context &mm) {
+ *   arch_flush_tlb_asid(allocator.asid_of(mm.asid)); // tagged, this ASID only
+ * }
+ * @endcode
+ *
+ * ## Finding which CPUs to flush: `mm_context` may be active on none, one, or many cores
+ *
+ * `flush_mm_mappings()` above is only correct on a strictly single-core
+ * target. On SMP, a page-table mutation must reach the TLB of **every**
+ * core that could be holding a stale, tagged translation for `mm` -- which
+ * is not just "the core currently running it": `active(slot)` reports the
+ * context most recently loaded into tracking slot `slot` and is left
+ * untouched by deactivation (deactivation is a pure no-op, by design --
+ * see "Bridging to an `mm_context`-like structure" above), so a slot whose
+ * owner was merely switched away from (not released) still correctly
+ * reports `mm`'s ID here, flagging that core's TLB as still potentially
+ * carrying `mm`'s tagged entries from its last residency. Iterating every
+ * slot and comparing against `mm.asid` (via `tagged_asid`'s `operator==`)
+ * is therefore the right -- and only -- way to compute the shootdown
+ * target set; there is no separate "is this mm active anywhere" query
+ * because this iteration already answers it (an empty target set means
+ * no core's TLB can contain `mm`'s entries, so nothing need be flushed at
+ * all, now or later, until `mm` is activated again, which revalidates
+ * through `allocate()` that happens to re-share the same unflushed ASID
+ * only when the mapping did not change since -- callers that mutate
+ * mappings must always flush below, since `allocate()` performs no
+ * flush of its own on a fast-path reuse).
+ *
+ * Once the target set is known, delivering the flush itself is
+ * architecture-specific: some ISAs provide a broadcast, tagged
+ * invalidation instruction that every core in a shareability domain
+ * observes without software help (e.g. ARM's inner-shareable `TLBI
+ * ...IS` forms) -- there, a single instruction on any one core suffices
+ * and the loop below only needs to decide *whether* to flush at all, not
+ * which cores to IPI. Architectures without a broadcast form (plain
+ * `INVLPG`/`INVPCID` on x86-64, or non-`IS` ARM forms) require the
+ * classic TLB-shootdown pattern: flush locally in-line if the local core
+ * is in the target set, and send an inter-processor interrupt to every
+ * *other* target core asking it to run the same local, tagged flush on
+ * itself, waiting for all of them to acknowledge before returning (so the
+ * caller can safely assume the stale mapping is gone everywhere once the
+ * function returns). This is exactly the same shootdown machinery a
+ * generation rollover's `arch_flush_tlb_all()` (see "Division of
+ * responsibility" above) needs too -- a rollover's stale entries can be
+ * resident on *any* core, not just the one that happened to observe
+ * `flush_required`, so that flush must also reach every core, typically
+ * by unconditionally targeting the whole cpu mask rather than computing
+ * one from `active()`.
+ *
+ * @code
+ * // Returns a bitmask of logical core indices that may be holding a
+ * // stale, tagged TLB entry for `mm` -- empty if `mm` has never been
+ * // resident on any core, or was fully flushed since its last residency.
+ * std::uint64_t cpu_mask_for_mm(const mm_context &mm) {
+ *   std::uint64_t mask = 0;
+ *   if (!mm.asid.is_valid()) { return mask; } // never activated: nothing to flush
+ *   for (std::size_t slot = 0; slot < allocator_type::max_active; ++slot) {
+ *     if (allocator.active(slot) == mm.asid) {
+ *       mask |= (std::uint64_t{1} << slot); // assumes slot == logical core index
+ *     }
+ *   }
+ *   return mask;
+ * }
+ *
+ * // Call after mutating `mm`'s page tables (munmap/mprotect/etc.) while
+ * // it may be resident -- current or past -- on any number of cores.
+ * void flush_mm_mappings_smp(mm_context &mm) {
+ *   std::uint64_t targets = cpu_mask_for_mm(mm);
+ *   if (targets == 0) { return; } // not resident anywhere: nothing can be stale
+ *
+ *   auto raw_asid = allocator.asid_of(mm.asid);
+ *   if constexpr (arch_has_broadcast_tlbi) {
+ *     arch_flush_tlb_asid_broadcast(raw_asid); // e.g. ARM TLBI ...IS: one instruction, every core
+ *   } else {
+ *     if (targets & (std::uint64_t{1} << this_cpu())) {
+ *       arch_flush_tlb_asid(raw_asid); // local, tagged
+ *     }
+ *     arch_send_tlb_shootdown_ipi(targets & ~(std::uint64_t{1} << this_cpu()), raw_asid);
+ *     arch_wait_for_shootdown_acks(targets); // block until every remote core has flushed
+ *   }
+ * }
+ * @endcode
+ *
+ * ## Fine-grained flushes after unmapping a single page
+ *
+ * `flush_mm_mappings_smp()` above invalidates **every** TLB entry tagged
+ * with `mm`'s ASID -- correct, but wasteful after e.g. a single `munmap()`
+ * of one page: every other still-mapped page's cached translation is
+ * thrown away too, only to be refetched by a page-table walk on its next
+ * access. Most ISAs provide a by-address (optionally still ASID-tagged)
+ * invalidation form precisely for this case (ARM's `TLBI VAE1IS`, x86's
+ * single-address `INVLPG`/`INVPCID` type 0) -- use it instead of the
+ * whole-ASID form whenever the set of unmapped pages is small, following
+ * exactly the same target-cpu-mask computation as above (the *scope* of
+ * what gets invalidated changes; *where* it needs to be invalidated does
+ * not).
+ *
+ * A single-page (or short run of pages) unmap should therefore issue one
+ * by-address flush per page, to the same `cpu_mask_for_mm()` target set,
+ * instead of a full-ASID flush:
+ *
+ * @code
+ * // Call after unmapping exactly one page at `vaddr` from `mm`.
+ * void flush_mm_page(mm_context &mm, std::uintptr_t vaddr) {
+ *   std::uint64_t targets = cpu_mask_for_mm(mm);
+ *   if (targets == 0) { return; }
+ *
+ *   auto raw_asid = allocator.asid_of(mm.asid);
+ *   if constexpr (arch_has_broadcast_tlbi) {
+ *     arch_flush_tlb_page_asid_broadcast(raw_asid, vaddr); // by-address, tagged, one instruction
+ *   } else {
+ *     if (targets & (std::uint64_t{1} << this_cpu())) {
+ *       arch_flush_tlb_page_asid(raw_asid, vaddr); // local, by-address, tagged
+ *     }
+ *     arch_send_tlb_shootdown_ipi_page(targets & ~(std::uint64_t{1} << this_cpu()), raw_asid, vaddr);
+ *     arch_wait_for_shootdown_acks(targets);
+ *   }
+ * }
+ * @endcode
+ *
+ * Unmapping a short *run* of pages (e.g. a small `munmap()` range) extends
+ * naturally: loop `flush_mm_page()`-style over each page in the range,
+ * reusing one `cpu_mask_for_mm()` computation and one shootdown IPI/ack
+ * round-trip for the whole range rather than per page, issuing a
+ * by-address invalidation (or, on ISAs that provide one, a single
+ * hardware range-invalidation instruction, e.g. ARM's `TLBI RVAE1IS`) for
+ * each page in the loop. Past some range-size threshold, though, the
+ * per-page loop's cumulative cost exceeds a single full-ASID flush --
+ * real kernels (e.g. Linux's `tlb_flush_mmu()`) fall back to the
+ * whole-ASID form above once the unmapped range spans more than a
+ * small, architecture-tuned number of pages, rather than looping
+ * indefinitely:
+ *
+ * @code
+ * // Call after unmapping [start, end) from `mm` (end exclusive, both
+ * // page-aligned). Falls back to a full-ASID flush past a small
+ * // range-size threshold, matching real kernels' amortization heuristic.
+ * constexpr std::size_t max_pages_for_fine_grained_flush = 33; // architecture-tuned, e.g. Linux arm64's default
+ *
+ * void flush_mm_range(mm_context &mm, std::uintptr_t start, std::uintptr_t end) {
+ *   std::size_t num_pages = (end - start) / page_size;
+ *   if (num_pages > max_pages_for_fine_grained_flush) {
+ *     flush_mm_mappings_smp(mm); // cheaper than num_pages individual invalidations
+ *     return;
+ *   }
+ *
+ *   std::uint64_t targets = cpu_mask_for_mm(mm);
+ *   if (targets == 0) { return; }
+ *   auto raw_asid = allocator.asid_of(mm.asid);
+ *   for (std::uintptr_t vaddr = start; vaddr < end; vaddr += page_size) {
+ *     if constexpr (arch_has_broadcast_tlbi) {
+ *       arch_flush_tlb_page_asid_broadcast(raw_asid, vaddr);
+ *     } else {
+ *       if (targets & (std::uint64_t{1} << this_cpu())) { arch_flush_tlb_page_asid(raw_asid, vaddr); }
+ *       arch_send_tlb_shootdown_ipi_page(targets & ~(std::uint64_t{1} << this_cpu()), raw_asid, vaddr);
+ *     }
+ *   }
+ *   if constexpr (!arch_has_broadcast_tlbi) { arch_wait_for_shootdown_acks(targets); } // once, for the whole range
+ * }
  * @endcode
  */
 
