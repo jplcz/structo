@@ -122,6 +122,12 @@
  *
  * ## Bridging to an `mm_context`-like structure
  *
+ * @note The pattern below (one cached `context_id` plus a per-mm
+ * cpu-residency mask) is implemented as a ready-made, tested type in
+ * `structo/arch/mm_asid_context.hpp` (`mm_asid_context<AsidTag, MaxCpus>`)
+ * -- prefer it over hand-rolling the fields described here, unless its
+ * design (see its own Doxygen block for the reasoning) doesn't fit.
+ *
  * A real kernel's per-address-space structure (Linux's `mm_context_t`,
  * a hypervisor's per-VM `vmid` field, etc.) should cache exactly one
  * `context_id` across its whole lifetime and drive it through three

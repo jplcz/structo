@@ -132,6 +132,12 @@ single-core targets) that don't need one.
 
 ## Bridging to an `mm_context`-like structure
 
+> **A ready-made implementation of this pattern exists:** see
+> [`mm_asid_context.md`](mm_asid_context.md) (`mm_asid_context<AsidTag,
+> MaxCpus>`) for a tested type that embeds exactly the cached
+> `context_id` plus the lock-free cpu-residency mask this section
+> describes, instead of hand-rolling the fields below.
+
 A per-address-space structure (Linux's `mm_context_t`, a hypervisor's
 per-VM `vmid` field, etc.) should cache exactly one `context_id` across
 its whole lifetime, driven through three events that are **not**
@@ -357,7 +363,9 @@ if (alloc_res.value().flush_required) {
 arch_write_ttbr0_asid(allocator.asid_of(task.asid)); // the one sanctioned decode
 ```
 
-See also: [`hw_id_map.md`](hw_id_map.md) (the analogous hardware-ID-to-
-logical-index lookup this header's `MaxActive` convention is modeled
-after), [`io_space_ref.md`](io_space_ref.md) (the same "bookkeeping here,
-hardware effects at the caller" division of responsibility).
+See also: [`mm_asid_context.md`](mm_asid_context.md) (the ready-made
+`mm_context`-bridging type built on this allocator), [`hw_id_map.md`](hw_id_map.md)
+(the analogous hardware-ID-to-logical-index lookup this header's
+`MaxActive` convention is modeled after), [`io_space_ref.md`](io_space_ref.md)
+(the same "bookkeeping here, hardware effects at the caller" division of
+responsibility).

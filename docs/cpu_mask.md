@@ -96,6 +96,15 @@ compile outright (`#error`) on any other compiler.
   **clear**-and-set, a lock-free "claim a free slot" bitmap-allocator
   primitive built on an `__atomic_compare_exchange_n()` retry loop;
   returns the claimed index, or `nullopt` if every CPU is already set.
+- `atomic_snapshot(order = memory_order_seq_cst)` -- builds a plain,
+  non-atomic `cpu_mask` by atomically loading each backing word in turn
+  (via `atomic_word()`). Like every other `atomic_*` accessor this is
+  per-word, not whole-mask, atomic (see below) -- useful when a caller
+  needs to hand the *whole* mask to non-atomic-aware code (iteration,
+  `count()`, equality comparisons) after a lock-free accumulation phase,
+  e.g. computing TLB-shootdown targets from a mask that only ever grows
+  bit-by-bit, where over-including a not-yet-fully-visible bit is always
+  safe.
 
 This gives per-bit atomicity, **not** whole-mask atomicity: a mask
 spanning more than one word (`MaxCpus > 64`) cannot be observed or
@@ -131,7 +140,8 @@ data race like any other.
 - `atomic_test`/`atomic_set`/`atomic_clear`/`atomic_toggle`,
   `atomic_test_and_set`/`atomic_test_and_clear`/`atomic_test_and_toggle`,
   `atomic_word`/`atomic_try_word`, `atomic_lowest_set[_from]`,
-  `atomic_find_and_set[_from]` -- lock-free atomic subset (see above).
+  `atomic_find_and_set[_from]`, `atomic_snapshot` -- lock-free atomic
+  subset (see above).
 
 ## Example
 
