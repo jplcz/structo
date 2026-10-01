@@ -246,16 +246,31 @@ if(JPLCZ_STRUCTO_BUILD_EXAMPLES)
 endif()
 
 if(JPLCZ_STRUCTO_BUILD_HEADER_CHECKS)
-    file(GLOB JPLCZ_STRUCTO_PUBLIC_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/*.hpp")
+    # Recurse into every public subdirectory (arch/, sync/, ...) alongside the
+    # top-level headers; include/structo/detail/ is deliberately excluded --
+    # it holds private implementation headers, never included directly by
+    # consumers, and is not part of the public API surface this target
+    # verifies.
+    file(GLOB JPLCZ_STRUCTO_PUBLIC_HEADERS CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/*.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/arch/*.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/sync/*.hpp"
+    )
 
     function(add_jplcz_structo_header_check std)
         set(check_dir "${CMAKE_CURRENT_BINARY_DIR}/header_check_cxx${std}")
         file(MAKE_DIRECTORY "${check_dir}")
         set(sources "")
         foreach(header ${JPLCZ_STRUCTO_PUBLIC_HEADERS})
-            get_filename_component(name "${header}" NAME_WE)
-            set(src "${check_dir}/${name}.cpp")
-            file(WRITE "${src}" "#include <structo/${name}.hpp>\n")
+            # Use the path relative to include/structo/ (e.g. "arch/cpu_index")
+            # both for the #include directive below and to build a unique
+            # generated source file name -- a flat NAME_WE would collide if
+            # two subdirectories ever ship a header with the same base name.
+            file(RELATIVE_PATH rel_header "${CMAKE_CURRENT_SOURCE_DIR}/include/structo" "${header}")
+            string(REGEX REPLACE "\\.hpp$" "" rel_name "${rel_header}")
+            string(REPLACE "/" "_" flat_name "${rel_name}")
+            set(src "${check_dir}/${flat_name}.cpp")
+            file(WRITE "${src}" "#include <structo/${rel_header}>\n")
             list(APPEND sources "${src}")
         endforeach()
         add_library(jplcz_structo_headers_cxx${std} OBJECT ${sources})

@@ -312,7 +312,7 @@ public:
     // Verify if this fault belongs to this co-processor/extension
     auto match_res = detail::trap_matcher<Traits, FaultContext>::match(fault_ctx);
     if (!match_res) {
-      return match_res.error();
+      return reloco::unexpected(match_res.error());
     }
     if (!*match_res) {
       return false; // Not our block; cascade to next extension handler

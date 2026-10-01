@@ -3,6 +3,23 @@
 
 #pragma once
 
+/** @file hw_id_map.hpp
+ * @brief `structo::arch::hw_id_lut<HwId, MaxCpus, L1Size, Hash>`: a
+ * caller-owned, allocation-free, two-tier lookup table mapping an
+ * architectural hardware ID (e.g. ARM's MPIDR_EL1) to a logical CPU
+ * index.
+ *
+ * Built for the SMP boot path: firmware/devicetree enumerates CPUs by
+ * raw hardware ID, but the rest of the kernel wants a dense `[0,
+ * max_cpus)` logical index. Lookup is a fixed-size hash filter (L1, one
+ * byte per slot, capacity a power of two up to 64) verified against a
+ * direct inverse map to eliminate false positives in O(1); any hash
+ * collision demotes that slot to a tombstone and falls back to a
+ * sorted, duplicate-free array (L2) searched in O(log `MaxCpus`).
+ * `default_hw_id_hash` is the bundled multiplication-free mixer tuned
+ * for small (<=4-byte) and wide (8-byte) hardware IDs alike.
+ */
+
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
@@ -12,7 +29,19 @@ namespace structo::arch {
 // -------------------------------------------------------------------------
 // Multiplication-Free Hardware ID Mixer
 // -------------------------------------------------------------------------
+/**
+ * @brief Default `hw_id_lut` hash functor: a multiplication-free bit mixer
+ * (XOR-shift cascade) chosen for cheap bare-metal codegen (no hardware
+ * multiplier required).
+ * @tparam HwId Hardware ID integer type being hashed.
+ */
 template <typename HwId> struct default_hw_id_hash {
+  /**
+   * @brief Mixes `id` into a `std::size_t` hash value.
+   * @param id Hardware ID to hash.
+   * @return Mixed hash value (only the low `log2(L1Size)` bits are
+   * actually consumed by `hw_id_lut`, via `& l1_mask`).
+   */
   [[nodiscard]] constexpr std::size_t operator()(HwId id) const noexcept {
     if constexpr (sizeof(HwId) <= 4) {
       // ARM barrel-shifter friendly: 2 instructions, 0 multipliers
@@ -66,6 +95,12 @@ public:
   /**
    * @brief Register a hardware ID mapping.
    * Inserts into sorted L2, then registers into L1 if no hash collision occurs.
+   * If `id` is already registered, updates its `cpu_idx` in place instead of
+   * growing the table (keeping L1, L2, and the inverse map all consistent).
+   * @param id      Hardware ID to register (e.g. an MPIDR value).
+   * @param cpu_idx Logical CPU index to associate with `id`.
+   * @return `true` on success; `false` if `cpu_idx` is out of range (or the
+   * reserved tombstone value) or the table is already full.
    */
   constexpr bool insert(hw_id_type id, uint8_t cpu_idx) noexcept {
     if (cpu_idx >= max_cpus || m_l2_size >= max_cpus || cpu_idx == tombstone) {
@@ -80,8 +115,26 @@ public:
 
     // If entry already exists, update cpu_idx
     if (insert_pos < m_l2_size && m_l2[insert_pos].hw_id == id) {
+      const uint8_t old_cpu_idx = m_l2[insert_pos].cpu_idx;
       m_l2[insert_pos].cpu_idx = cpu_idx;
+      if (old_cpu_idx != cpu_idx) {
+        // Drop the stale inverse-map entry for the vacated cpu_idx so a
+        // later insert() reusing a different hw_id at that index cannot be
+        // confused with this one.
+        m_hw_by_cpu[old_cpu_idx] = hw_id_type{};
+      }
       m_hw_by_cpu[cpu_idx] = id;
+
+      // Repoint the L1 fast-path slot too, if this id owns one uncollided:
+      // leaving it at old_cpu_idx would make find() return the superseded
+      // index via the L1 path even though L2 (and m_hw_by_cpu) already
+      // moved on.
+      const std::size_t slot = hasher{}(id)&l1_mask;
+      const uint64_t slot_bit = (1ULL << slot);
+      if ((m_l1_collided & slot_bit) == 0) {
+        m_l1_claimed |= slot_bit;
+        m_l1[slot] = cpu_idx;
+      }
       return true;
     }
 
@@ -119,6 +172,9 @@ public:
    * @brief Resolve hardware ID to core index.
    * Path 1: Check L1 filter and verify against inverse map (O(1)).
    * Path 2: Fall back to L2 binary search (O(log N)).
+   * @param id Hardware ID to resolve.
+   * @return The registered logical CPU index, or `invalid_index` if `id`
+   * was never registered via `insert()`.
    */
   [[nodiscard]] constexpr std::size_t find(hw_id_type id) const noexcept {
     // --- Level 1: Direct Mapped Filter ---
@@ -136,6 +192,13 @@ public:
     return binary_search_l2(id);
   }
 
+  /**
+   * @brief `find()` variant reporting success/failure instead of a sentinel.
+   * @param id      Hardware ID to resolve.
+   * @param out_idx Set to the resolved logical CPU index on success; left
+   * untouched on failure.
+   * @return `true` if `id` was found; `false` otherwise.
+   */
   [[nodiscard]] constexpr bool lookup(hw_id_type id, std::size_t &out_idx) const noexcept {
     const std::size_t res = find(id);
     if (res != invalid_index) {
@@ -145,6 +208,9 @@ public:
     return false;
   }
 
+  /**
+   * @brief Resets the table to empty (no registered hardware IDs).
+   */
   constexpr void clear() noexcept {
     for (std::size_t i = 0; i < l1_capacity; ++i) {
       m_l1[i] = tombstone;
@@ -158,10 +224,18 @@ public:
     m_l2_size = 0;
   }
 
+  /**
+   * @brief Number of hardware IDs currently registered.
+   * @return Current L2 occupancy (always `<= max_cpus`).
+   */
   [[nodiscard]] constexpr std::size_t size() const noexcept { return m_l2_size; }
 
 private:
-  // Binary search in sorted m_l2 array
+  /**
+   * @brief Binary search for `id` in the sorted, duplicate-free L2 array.
+   * @param id Hardware ID to resolve.
+   * @return The registered logical CPU index, or `invalid_index` if not found.
+   */
   [[nodiscard]] constexpr std::size_t binary_search_l2(hw_id_type id) const noexcept {
     std::size_t low = 0;
     std::size_t high = m_l2_size;
