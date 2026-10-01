@@ -33,4 +33,20 @@ built purely on top of those two hooks:
 See the header's `@file` block for a complete `arm_irq_traits` example
 (ARM-style CPSR save/restore via inline assembly).
 
+## Bundled per-architecture `Traits`
+
+Real, ready-made `Traits` implementations are provided per architecture
+(best-effort inline assembly; not exercisable from a normal userspace
+test process since they execute privileged instructions -- validated by
+header-compilation only, under each architecture's own `#if`/`__arm__`-
+style guard so the header is an intentional no-op when built for any
+other target):
+
+| Header | Type | Masks |
+|---|---|---|
+| `arch/arm/irq_guard.hpp` | `structo::arch::arm::irq_traits` | CPSR `A`/`I`/`F` ("AIF") via `cpsid aif` |
+| `arch/arm64/irq_guard.hpp` | `structo::arch::arm64::irq_traits` | `DAIF` (Debug/SError/IRQ/FIQ) via `msr daifset, #0xf` |
+| `arch/riscv/irq_guard.hpp` | `structo::arch::riscv::irq_traits` | `sstatus.SIE` (supervisor mode) |
+| `arch/x86/irq_guard.hpp` | `structo::arch::x86::irq_traits` | `RFLAGS.IF` via `cli`, full flags saved/restored with `pushf`/`popf` |
+
 See also: [`lazy_context.md`](lazy_context.md).
