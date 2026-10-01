@@ -17,6 +17,7 @@ exists and where.
 | `compat_sg.hpp` | `sg_descriptor_layout<StorageType, PfnField, OffsetField, LengthField, LastFlagField, HeaderSize>`, `chained_sg_layout<StorageType, PfnField, OffsetField, LengthField, LastFlagField, ChainFlagField, HeaderSize>`, `compact_sg_codec<Layout, PageTraits, SpaceTag>`, `chained_sg_codec<Layout, PageTraits, SpaceTag>`, `two_level_sg_codec<L1Layout, L2Layout, PageTraits, SpaceTag>` | Compile-time scatter-gather descriptor layouts and codecs for compact, chained, and two-level representations |
 | `phys_addr.hpp` | `default_phys_space`, `host_phys_space`, `guest_phys_space`, `dma_bus_space`, `secure_phys_space`, `nonsecure_phys_space`, `root_phys_space`, `realm_phys_space`, `phys_addr<T, SpaceTag, PhysInt>`, `dmap_mapper<VirtBase, PhysSize, ExpectedSpace, PhysBase>`, `dmap_ptr<T, Mapper, PhysInt>` | Typed physical addresses, address-space tags, and direct-map pointer conversion |
 | `target_ptr.hpp` | `user_space`, `kernel_space`, `guest_vm_space`, `realm_space`, `secure_world_space`, `target_ptr_space_traits<SpaceTag>`, `target_ptr<T, SpaceTag, PtrType>` | Typed pointer into another *virtual* address space (user/kernel/Realm/guest VM/...), valid only in the current execution context; fallible, page-fault-aware materialize/store accessors (with `_nofault` variants) and Rust-style checked/wrapping/saturating pointer arithmetic |
+| `io_address.hpp` | `default_io_space`, `port_io_space`, `device_io_space`, `secure_io_space`, `nonsecure_io_space`, `realm_io_space`, `hypervisor_io_space`, `io_address<T, SpaceTag, IoInt>`, `reg_traits<Size>`, `io_math` | Typed, tagged address into a device-register space (port I/O, MMIO, ARM device memory, ...); pure address tagging and compile-time-checked offset arithmetic, plus register-width-aware offset math, no I/O access itself |
 | `pfn_translator.hpp` | `phys_pfn<SpaceTag, PageTraits, PhysInt>` | Typed physical page-frame number and address conversion |
 | `phys_page.hpp` | `page_traits<Size, Shift>`, `os_traits_base<Derived, OsPage>`, `page_view<PageTraits, OsTraits>` | Page-size traits and an OS-page-backed physical page view |
 | `phys_translator.hpp` | `phys_translator<Policy>` | Policy-based virtual/physical address translator |
@@ -47,6 +48,7 @@ exists and where.
 - [`boot_memory_map.md`](boot_memory_map.md) -- DTB-derived physical memory map
 - [`device_tree.md`](device_tree.md) -- `fdt_reader`/`fdt_index` bundle with `/chosen` helpers
 - [`target_ptr.md`](target_ptr.md) -- typed pointers into another virtual address space (user/kernel/Realm/VM)
+- [`io_address.md`](io_address.md) -- typed, tagged device-register addresses (port I/O, MMIO, ARM device memory)
 
 ## OS-development building blocks (from `jplcz_reloco`)
 
