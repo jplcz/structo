@@ -300,6 +300,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_page_table_occupancy.cpp
         tests/test_arch_page_table_traits.cpp
         tests/test_arch_pte_fields.cpp
+        tests/test_mmu_regs.cpp
     )
     target_link_libraries(jplcz_structo_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)
