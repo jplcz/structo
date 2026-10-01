@@ -19,7 +19,8 @@ public:
   /**
    * @brief Translates an input sequence into a strongly-typed output SGL.
    *
-   * @tparam Policy A mapping policy compatible with `phys_translator`.
+   * @tparam Policy A mapping policy compatible with `phys_translator`; see
+   * `phys_translator.hpp`'s @file-level docs for a complete example `Policy`.
    * @tparam InIterable Any iterable container/span of `sg_entry`.
    * @tparam OutContainer The underlying vector backing the output `sg_list`.
    */

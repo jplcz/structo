@@ -4,6 +4,43 @@
 
 #pragma once
 
+/** @file phys_page.hpp
+ * @brief `structo::page_view<PageTraits, OsTraits>`: a typed view of an
+ * operating-system page (pointer, PFN, or compressed handle, whatever
+ * `OsTraits::os_page_type` is), plus `page_traits<Size, Shift>` (compile-
+ * time page-size constants) and the `os_traits_base<Derived, OsPage>`
+ * CRTP helper that implements buddy-allocator-style neighbor/retreat/
+ * advance arithmetic on top of a handful of OS-supplied primitives.
+ *
+ * `Derived` (passed as the first `os_traits_base` template argument, CRTP-
+ * style) only needs to provide `to_pfn(p)`, `from_pfn(pfn) ->
+ * result<os_page_type>`, and `is_same_zone(a, b)`; `os_traits_base` then
+ * implements `try_advance()`/`try_retreat()`/`try_get_buddy()` generically
+ * on top of those three. Example `Derived` (a compressed 32-bit page
+ * handle backed by a flat metadata array, as used by `buddy_allocator`):
+ * @code
+ * struct my_os_traits : structo::os_traits_base<my_os_traits, uint32_t> {
+ *   using os_page_type = uint32_t;
+ *
+ *   static os_page_type null_page() noexcept { return ~uint32_t(0); }
+ *   static bool is_null(os_page_type p) noexcept { return p == null_page(); }
+ *
+ *   static uint64_t to_pfn(os_page_type p) noexcept { return p; }
+ *
+ *   static reloco::result<os_page_type> from_pfn(uint64_t pfn) noexcept {
+ *     if (pfn >= MY_TOTAL_PAGES) {
+ *       return reloco::unexpected(reloco::error::out_of_range);
+ *     }
+ *     return static_cast<uint32_t>(pfn);
+ *   }
+ *
+ *   static bool is_same_zone(os_page_type a, os_page_type b) noexcept {
+ *     return my_meta[a].zone_id == my_meta[b].zone_id;
+ *   }
+ * };
+ * @endcode
+ */
+
 #include <reloco/error.hpp>
 #include "phys_addr.hpp"
 #include <cstddef>

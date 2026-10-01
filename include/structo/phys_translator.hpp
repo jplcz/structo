@@ -4,6 +4,41 @@
 
 #pragma once
 
+/** @file phys_translator.hpp
+ * @brief `structo::phys_translator<Policy>`: a policy-based, fallible
+ * virtual/physical (or physical/physical, e.g. host-to-DMA-bus) address
+ * translator, plus the `physical_cast<Policy>()` free-function
+ * convenience wrappers.
+ *
+ * `Policy` is the one piece every caller supplies: it names the two
+ * `phys_addr` space tags being translated between and performs the
+ * actual bounds-checked translation. Everything else (null-pointer
+ * short-circuiting, `sizeof(T)` size deduction, error propagation) is
+ * handled generically by `phys_translator` itself.
+ *
+ * Example `Policy` (a stateful linear IOMMU mapping host physical
+ * addresses into a DMA bus window):
+ * @code
+ * struct linear_iommu_policy {
+ *   using from_space = structo::host_phys_space;
+ *   using to_space = structo::dma_bus_space;
+ *
+ *   uint64_t bus_offset;
+ *   uint64_t window_size;
+ *
+ *   reloco::result<uint64_t> translate(uint64_t addr, uint64_t size) const noexcept {
+ *     if (addr > ~uint64_t(0) - size) {
+ *       return reloco::unexpected(reloco::error::invalid_argument);
+ *     }
+ *     if (addr + size > window_size) {
+ *       return reloco::unexpected(reloco::error::out_of_range);
+ *     }
+ *     return addr + bus_offset;
+ *   }
+ * };
+ * @endcode
+ */
+
 #include <reloco/error.hpp>
 #include "phys_addr.hpp"
 #include <type_traits>
@@ -20,6 +55,8 @@ using namespace reloco;
  * - `using from_space`
  * - `using to_space`
  * - `result<PhysInt> translate(PhysInt addr, PhysInt size) const noexcept`
+ *
+ * See the @file-level docs above for a complete example `Policy`.
  */
 /**
  * @brief Policy-based virtual/physical address translator.

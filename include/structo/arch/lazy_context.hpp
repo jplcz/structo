@@ -3,6 +3,55 @@
 
 #pragma once
 
+/** @file lazy_context.hpp
+ * @brief `structo::arch::lazy_context<Traits, CpuId>` +
+ * `lazy_context_switcher<Traits, CpuId>`: a lazy/deferred hardware-
+ * context switching framework for per-thread coprocessor/extension state
+ * (FPU, vector-register files, debug registers, ...) that is expensive
+ * to save/restore on every context switch and so should only be
+ * saved/restored when a thread actually traps into using it.
+ *
+ * See the ASCII-art state-machine diagram below for the full state
+ * transition map (`UNINITIALIZED` -> `ACTIVE_SILICON` <->
+ * `CACHED_SILICON` -> `EVICTED_SYNC`/`EVICTED_DIRTY`). `static_per_cpu_storage`
+ * is the bundled zero-allocation `Traits::get_active_context()` /
+ * `set_active_context()` / `clear_active_context()` implementation (a
+ * flat `Context*[MaxCpus]` array) most `Traits` types can simply inherit
+ * from instead of reimplementing per-CPU residency tracking themselves.
+ *
+ * `Traits` must provide a `state_type` (the raw hardware register
+ * block) plus `is_enabled()`, `enable()`, `disable()`,
+ * `save_context(state_type&)`, `restore_context(state_type&)`, and the
+ * three `*_active_context()` residency hooks (inherit
+ * `static_per_cpu_storage` for these, or implement them directly).
+ * Everything else -- `matches_trap()` (trap cascading to the correct
+ * extension handler), `init_context()` (distinct first-touch
+ * initialization vs. ordinary restore), `on_migrate()` (cross-CPU
+ * migration notification), `on_thread_construct()`/`on_lazy_construct()`
+ * (eager vs. deferred allocation) and both `destroy_context()` overloads
+ * -- is optional and individually SFINAE-detected.
+ *
+ * Example `Traits` (a toy single-register "FPU" with eager construction,
+ * no migration/init hooks -- see `lazy_context_switcher`'s own method
+ * docs below for what each optional hook does):
+ * @code
+ * struct toy_fpu_traits : structo::arch::static_per_cpu_storage<8, void, std::size_t> {
+ *   struct state_type {
+ *     uint64_t fpcr = 0;
+ *   };
+ *
+ *   static inline constexpr std::size_t invalid_cpu = static_cast<std::size_t>(-1);
+ *
+ *   static bool is_enabled() noexcept { return hw_fpu_is_enabled(); }
+ *   static void enable() noexcept { hw_fpu_enable(); }
+ *   static void disable() noexcept { hw_fpu_disable(); }
+ *
+ *   static void save_context(state_type &s) noexcept { s.fpcr = hw_fpu_read_fpcr(); }
+ *   static void restore_context(const state_type &s) noexcept { hw_fpu_write_fpcr(s.fpcr); }
+ * };
+ * @endcode
+ */
+
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
@@ -75,8 +124,16 @@ template <typename Traits, typename CpuId> class lazy_context_switcher;
 // -------------------------------------------------------------------------
 // SFINAE Feature Detection for Traits & Hardware Context
 // -------------------------------------------------------------------------
+/**
+ * @brief Compile-time detectors for which optional `Traits` members are
+ * implemented, used to SFINAE-gate `lazy_context_switcher`'s matching
+ * optional behavior (migration notification, dynamic construction,
+ * distinct init-vs-restore, allocator-aware destruction, trap cascading)
+ * so a `Traits` that only implements the required subset still compiles.
+ */
 namespace detail {
 
+/** @brief Resolves `CpuId`'s sentinel "no CPU" value: `Traits::invalid_cpu` if provided, else `static_cast<CpuId>(-1)`. */
 template <typename T, typename CpuId, typename = void> struct get_invalid_cpu {
   static constexpr CpuId value = static_cast<CpuId>(-1);
 };
@@ -85,6 +142,7 @@ template <typename T, typename CpuId> struct get_invalid_cpu<T, CpuId, std::void
   static constexpr CpuId value = static_cast<CpuId>(T::invalid_cpu);
 };
 
+/** @brief True if `state_type` itself (rather than `Traits`) exposes `try_construct(alloc)`. */
 template <typename S, typename Alloc = reloco::allocator_ref, typename = void>
 struct state_has_try_construct : std::false_type {};
 
@@ -93,6 +151,7 @@ struct state_has_try_construct<S, Alloc,
                                std::void_t<decltype(std::declval<S &>().try_construct(std::declval<Alloc &>()))>>
     : std::true_type {};
 
+/** @brief True if `Traits::try_construct(state, alloc)` is implemented. */
 template <typename T, typename S, typename Alloc = reloco::allocator_ref, typename = void>
 struct traits_has_try_construct : std::false_type {};
 
@@ -101,6 +160,7 @@ struct traits_has_try_construct<T, S, Alloc,
                                 std::void_t<decltype(T::try_construct(std::declval<S &>(), std::declval<Alloc &>()))>>
     : std::true_type {};
 
+/** @brief True if `Traits::on_thread_construct(state, alloc)` is implemented (eager per-thread construction hook). */
 template <typename T, typename S, typename Alloc = reloco::allocator_ref, typename = void>
 struct traits_has_on_thread_construct : std::false_type {};
 
@@ -109,6 +169,7 @@ struct traits_has_on_thread_construct<
     T, S, Alloc, std::void_t<decltype(T::on_thread_construct(std::declval<S &>(), std::declval<Alloc &>()))>>
     : std::true_type {};
 
+/** @brief True if `Traits::on_lazy_construct(state, alloc)` is implemented (deferred, first-touch construction hook). */
 template <typename T, typename S, typename Alloc = reloco::allocator_ref, typename = void>
 struct traits_has_on_lazy_construct : std::false_type {};
 
@@ -117,6 +178,7 @@ struct traits_has_on_lazy_construct<
     T, S, Alloc, std::void_t<decltype(T::on_lazy_construct(std::declval<S &>(), std::declval<Alloc &>()))>>
     : std::true_type {};
 
+/** @brief True if `Traits::destroy_context(state, alloc)` (allocator-aware overload) is implemented. */
 template <typename T, typename S, typename Alloc = reloco::allocator_ref, typename = void>
 struct traits_has_destroy_alloc : std::false_type {};
 
@@ -125,17 +187,20 @@ struct traits_has_destroy_alloc<T, S, Alloc,
                                 std::void_t<decltype(T::destroy_context(std::declval<S &>(), std::declval<Alloc &>()))>>
     : std::true_type {};
 
+/** @brief True if `Traits::destroy_context(state)` (plain, no-allocator overload) is implemented. */
 template <typename T, typename S, typename = void> struct traits_has_destroy_plain : std::false_type {};
 
 template <typename T, typename S>
 struct traits_has_destroy_plain<T, S, std::void_t<decltype(T::destroy_context(std::declval<S &>()))>> : std::true_type {
 };
 
+/** @brief True if `Traits::init_context(state)` is implemented (distinct first-touch init vs. `restore_context()`). */
 template <typename T, typename S, typename = void> struct traits_has_init_context : std::false_type {};
 
 template <typename T, typename S>
 struct traits_has_init_context<T, S, std::void_t<decltype(T::init_context(std::declval<S &>()))>> : std::true_type {};
 
+/** @brief True if `Traits::on_migrate(ctx, from_cpu, to_cpu)` is implemented (cross-CPU migration notification). */
 template <typename T, typename Ctx, typename Cpu, typename = void> struct traits_has_on_migrate : std::false_type {};
 
 template <typename T, typename Ctx, typename Cpu>
@@ -143,12 +208,14 @@ struct traits_has_on_migrate<
     T, Ctx, Cpu, std::void_t<decltype(T::on_migrate(std::declval<Ctx &>(), std::declval<Cpu>(), std::declval<Cpu>()))>>
     : std::true_type {};
 
+/** @brief True if `Traits`/`State` provides any form of deferred/on-demand construction (any of the three detectors above). */
 template <typename Traits, typename State> struct is_dynamically_constructed {
   static constexpr bool value = traits_has_try_construct<Traits, State>::value ||
                                 traits_has_on_lazy_construct<Traits, State>::value ||
                                 state_has_try_construct<State>::value;
 };
 
+/** @brief Dispatches to `Traits::matches_trap(fault_ctx)` if implemented; otherwise always matches (single-extension systems). */
 template <typename T, typename FC, typename = void> struct trap_matcher {
   static reloco::result<bool> match(const FC &) noexcept {
     // If trait doesn't provide a matcher, assume this block matches unconditionally
@@ -175,6 +242,14 @@ struct trap_matcher<T, FC, std::void_t<decltype(T::matches_trap(std::declval<con
 // -------------------------------------------------------------------------
 /**
  * @brief Per-entity context structure embedded in a task or vcpu.
+ *
+ * Tracks the state machine from the file-level diagram above: whether
+ * the backing `state_type` has been constructed at all
+ * (`is_constructed()`), whether hardware registers have ever been
+ * programmed from it (`is_initialized()`), which CPU last held it
+ * resident (`last_cpu()`), and whether memory has been mutated out from
+ * under active silicon (`is_dirty()`).
+ *
  * @tparam Traits Policy defining hardware operations and state_type.
  * @tparam CpuId  Type representing the CPU core index.
  */
@@ -194,21 +269,37 @@ public:
   lazy_context(lazy_context &&) = delete;
   lazy_context &operator=(lazy_context &&) = delete;
 
+  /** @brief Which CPU last held this context resident (silicon or cached); `invalid_cpu` if never/severed. */
   [[nodiscard]] constexpr CpuId last_cpu() const noexcept { return m_last_cpu; }
+  /** @brief Sets the recorded last-resident CPU (see `last_cpu()`). */
   constexpr void set_last_cpu(CpuId cpu) noexcept { m_last_cpu = cpu; }
 
+  /** @brief Whether hardware registers have ever been programmed from `state()` (first touch has occurred). */
   [[nodiscard]] constexpr bool is_initialized() const noexcept { return m_initialized; }
+  /** @brief Sets the initialized flag (see `is_initialized()`). */
   constexpr void set_initialized(bool init = true) noexcept { m_initialized = init; }
 
+  /** @brief Whether `state()` itself has been constructed (relevant only for dynamically-constructed `Traits`). */
   [[nodiscard]] constexpr bool is_constructed() const noexcept { return m_constructed; }
+  /** @brief Sets the constructed flag (see `is_constructed()`). */
   constexpr void set_constructed(bool constructed = true) noexcept { m_constructed = constructed; }
 
+  /** @brief Whether `state()` has been mutated (e.g. by a debugger) since hardware was last synced from it. */
   [[nodiscard]] constexpr bool is_dirty() const noexcept { return m_dirty; }
+  /** @brief Sets the dirty flag (see `is_dirty()`). */
   constexpr void set_dirty(bool dirty = true) noexcept { m_dirty = dirty; }
 
+  /** @brief Access to the raw hardware state block (`Traits::state_type`). */
   [[nodiscard]] constexpr state_type &state() noexcept RELOCO_LIFETIMEBOUND { return m_state; }
+  /** @brief `const`-qualified overload of `state()`. */
   [[nodiscard]] constexpr const state_type &state() const noexcept RELOCO_LIFETIMEBOUND { return m_state; }
 
+  /**
+   * @brief Resets the context back to its just-constructed state: severs
+   * CPU residency, clears initialized/dirty, and restores `is_constructed()`
+   * to its default for this `Traits` (eager `Traits` start constructed;
+   * dynamically-constructed `Traits` start unconstructed).
+   */
   constexpr void reset() noexcept {
     m_last_cpu = invalid_cpu;
     m_initialized = false;
@@ -227,6 +318,17 @@ private:
 // -------------------------------------------------------------------------
 // Lazy Context Switcher Manager
 // -------------------------------------------------------------------------
+/**
+ * @brief Stateless dispatcher implementing the lazy context-switching state
+ * machine (see the file-level ASCII diagram) over a `lazy_context<Traits,
+ * CpuId>`: every member is `static` and operates purely on the `context_type&`
+ * (or `context_type*`) passed in, so one `lazy_context_switcher` instantiation
+ * drives every thread's context for a given `Traits`.
+ * @tparam Traits Policy defining hardware operations and `state_type`; see
+ * the file-level docs above for the full required/optional interface and an
+ * example implementation.
+ * @tparam CpuId  Type representing the CPU core index.
+ */
 template <typename Traits, typename CpuId = std::size_t> class lazy_context_switcher {
 public:
   using traits_type = Traits;
@@ -535,14 +637,31 @@ public:
 // -------------------------------------------------------------------------
 // Static Per-CPU Storage Helper
 // -------------------------------------------------------------------------
+/**
+ * @brief Bundled zero-allocation implementation of the three
+ * `*_active_context()` residency hooks `lazy_context_switcher` requires
+ * from `Traits`: a flat `Context*[MaxCpus]` array, one slot per CPU.
+ * Inherit from this (as in the `toy_fpu_traits` example in the
+ * file-level docs above) instead of reimplementing per-CPU residency
+ * tracking in every `Traits` type.
+ *
+ * @tparam MaxCpus Number of CPU slots to reserve (indices `[0, MaxCpus)`;
+ * out-of-range `cpu` values passed to any method are silently ignored).
+ * @tparam Context Context pointee type tracked per CPU (typically `void`,
+ * type-erasing the actual `lazy_context<Traits, CpuId>` behind a `void*`
+ * that `lazy_context_switcher` `static_cast`s back as needed).
+ * @tparam CpuId Type representing the CPU core index.
+ */
 template <std::size_t MaxCpus, typename Context = void, typename CpuId = std::size_t> struct static_per_cpu_storage {
   static inline Context *active_contexts[MaxCpus]{nullptr};
 
+  /** @brief Returns the context currently resident on `cpu`, or `nullptr` if none/out-of-range. */
   static inline Context *get_active_context(CpuId cpu) noexcept {
     const auto idx = static_cast<std::size_t>(cpu);
     return (idx < MaxCpus) ? active_contexts[idx] : nullptr;
   }
 
+  /** @brief Records `ctx` as resident on `cpu`; a no-op if `cpu` is out of range. */
   static inline void set_active_context(CpuId cpu, Context *ctx) noexcept {
     const auto idx = static_cast<std::size_t>(cpu);
     if (idx < MaxCpus) {
@@ -550,6 +669,7 @@ template <std::size_t MaxCpus, typename Context = void, typename CpuId = std::si
     }
   }
 
+  /** @brief Clears `cpu`'s resident-context pointer (sets it back to `nullptr`); a no-op if `cpu` is out of range. */
   static inline void clear_active_context(CpuId cpu) noexcept {
     const auto idx = static_cast<std::size_t>(cpu);
     if (idx < MaxCpus) {

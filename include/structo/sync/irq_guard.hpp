@@ -13,7 +13,24 @@
  * `hw_restore_irqs(flags)`) plus a `flags_type`; everything else here
  * (the guard, the proof token, the functional helper, and the
  * `Mutex<RefCell<T>>`-style data wrapper) is architecture-agnostic and
- * built purely on top of those two hooks.
+ * built purely on top of those two hooks. Example `Traits` (ARM-style
+ * CPSR save/restore):
+ * @code
+ * struct arm_irq_traits {
+ *   using flags_type = uint32_t;
+ *
+ *   static flags_type hw_save_irqs() noexcept {
+ *     uint32_t cpsr;
+ *     asm volatile("mrs %0, cpsr" : "=r"(cpsr));
+ *     asm volatile("cpsid i" ::: "memory");
+ *     return cpsr;
+ *   }
+ *
+ *   static void hw_restore_irqs(flags_type cpsr) noexcept {
+ *     asm volatile("msr cpsr_c, %0" : : "r"(cpsr) : "memory");
+ *   }
+ * };
+ * @endcode
  */
 
 #include <cstddef>
