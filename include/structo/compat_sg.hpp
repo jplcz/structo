@@ -18,17 +18,32 @@ namespace structo {
 using namespace reloco;
 
 /**
+ * @brief `Layout::length_field` stores a literal byte count (the default,
+ * matching every pre-existing `sg_descriptor_layout`/`chained_sg_layout`).
+ */
+struct length_unit_bytes {};
+
+/**
+ * @brief `Layout::length_field` stores a count of whole `PageTraits::page_size`
+ * pages rather than bytes (e.g. a hardware PFN + page-count descriptor).
+ * Only meaningful alongside `OffsetField = void` (such descriptors are always
+ * page-aligned; see `compact_sg_codec`).
+ */
+struct length_unit_pages {};
+
+/**
  * @brief Defines the hardware bitfield layout for a compact SG descriptor.
  * Fields can be set to `void` to disable them (e.g. for pure PFN page sharing).
  */
 template <typename StorageType, typename PfnField, typename OffsetField = void, typename LengthField = void,
-          typename LastFlagField = void, size_t HeaderSize = 0>
+          typename LastFlagField = void, size_t HeaderSize = 0, typename LengthUnit = length_unit_bytes>
 struct sg_descriptor_layout {
   using storage_type = StorageType;
   using pfn_field = PfnField;
   using offset_field = OffsetField;
   using length_field = LengthField;
   using last_flag = LastFlagField;
+  using length_unit = LengthUnit;
   static constexpr size_t header_size = HeaderSize;
 };
 
@@ -110,6 +125,17 @@ public:
             RELOCO_UNLIKELY
           return unexpected(error::invalid_argument);
           chunk = PageTraits::page_size;
+        } else if constexpr (std::is_same_v<typename Layout::length_unit, length_unit_pages>) {
+          // The length field counts whole pages, not bytes (e.g. a PFN +
+          // page-count descriptor); every chunk must therefore itself be a
+          // whole number of pages, same as the Length-disabled case above.
+          if (remaining < PageTraits::page_size)
+            RELOCO_UNLIKELY
+          return unexpected(error::invalid_argument);
+          constexpr uint64_t max_hw_pages = detail::generate_mask<Layout::length_field::bits, uint64_t>();
+          uint64_t pages_remaining = static_cast<uint64_t>(remaining) / PageTraits::page_size;
+          uint64_t pages_chunk = std::min(pages_remaining, max_hw_pages);
+          chunk = pages_chunk * PageTraits::page_size;
         } else {
           constexpr uint64_t max_hw_len = detail::generate_mask<Layout::length_field::bits, uint64_t>();
           uint64_t page_remaining = PageTraits::page_size - offset;
@@ -124,7 +150,11 @@ public:
           desc.template truncating_set<typename Layout::offset_field>(offset);
         }
         if constexpr (!std::is_void_v<typename Layout::length_field>) {
-          desc.template truncating_set<typename Layout::length_field>(chunk);
+          if constexpr (std::is_same_v<typename Layout::length_unit, length_unit_pages>) {
+            desc.template truncating_set<typename Layout::length_field>(chunk / PageTraits::page_size);
+          } else {
+            desc.template truncating_set<typename Layout::length_field>(chunk);
+          }
         }
         if constexpr (!std::is_void_v<typename Layout::last_flag>) {
           desc.template truncating_set<typename Layout::last_flag>(0);
@@ -170,11 +200,22 @@ public:
       uint64_t length = PageTraits::page_size;
       if constexpr (!std::is_void_v<typename Layout::length_field>) {
         length = desc.template get<typename Layout::length_field>();
+        if constexpr (std::is_same_v<typename Layout::length_unit, length_unit_pages>) {
+          // The length field counts whole pages, not bytes; convert before
+          // the bounds check below (which operates on byte lengths).
+          length *= PageTraits::page_size;
+        }
       }
 
       // --- Speculation Defenses ---
-      // Evaluate all bounds in a single bitwise boolean expression
-      bool is_safe = (offset < PageTraits::page_size) & ((offset + length) <= PageTraits::page_size);
+      // Evaluate all bounds in a single bitwise boolean expression.
+      // A page-count length field (no Offset field, always page-aligned) can
+      // legitimately span many pages, so the intra-page `offset + length`
+      // bound below only applies to a byte-unit length field.
+      bool is_safe = true;
+      if constexpr (!std::is_same_v<typename Layout::length_unit, length_unit_pages>) {
+        is_safe &= (offset < PageTraits::page_size) & ((offset + length) <= PageTraits::page_size);
+      }
 
       if constexpr (!std::is_void_v<typename Layout::length_field>) {
         is_safe &= (length > 0);

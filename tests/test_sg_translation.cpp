@@ -88,6 +88,146 @@ TEST(CompactSgCodecTest, EncodesAndDecodesPageFragments) {
   EXPECT_EQ(decoded.begin()->length, 32u);
 }
 
+// Mirrors a hardware descriptor such as:
+//   struct test_sglist_entry {
+//     uint32_t phys_lo;
+//     uint32_t phys_hi : 12;
+//     uint32_t count   : 20; // whole 4 KB pages, not bytes
+//   };
+// which packs, little-endian, into a single 64-bit value: a contiguous
+// 44-bit PFN (phys_lo's 32 bits followed by phys_hi's 12) in bits [43:0],
+// and a 20-bit page count in bits [63:44] -- i.e. `bitfield<0, 44>` /
+// `bitfield<44, 20>` over a `uint64_t`, with no Offset field (every
+// descriptor is page-aligned) and `length_unit_pages` so the codec scales
+// the field by `PageTraits::page_size` instead of treating it as bytes.
+using test_sglist_pfn_field = bitfield<0, 44>;
+using test_sglist_count_field = bitfield<44, 20>;
+using test_sglist_layout =
+    sg_descriptor_layout<uint64_t, test_sglist_pfn_field, void, test_sglist_count_field, void, 0, length_unit_pages>;
+using test_sglist_codec = compact_sg_codec<test_sglist_layout, page_4k, dma_bus_space>;
+
+TEST(CompactSgCodecTest, EncodesAndDecodesPageCountDescriptors) {
+  using entry_type = test_sglist_codec::entry_type;
+  using packed_type = test_sglist_codec::packed_type;
+  sg_list<inline_vector<entry_type, 4>> input;
+  // Three contiguous, page-aligned pages: a multi-page entry that a
+  // byte-length field could not represent in a single descriptor at this
+  // bit width, but a 20-bit page count represents trivially.
+  ASSERT_TRUE(input.try_push_back(phys_addr<void, dma_bus_space>{0x100000}, 3 * 4096));
+
+  inline_vector<packed_type, 4> descriptors;
+  ASSERT_TRUE(test_sglist_codec::encode(input, descriptors));
+  ASSERT_EQ(descriptors.size(), 1u);
+  EXPECT_EQ(descriptors[0].get<test_sglist_pfn_field>(), 0x100000u >> 12);
+  EXPECT_EQ(descriptors[0].get<test_sglist_count_field>(), 3u);
+
+  sg_list<inline_vector<entry_type, 4>> decoded;
+  span<const packed_type> encoded_view{descriptors.data(), descriptors.size()};
+  ASSERT_TRUE(test_sglist_codec::decode(encoded_view, decoded));
+  ASSERT_EQ(decoded.size(), 1u);
+  EXPECT_EQ(decoded.begin()->addr.value, 0x100000u);
+  EXPECT_EQ(decoded.begin()->length, 3u * 4096u);
+}
+
+TEST(CompactSgCodecTest, PageCountDescriptorsSplitAtHardwareCountLimitAndRejectSubPageRemainders) {
+  using entry_type = test_sglist_codec::entry_type;
+  using packed_type = test_sglist_codec::packed_type;
+
+  // Rejects an entry whose length is not a whole number of pages.
+  {
+    sg_list<inline_vector<entry_type, 2>> input;
+    ASSERT_TRUE(input.try_push_back(phys_addr<void, dma_bus_space>{0x100000}, 4096 + 10));
+    inline_vector<packed_type, 2> descriptors;
+    auto res = test_sglist_codec::encode(input, descriptors);
+    ASSERT_FALSE(res);
+    EXPECT_EQ(res.error(), error::invalid_argument);
+  }
+
+  // A run longer than the 20-bit count field's max (2^20 - 1 pages) splits
+  // into multiple descriptors, same as a byte-length field hitting its max.
+  {
+    sg_list<inline_vector<entry_type, 4>> input;
+    constexpr uint64_t max_pages = (1u << 20) - 1;
+    ASSERT_TRUE(input.try_push_back(phys_addr<void, dma_bus_space>{uint64_t{0x10000}}, (max_pages + 2) * 4096));
+
+    inline_vector<packed_type, 4> descriptors;
+    ASSERT_TRUE(test_sglist_codec::encode(input, descriptors));
+    ASSERT_EQ(descriptors.size(), 2u);
+    EXPECT_EQ(descriptors[0].get<test_sglist_count_field>(), max_pages);
+    EXPECT_EQ(descriptors[1].get<test_sglist_count_field>(), 2u);
+  }
+}
+
+// Mirrors an NVMe-style PRP (Physical Region Page) entry: a raw,
+// page-aligned 64-bit physical address with the low 12 bits reserved
+// (always zero on the wire), rather than a PFN right-justified at bit 0.
+// Positioning the PFN field's `Offset` at `page_shift` instead of `0`
+// reproduces that: the codec still does its PFN math in frame-number
+// units internally, but `bitfield<12, 52>` places those bits back at
+// their natural position in the 64-bit word, leaving bits [11:0] as the
+// implicit, always-zero page offset. No Offset/Length field exists
+// because a PRP entry always covers exactly one page (chaining into
+// further pages is a `chained_sg_codec`-level concern, not this format).
+using nvme_prp_pfn_field = bitfield<12, 52>;
+using nvme_prp_layout = sg_descriptor_layout<uint64_t, nvme_prp_pfn_field>;
+using nvme_prp_codec = compact_sg_codec<nvme_prp_layout, page_4k>;
+
+TEST(CompactSgCodecTest, EncodesRawPageAlignedAddressesViaAnOffsetPfnField) {
+  using entry_type = nvme_prp_codec::entry_type;
+  using packed_type = nvme_prp_codec::packed_type;
+  sg_list<inline_vector<entry_type, 4>> input;
+  ASSERT_TRUE(input.try_push_back(phys_addr<void, dma_bus_space>{0x200000}, 2 * 4096));
+
+  inline_vector<packed_type, 4> descriptors;
+  ASSERT_TRUE(nvme_prp_codec::encode(input, descriptors));
+  ASSERT_EQ(descriptors.size(), 2u);
+  // The wire value is the plain physical address itself (low 12 bits zero),
+  // not a frame number sitting at bit 0.
+  EXPECT_EQ(descriptors[0].value(), 0x200000u);
+  EXPECT_EQ(descriptors[1].value(), 0x201000u);
+
+  sg_list<inline_vector<entry_type, 4>> decoded;
+  span<const packed_type> encoded_view{descriptors.data(), descriptors.size()};
+  ASSERT_TRUE(nvme_prp_codec::decode(encoded_view, decoded));
+  ASSERT_EQ(decoded.size(), 1u); // sg_list re-coalesces the two contiguous pages
+  EXPECT_EQ(decoded.begin()->addr.value, 0x200000u);
+  EXPECT_EQ(decoded.begin()->length, 2u * 4096u);
+}
+
+// Demonstrates `HeaderSize` on a non-chained `compact_sg_codec`: a fixed,
+// opaque leading word (e.g. an entry-count/cookie a caller fills in once
+// encoding is complete) that `encode()`/`decode()` reserve and skip,
+// without the codec itself knowing or caring what it holds.
+using header_pfn_field = bitfield<0, 52>;
+using header_length_field = bitfield<52, 12>;
+using headered_layout = sg_descriptor_layout<uint64_t, header_pfn_field, void, header_length_field, void,
+                                              sizeof(uint64_t)>;
+using headered_codec = compact_sg_codec<headered_layout, page_4k>;
+
+TEST(CompactSgCodecTest, ReservesAndSkipsAnOpaqueLeadingHeaderWord) {
+  using entry_type = headered_codec::entry_type;
+  using packed_type = headered_codec::packed_type;
+  sg_list<inline_vector<entry_type, 4>> input;
+  ASSERT_TRUE(input.try_push_back(phys_addr<void, dma_bus_space>{0x3000}, 100));
+
+  inline_vector<packed_type, 4> descriptors;
+  ASSERT_TRUE(headered_codec::encode(input, descriptors));
+  ASSERT_EQ(descriptors.size(), 2u); // one reserved header word + one data descriptor
+  EXPECT_EQ(descriptors[0].value(), 0u);
+
+  // The caller is free to overwrite the reserved header with real metadata
+  // after encoding; decode() always skips exactly `header_size` bytes
+  // regardless of what's stored there.
+  descriptors[0] = packed_type{0xdeadbeefu};
+
+  sg_list<inline_vector<entry_type, 4>> decoded;
+  span<const packed_type> encoded_view{descriptors.data(), descriptors.size()};
+  ASSERT_TRUE(headered_codec::decode(encoded_view, decoded));
+  ASSERT_EQ(decoded.size(), 1u);
+  EXPECT_EQ(decoded.begin()->addr.value, 0x3000u);
+  EXPECT_EQ(decoded.begin()->length, 100u);
+}
+
 TEST(CompactSgCodecTest, RejectsDescriptorCrossingPageBoundary) {
   using packed_type = compact_codec::packed_type;
   inline_vector<packed_type, 4> descriptors;
