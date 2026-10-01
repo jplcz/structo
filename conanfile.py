@@ -18,7 +18,7 @@ class JplczStructoConan(ConanFile):
     description = (
         "Header-only OS/kernel/hypervisor/trusted-boundary building "
         "blocks (Flattened Device Tree decoding, physical memory region "
-        "management) built on jplcz_reloco"
+        "management) built on jplcz_reloco and jplcz_microfmt"
     )
     topics = ("kernel", "hypervisor", "embedded", "devicetree", "header-only")
 
@@ -27,6 +27,7 @@ class JplczStructoConan(ConanFile):
 
     def requirements(self):
         self.requires("jplcz_reloco/0.1.0")
+        self.requires("jplcz_microfmt/0.1.0")
 
     def package(self):
         copy(

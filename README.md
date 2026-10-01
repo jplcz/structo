@@ -57,12 +57,13 @@ FetchContent_MakeAvailable(jplcz_structo)
 target_link_libraries(my_kernel PRIVATE jplcz_structo::structo)
 ```
 
-structo's own `CMakeLists.txt` fetches `jplcz_reloco` the same way (see
-`JPLCZ_STRUCTO_RELOCO_SOURCE_DIR`/`JPLCZ_STRUCTO_RELOCO_GIT_REPOSITORY`/
-`JPLCZ_STRUCTO_RELOCO_GIT_TAG`), so a consumer never has to declare that
-dependency itself unless it wants to pin/vendor a specific reloco
-checkout. See [docs/package-managers.md](docs/package-managers.md) for
-Conan/vcpkg/CPM alternatives.
+structo's own `CMakeLists.txt` fetches `jplcz_reloco` and `jplcz_microfmt` the
+same way (see `JPLCZ_STRUCTO_RELOCO_SOURCE_DIR`/`JPLCZ_STRUCTO_RELOCO_GIT_REPOSITORY`/
+`JPLCZ_STRUCTO_RELOCO_GIT_TAG` and their `JPLCZ_STRUCTO_MICROFMT_*`
+counterparts), so a consumer never has to declare either dependency itself
+unless it wants to pin/vendor a specific reloco or microfmt checkout. See
+[docs/package-managers.md](docs/package-managers.md) for Conan/vcpkg/CPM
+alternatives.
 
 ### Copy-paste: the full 4-step resolution block
 
@@ -188,6 +189,29 @@ each step only taken if the previous one did not already settle the question:
 dependencies the same way, under the matching
 `JPLCZ_MICROFMT_RELOCO_*`/`MICROVISOR_MICROFMT_*`/`MICROVISOR_STRUCTO_*`
 variable names.
+
+### How the jplcz_microfmt dependency is resolved
+
+`CMakeLists.txt` resolves `jplcz_microfmt` with the exact same four steps,
+under the `JPLCZ_STRUCTO_MICROFMT_*` variable names instead:
+
+1. **Detect an existing target.** `if(NOT TARGET jplcz_microfmt::microfmt)`
+   guards the whole block, reusing a parent-provided target as-is.
+2. **A local checkout, named by variable.** `JPLCZ_STRUCTO_MICROFMT_SOURCE_DIR`
+   (`CACHE PATH`, or the environment variable of the same name) points
+   `FetchContent_Declare`'s `SOURCE_DIR` at a local working copy.
+3. **A user-selected Git remote.** `JPLCZ_STRUCTO_MICROFMT_GIT_REPOSITORY`/
+   `JPLCZ_STRUCTO_MICROFMT_GIT_TAG` let a consumer point at their own fork,
+   mirror, or pinned tag/commit.
+4. **The official repository, by default.** Otherwise these default to
+   `https://github.com/jplcz/microfmt.git`/`master`.
+
+structo links `jplcz_microfmt::microfmt` into the `jplcz_structo` interface
+target alongside `jplcz_reloco::reloco`, and its own development targets
+(tests, examples, benchmarks, header checks, manpages, strict warnings) are
+forced off the same way `jplcz_reloco`'s are (`JPLCZ_MICROFMT_BUILD_TESTS OFF
+CACHE BOOL "" FORCE`, etc.) -- see the "Local checkout and overriding cache
+variables" section above for why `FORCE` is required there.
 
 ## Building
 

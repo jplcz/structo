@@ -139,6 +139,65 @@ if(NOT TARGET jplcz_reloco::reloco)
     FetchContent_MakeAvailable(jplcz_reloco)
 endif()
 
+# jplcz_microfmt dependency
+#
+# jplcz_microfmt provides the allocation-free, no-libc-growth formatting
+# primitives (format/parse, cbor encode/decode) that jplcz_structo's
+# diagnostic/tracing paths are built on (e.g. serializing boot state for
+# early-console logging without pulling in iostream/printf). Callers that
+# already vendor or pin a specific microfmt checkout can point
+# JPLCZ_STRUCTO_MICROFMT_SOURCE_DIR at it; otherwise it is fetched from
+# its GitHub repository at a pinned commit. Mirrors the jplcz_reloco
+# block immediately above exactly.
+#
+# If a parent project already brought in jplcz_microfmt itself, the
+# jplcz_microfmt::microfmt target already exists by the time this file
+# runs: skip fetching/declaring it a second time and reuse the parent's
+# target as-is instead of silently overriding it.
+if(NOT TARGET jplcz_microfmt::microfmt)
+    set(JPLCZ_STRUCTO_MICROFMT_SOURCE_DIR "" CACHE PATH
+        "Path to a local jplcz_microfmt checkout to use instead of fetching it")
+    # Allow the local checkout path to be supplied via an environment variable
+    # (e.g. for CI or shell profiles) without having to pass -D on every configure.
+    # The explicit CMake cache variable/-D option always takes precedence.
+    if(NOT JPLCZ_STRUCTO_MICROFMT_SOURCE_DIR AND DEFINED ENV{JPLCZ_STRUCTO_MICROFMT_SOURCE_DIR})
+        set(JPLCZ_STRUCTO_MICROFMT_SOURCE_DIR "$ENV{JPLCZ_STRUCTO_MICROFMT_SOURCE_DIR}" CACHE PATH
+            "Path to a local jplcz_microfmt checkout to use instead of fetching it" FORCE)
+    endif()
+    set(JPLCZ_STRUCTO_MICROFMT_GIT_REPOSITORY "https://github.com/jplcz/microfmt.git" CACHE STRING
+        "Git repository to fetch jplcz_microfmt from when JPLCZ_STRUCTO_MICROFMT_SOURCE_DIR is unset")
+    set(JPLCZ_STRUCTO_MICROFMT_GIT_TAG "master" CACHE STRING
+        "Git tag or commit to fetch jplcz_microfmt from when JPLCZ_STRUCTO_MICROFMT_SOURCE_DIR is unset")
+
+    include(FetchContent)
+    if(JPLCZ_STRUCTO_MICROFMT_SOURCE_DIR)
+        FetchContent_Declare(
+            jplcz_microfmt
+            SOURCE_DIR "${JPLCZ_STRUCTO_MICROFMT_SOURCE_DIR}"
+        )
+    else()
+        FetchContent_Declare(
+            jplcz_microfmt
+            GIT_REPOSITORY "${JPLCZ_STRUCTO_MICROFMT_GIT_REPOSITORY}"
+            GIT_TAG "${JPLCZ_STRUCTO_MICROFMT_GIT_TAG}"
+        )
+    endif()
+
+    # jplcz_microfmt is consumed as a header-only build dependency: keep its
+    # own development targets (tests, examples, benchmarks, header checks,
+    # manpages, strict warnings) out of the combined build, and mirror
+    # JPLCZ_STRUCTO_INSTALL so an installed jplcz_structo package also
+    # installs and exports the jplcz_microfmt package it depends on.
+    set(JPLCZ_MICROFMT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(JPLCZ_MICROFMT_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(JPLCZ_MICROFMT_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
+    set(JPLCZ_MICROFMT_BUILD_HEADER_CHECKS OFF CACHE BOOL "" FORCE)
+    set(JPLCZ_MICROFMT_BUILD_MANPAGES OFF CACHE BOOL "" FORCE)
+    set(JPLCZ_MICROFMT_ENABLE_STRICT_WARNINGS OFF CACHE BOOL "" FORCE)
+    set(JPLCZ_MICROFMT_INSTALL ${JPLCZ_STRUCTO_INSTALL} CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(jplcz_microfmt)
+endif()
+
 # Header-only interface target
 add_library(jplcz_structo INTERFACE)
 target_compile_features(jplcz_structo INTERFACE cxx_std_17)
@@ -152,7 +211,7 @@ target_include_directories(jplcz_structo INTERFACE
     $<INSTALL_INTERFACE:${JPLCZ_STRUCTO_INSTALL_INCLUDEDIR}>
 )
 
-target_link_libraries(jplcz_structo INTERFACE jplcz_reloco::reloco)
+target_link_libraries(jplcz_structo INTERFACE jplcz_reloco::reloco jplcz_microfmt::microfmt)
 
 add_library(jplcz_structo::structo ALIAS jplcz_structo)
 
@@ -368,7 +427,7 @@ if(JPLCZ_STRUCTO_IS_TOP_LEVEL AND JPLCZ_STRUCTO_INSTALL)
     set(CPACK_PACKAGE_VENDOR "Jaroslaw Pelczar")
     set(CPACK_PACKAGE_CONTACT "Jaroslaw Pelczar <jarek@jpelczar.com>")
     set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
-        "Header-only OS/kernel/hypervisor building blocks (device-tree decoding, physical memory region management) built on jplcz_reloco")
+        "Header-only OS/kernel/hypervisor building blocks (device-tree decoding, physical memory region management) built on jplcz_reloco and jplcz_microfmt")
     set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/jplcz/structo")
     set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
     set(CPACK_PACKAGE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")

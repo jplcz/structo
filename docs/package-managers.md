@@ -18,7 +18,8 @@ target_link_libraries(my_target PRIVATE jplcz_structo::structo)
 ```
 
 The package is header-only, requires C++17 or later, and depends on
-`jplcz_reloco` (resolved transitively by every integration below).
+`jplcz_reloco` and `jplcz_microfmt` (both resolved transitively by every
+integration below).
 
 ## Conan 2
 
@@ -30,7 +31,7 @@ conan create . --build=missing
 ```
 
 The resulting reference is `jplcz_structo/0.1.0`, depending on
-`jplcz_reloco/0.1.0`. A consuming `conanfile.txt`:
+`jplcz_reloco/0.1.0` and `jplcz_microfmt/0.1.0`. A consuming `conanfile.txt`:
 
 ```ini
 [requires]
@@ -52,8 +53,8 @@ vcpkg install jplcz-structo --overlay-ports=packaging/vcpkg/ports
 
 or register `packaging/vcpkg/ports` via `vcpkg-configuration.json`'s
 `overlay-ports` for a manifest-mode build. The port depends on
-`jplcz-reloco` (itself available the same way from reloco's own
-`packaging/vcpkg/ports`).
+`jplcz-reloco` and `jplcz-microfmt` (both available the same way from
+reloco's/microfmt's own `packaging/vcpkg/ports`).
 
 ## CPM.cmake / FetchContent
 
@@ -74,12 +75,13 @@ FetchContent_MakeAvailable(jplcz_structo)
 target_link_libraries(my_target PRIVATE jplcz_structo::structo)
 ```
 
-This transitively fetches `jplcz_reloco` the same way (see
-`JPLCZ_STRUCTO_RELOCO_SOURCE_DIR`/`JPLCZ_STRUCTO_RELOCO_GIT_REPOSITORY`/
-`JPLCZ_STRUCTO_RELOCO_GIT_TAG` in structo's `CMakeLists.txt`) unless a
-`jplcz_reloco::reloco` target already exists in the combined build (e.g.
-a parent project's own earlier `add_subdirectory`/`FetchContent` of
-reloco), in which case that target is reused as-is.
+This transitively fetches `jplcz_reloco` and `jplcz_microfmt` the same
+way (see `JPLCZ_STRUCTO_RELOCO_SOURCE_DIR`/`JPLCZ_STRUCTO_RELOCO_GIT_REPOSITORY`/
+`JPLCZ_STRUCTO_RELOCO_GIT_TAG` and their `JPLCZ_STRUCTO_MICROFMT_*`
+counterparts in structo's `CMakeLists.txt`) unless a `jplcz_reloco::reloco`
+and/or `jplcz_microfmt::microfmt` target already exists in the combined
+build (e.g. a parent project's own earlier `add_subdirectory`/`FetchContent`
+of reloco/microfmt), in which case that target is reused as-is.
 
 ## `add_subdirectory`
 
