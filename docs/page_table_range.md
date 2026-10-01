@@ -137,4 +137,7 @@ void unmap_range(reloco::span<entry> root_table, std::uint64_t root_base_va, std
 ```
 
 See also: [`page_table_traits.md`](page_table_traits.md) (the per-level
-index traits and opaque entry handle this range adapter is built on).
+index traits and opaque entry handle this range adapter is built on) and
+[`page_table_occupancy.md`](page_table_occupancy.md) (an O(1) live-entry
+counter for releasing now-empty tables back to the allocator during an
+unmap walk built on this range adapter).

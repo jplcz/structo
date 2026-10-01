@@ -40,6 +40,7 @@ exists and where.
 | `arch/mm_asid_context.hpp` | `mm_asid_context<AsidTag, MaxCpus, CpuTag>` | Reusable per-address-space ASID/cpu-residency tracker composing `asid_allocator` + `cpu_mask`: a cached `tagged_asid<AsidTag>` plus a lock-free cpu mask of every core that may still hold a stale, tagged TLB entry for it |
 | `arch/page_table_traits.hpp` | `page_table_level<IndexBits, Shift, AllowsLeaf>`, `page_table_levels<LeafPageTraits, VaBits, Levels...>`, `page_table_entry<Tag, Int>`, `page_table_entry_traits<Tag>` | Compile-time, self-consistency-checked per-level index-decoding traits for a multi-level hardware page table (ARM64/x86-64/RISC-V-shaped), plus an opaque tagged raw PTE handle and a declared-but-undefined entry-encode/decode extension point for a future walker layer |
 | `arch/page_table_range.hpp` | `page_table_level_range<Levels, LevelIndex, Entry, AddrInt>`, `make_level_range<Levels, LevelIndex>(...)` | Forward-iterable (and Rust-style `.iter()`-able) adapter over exactly the entries of one caller-supplied page-table level's span that a `[start, end)` virtual-address range touches, built on `page_table_traits.hpp`; performs no mapping/allocation of its own |
+| `arch/page_table_occupancy.hpp` | `page_table_occupancy<CounterInt>` | O(1) live-entry counter for one page-table level's table (increment/decrement per entry transition), so a `page_table_range.hpp`-based unmap walk can free now-empty tables without an O(entry_count) rescan per table per unmap |
 | `arch/lazy_context.hpp` | `lazy_context<Traits, CpuId>`, `lazy_context_switcher<Traits, CpuId>`, `static_per_cpu_storage<MaxCpus, Context, CpuId>` | Lazy/deferred per-thread coprocessor-state (FPU, vector registers, ...) context-switching framework, saving/restoring hardware state only on first trapped use |
 | `arch/per_cpu_ptr.hpp` | `per_cpu_ptr<Tag, T>` | Storage-free, type-safe resolver for a per-CPU `T*`, keyed by `Tag` and backed entirely by `Tag`'s own OS-specific per-CPU mechanism |
 | `arch/per_thread_ptr.hpp` | `per_thread_ptr<Tag, T>` | Storage-free, type-safe resolver for the *running thread's own* `T*`, keyed by `Tag`; exposes no explicit-thread accessor by design |
@@ -95,6 +96,7 @@ and live under `include/structo/arch/` and `include/structo/sync/`:
 - [`mm_asid_context.md`](mm_asid_context.md) -- per-address-space ASID + lock-free cpu-residency tracker composing `asid_allocator` and `cpu_mask`
 - [`page_table_traits.md`](page_table_traits.md) -- compile-time, validated per-level page-table index-decoding traits and an opaque tagged PTE handle
 - [`page_table_range.md`](page_table_range.md) -- forward-/Rust-iterable adapter walking one page-table level's caller-supplied span over a virtual-address range
+- [`page_table_occupancy.md`](page_table_occupancy.md) -- O(1) live-entry counter enabling release of now-empty page tables during an unmap walk
 - [`fdt_cpu_map.md`](fdt_cpu_map.md) -- devicetree `/cpus` early CPU-index resolution into an `hw_id_lut`
 - [`lazy_context.md`](lazy_context.md) -- lazy per-thread coprocessor-state context switching
 - [`per_cpu_ptr.md`](per_cpu_ptr.md) -- storage-free, Tag-keyed per-CPU typed-pointer resolver
