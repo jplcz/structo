@@ -24,7 +24,10 @@ MMU exists.
 
 See [docs/reference.md](docs/reference.md) for the full per-header
 reference (one page per header, linked from there) covering every public
-type. A few highlights, demonstrated in [examples/](examples):
+type, and [docs/coding-guide.md](docs/coding-guide.md) for contribution
+conventions (no `std::` containers in main code/examples, `TEST_F`/
+`TEST_P` for new tests, trait-example requirements). A few highlights,
+demonstrated in [examples/](examples):
 
 - **[`boot_memory_map_demo.cpp`](examples/boot_memory_map_demo.cpp)** --
   decodes a DTB's `/memory`/`/reserved-memory` description into full/free

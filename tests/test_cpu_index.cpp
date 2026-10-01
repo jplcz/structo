@@ -36,9 +36,25 @@ struct multicore_tag {
   static void send_event() noexcept { ++send_count; }
 };
 
+/** @brief Fixture for `cpu_index<uniprocessor_tag>` tests; no shared mutable state to reset. */
+class CpuIndexUniprocessorTest : public ::testing::Test {};
+
+/** @brief Fixture for `cpu_index<multicore_tag>` tests; resets `multicore_tag`'s mutable static state before/after each test. */
+class CpuIndexMulticoreTest : public ::testing::Test {
+protected:
+  void SetUp() override {
+    multicore_tag::current_cpu = 0;
+    multicore_tag::yield_count = 0;
+    multicore_tag::wait_count = 0;
+    multicore_tag::send_count = 0;
+  }
+
+  void TearDown() override { multicore_tag::current_cpu = 0; }
+};
+
 } // namespace
 
-TEST(CpuIndexTest, UniprocessorTagReportsSingleAlwaysValidCore) {
+TEST_F(CpuIndexUniprocessorTest, ReportsSingleAlwaysValidCore) {
   using idx = cpu_index<uniprocessor_tag>;
 
   EXPECT_EQ(idx::max_cpus, 1u);
@@ -55,13 +71,13 @@ TEST(CpuIndexTest, UniprocessorTagReportsSingleAlwaysValidCore) {
   idx::send_event();
 }
 
-TEST(CpuIndexTest, UniprocessorTagFromContextAlwaysResolvesToCoreZero) {
+TEST_F(CpuIndexUniprocessorTest, FromContextAlwaysResolvesToCoreZero) {
   using idx = cpu_index<uniprocessor_tag>;
   struct dummy_context {};
   EXPECT_EQ(idx::from_context(dummy_context{}), 0u);
 }
 
-TEST(CpuIndexTest, MulticoreTagDelegatesCurrentAndClampsOutOfRangeResults) {
+TEST_F(CpuIndexMulticoreTest, DelegatesCurrentAndClampsOutOfRangeResults) {
   using idx = cpu_index<multicore_tag>;
 
   multicore_tag::current_cpu = 2;
@@ -72,10 +88,9 @@ TEST(CpuIndexTest, MulticoreTagDelegatesCurrentAndClampsOutOfRangeResults) {
   // rather than propagating an unchecked, possibly-out-of-bounds value.
   multicore_tag::current_cpu = 99;
   EXPECT_EQ(idx::current(), 0u);
-  multicore_tag::current_cpu = 0;
 }
 
-TEST(CpuIndexTest, MulticoreTagResolvesFromExplicitFaultContext) {
+TEST_F(CpuIndexMulticoreTest, ResolvesFromExplicitFaultContext) {
   using idx = cpu_index<multicore_tag>;
 
   EXPECT_EQ(idx::from_context(fault_context{3}), 3u);
@@ -83,25 +98,21 @@ TEST(CpuIndexTest, MulticoreTagResolvesFromExplicitFaultContext) {
   EXPECT_EQ(idx::from_context(fault_context{42}), 0u);
 }
 
-TEST(CpuIndexTest, MulticoreTagExposesHardwareIdAndKernelOperationPassthroughs) {
+TEST_F(CpuIndexMulticoreTest, ExposesHardwareIdAndKernelOperationPassthroughs) {
   using idx = cpu_index<multicore_tag>;
 
   EXPECT_EQ(idx::hardware_id(), 0xC0FFEEu);
-
-  const int yields_before = multicore_tag::yield_count;
-  const int waits_before = multicore_tag::wait_count;
-  const int sends_before = multicore_tag::send_count;
 
   idx::yield();
   idx::wait_for_event();
   idx::send_event();
 
-  EXPECT_EQ(multicore_tag::yield_count, yields_before + 1);
-  EXPECT_EQ(multicore_tag::wait_count, waits_before + 1);
-  EXPECT_EQ(multicore_tag::send_count, sends_before + 1);
+  EXPECT_EQ(multicore_tag::yield_count, 1);
+  EXPECT_EQ(multicore_tag::wait_count, 1);
+  EXPECT_EQ(multicore_tag::send_count, 1);
 }
 
-TEST(CpuIndexTest, IsValidRespectsTagMaxCpusBoundary) {
+TEST_F(CpuIndexMulticoreTest, IsValidRespectsTagMaxCpusBoundary) {
   using idx = cpu_index<multicore_tag>;
 
   EXPECT_TRUE(idx::is_valid(0));

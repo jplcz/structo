@@ -43,10 +43,15 @@ struct fake_irq_traits {
   }
 };
 
+/** @brief Fixture for `irq_guard`/`irq_locked` tests; resets `fake_irq_traits`'s mutable static state before each test. */
+class IrqGuardTest : public ::testing::Test {
+protected:
+  void SetUp() override { fake_irq_traits::reset(); }
+};
+
 } // namespace
 
-TEST(IrqGuardTest, ConstructionSavesAndDestructionRestoresFlags) {
-  fake_irq_traits::reset();
+TEST_F(IrqGuardTest, ConstructionSavesAndDestructionRestoresFlags) {
   {
     irq_guard<fake_irq_traits> guard;
     EXPECT_TRUE(guard.is_armed());
@@ -58,8 +63,7 @@ TEST(IrqGuardTest, ConstructionSavesAndDestructionRestoresFlags) {
   EXPECT_EQ(fake_irq_traits::last_restored_flags, 0);
 }
 
-TEST(IrqGuardTest, UnlockRestoresEarlyAndDisarmsFurtherRestoreOnDestruction) {
-  fake_irq_traits::reset();
+TEST_F(IrqGuardTest, UnlockRestoresEarlyAndDisarmsFurtherRestoreOnDestruction) {
   {
     irq_guard<fake_irq_traits> guard;
     guard.unlock();
@@ -74,8 +78,7 @@ TEST(IrqGuardTest, UnlockRestoresEarlyAndDisarmsFurtherRestoreOnDestruction) {
   EXPECT_EQ(fake_irq_traits::restore_count, 1);
 }
 
-TEST(IrqGuardTest, MoveConstructionTransfersOwnershipAndDisarmsSource) {
-  fake_irq_traits::reset();
+TEST_F(IrqGuardTest, MoveConstructionTransfersOwnershipAndDisarmsSource) {
   irq_guard<fake_irq_traits> first;
   EXPECT_EQ(fake_irq_traits::save_count, 1);
 
@@ -89,8 +92,7 @@ TEST(IrqGuardTest, MoveConstructionTransfersOwnershipAndDisarmsSource) {
   EXPECT_EQ(fake_irq_traits::restore_count, 0);
 }
 
-TEST(IrqGuardTest, MoveAssignmentRestoresTargetsPreviousStateBeforeTakingOver) {
-  fake_irq_traits::reset();
+TEST_F(IrqGuardTest, MoveAssignmentRestoresTargetsPreviousStateBeforeTakingOver) {
   irq_guard<fake_irq_traits> a; // saves flags=0, depth becomes 1
   irq_guard<fake_irq_traits> b; // saves flags=1, depth becomes 2
 
@@ -104,31 +106,27 @@ TEST(IrqGuardTest, MoveAssignmentRestoresTargetsPreviousStateBeforeTakingOver) {
   EXPECT_EQ(a.saved_flags(), 1);
 }
 
-TEST(IrqGuardTest, TokenIsOnlyObtainableFromAnActiveGuard) {
-  fake_irq_traits::reset();
+TEST_F(IrqGuardTest, TokenIsOnlyObtainableFromAnActiveGuard) {
   irq_guard<fake_irq_traits> guard;
   auto token = guard.token(); // must compile: only irq_guard/with_irq_disabled can mint one
   (void)token;
 }
 
-TEST(IrqGuardTest, WithIrqDisabledInvokesCallableWithoutArgumentsAndRestoresAfterwards) {
-  fake_irq_traits::reset();
+TEST_F(IrqGuardTest, WithIrqDisabledInvokesCallableWithoutArgumentsAndRestoresAfterwards) {
   bool called = false;
   with_irq_disabled<fake_irq_traits>([&] { called = true; });
   EXPECT_TRUE(called);
   EXPECT_EQ(fake_irq_traits::restore_count, 1);
 }
 
-TEST(IrqGuardTest, WithIrqDisabledPassesProofTokenWhenRequested) {
-  fake_irq_traits::reset();
+TEST_F(IrqGuardTest, WithIrqDisabledPassesProofTokenWhenRequested) {
   bool called = false;
   with_irq_disabled<fake_irq_traits>([&](structo::sync::critical_section_token) { called = true; });
   EXPECT_TRUE(called);
   EXPECT_EQ(fake_irq_traits::restore_count, 1);
 }
 
-TEST(IrqGuardTest, WithIrqDisabledPassesGuardReferenceWhenRequested) {
-  fake_irq_traits::reset();
+TEST_F(IrqGuardTest, WithIrqDisabledPassesGuardReferenceWhenRequested) {
   bool unlocked_early = false;
   with_irq_disabled<fake_irq_traits>([&](irq_guard<fake_irq_traits> &guard) {
     EXPECT_TRUE(guard.is_armed());
@@ -141,14 +139,12 @@ TEST(IrqGuardTest, WithIrqDisabledPassesGuardReferenceWhenRequested) {
   EXPECT_EQ(fake_irq_traits::restore_count, 1);
 }
 
-TEST(IrqGuardTest, WithIrqDisabledForwardsReturnValue) {
-  fake_irq_traits::reset();
+TEST_F(IrqGuardTest, WithIrqDisabledForwardsReturnValue) {
   const int result = with_irq_disabled<fake_irq_traits>([] { return 42; });
   EXPECT_EQ(result, 42);
 }
 
-TEST(IrqGuardTest, IrqLockedLockGrantsExclusiveAccessAndRestoresOnGuardDestruction) {
-  fake_irq_traits::reset();
+TEST_F(IrqGuardTest, IrqLockedLockGrantsExclusiveAccessAndRestoresOnGuardDestruction) {
   irq_locked<int, fake_irq_traits> locked(7);
 
   {
@@ -162,8 +158,7 @@ TEST(IrqGuardTest, IrqLockedLockGrantsExclusiveAccessAndRestoresOnGuardDestructi
   EXPECT_EQ(*guard2, 9);
 }
 
-TEST(IrqGuardTest, IrqLockedBorrowIsZeroCostGivenAnExistingToken) {
-  fake_irq_traits::reset();
+TEST_F(IrqGuardTest, IrqLockedBorrowIsZeroCostGivenAnExistingToken) {
   irq_locked<int, fake_irq_traits> locked(5);
 
   irq_guard<fake_irq_traits> guard;
@@ -178,8 +173,7 @@ TEST(IrqGuardTest, IrqLockedBorrowIsZeroCostGivenAnExistingToken) {
   EXPECT_EQ(locked.borrow(guard.token()), 11);
 }
 
-TEST(IrqGuardTest, IrqLockedWithLockPassesValueAndOptionalToken) {
-  fake_irq_traits::reset();
+TEST_F(IrqGuardTest, IrqLockedWithLockPassesValueAndOptionalToken) {
   irq_locked<int, fake_irq_traits> locked(1);
 
   const int doubled = locked.with_lock([](int &value) {

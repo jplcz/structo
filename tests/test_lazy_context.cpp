@@ -135,12 +135,30 @@ struct full_traits : structo::arch::static_per_cpu_storage<8, void, std::size_t>
 
 } // namespace
 
+namespace {
+
+/** @brief Fixture for `lazy_context`/`lazy_context_switcher<minimal_traits>` tests; resets `minimal_traits`'s mutable static state before each test. */
+class LazyContextMinimalTraitsTest : public ::testing::Test {
+protected:
+  void SetUp() override { minimal_traits::reset(); }
+};
+
+/** @brief Fixture for `lazy_context`/`lazy_context_switcher<full_traits>` tests; resets `full_traits`'s mutable static state before each test. */
+class LazyContextFullTraitsTest : public ::testing::Test {
+protected:
+  void SetUp() override { full_traits::reset(); }
+};
+
+/** @brief Fixture for `static_per_cpu_storage` tests; no shared mutable state to reset beyond each test's own local instance. */
+class StaticPerCpuStorageTest : public ::testing::Test {};
+
+} // namespace
+
 // ---------------------------------------------------------------------------
 // minimal_traits: eager construction, restore_context()-as-initializer
 // ---------------------------------------------------------------------------
 
-TEST(LazyContextTest, DefaultConstructedContextStartsConstructedWhenNoDynamicConstructionNeeded) {
-  minimal_traits::reset();
+TEST_F(LazyContextMinimalTraitsTest, DefaultConstructedContextStartsConstructedWhenNoDynamicConstructionNeeded) {
   structo::arch::lazy_context<minimal_traits> ctx;
 
   EXPECT_TRUE(ctx.is_constructed());
@@ -149,8 +167,7 @@ TEST(LazyContextTest, DefaultConstructedContextStartsConstructedWhenNoDynamicCon
   EXPECT_EQ(ctx.last_cpu(), minimal_traits::invalid_cpu);
 }
 
-TEST(LazyContextTest, OnTrapInitializesHardwareLazilyOnFirstTouch) {
-  minimal_traits::reset();
+TEST_F(LazyContextMinimalTraitsTest, OnTrapInitializesHardwareLazilyOnFirstTouch) {
   using switcher = structo::arch::lazy_context_switcher<minimal_traits>;
   switcher::context_type ctx;
 
@@ -166,8 +183,7 @@ TEST(LazyContextTest, OnTrapInitializesHardwareLazilyOnFirstTouch) {
   EXPECT_EQ(minimal_traits::restore_calls, 1);
 }
 
-TEST(LazyContextTest, OnTrapFastPathReusesResidentRegistersWithoutReload) {
-  minimal_traits::reset();
+TEST_F(LazyContextMinimalTraitsTest, OnTrapFastPathReusesResidentRegistersWithoutReload) {
   using switcher = structo::arch::lazy_context_switcher<minimal_traits>;
   switcher::context_type ctx;
   ASSERT_TRUE(switcher::on_trap(ctx, trap_frame{0}, std::size_t{0}));
@@ -180,8 +196,7 @@ TEST(LazyContextTest, OnTrapFastPathReusesResidentRegistersWithoutReload) {
   EXPECT_EQ(minimal_traits::restore_calls, restores_before); // zero register reload
 }
 
-TEST(LazyContextTest, OnTrapCascadesWhenMatcherRejectsTheFaultWithoutTouchingHardware) {
-  minimal_traits::reset();
+TEST_F(LazyContextMinimalTraitsTest, OnTrapCascadesWhenMatcherRejectsTheFaultWithoutTouchingHardware) {
   minimal_traits::should_match = false;
   using switcher = structo::arch::lazy_context_switcher<minimal_traits>;
   switcher::context_type ctx;
@@ -194,8 +209,7 @@ TEST(LazyContextTest, OnTrapCascadesWhenMatcherRejectsTheFaultWithoutTouchingHar
   EXPECT_EQ(minimal_traits::enable_calls, 0);
 }
 
-TEST(LazyContextTest, OnThreadLeaveSavesWhenResidentAndDisablesHardware) {
-  minimal_traits::reset();
+TEST_F(LazyContextMinimalTraitsTest, OnThreadLeaveSavesWhenResidentAndDisablesHardware) {
   using switcher = structo::arch::lazy_context_switcher<minimal_traits>;
   switcher::context_type ctx;
   ASSERT_TRUE(switcher::on_trap(ctx, trap_frame{0}, std::size_t{0}));
@@ -206,8 +220,7 @@ TEST(LazyContextTest, OnThreadLeaveSavesWhenResidentAndDisablesHardware) {
   EXPECT_FALSE(minimal_traits::enabled);
 }
 
-TEST(LazyContextTest, OnThreadLeaveIsANoOpForAContextThatWasNeverInitialized) {
-  minimal_traits::reset();
+TEST_F(LazyContextMinimalTraitsTest, OnThreadLeaveIsANoOpForAContextThatWasNeverInitialized) {
   using switcher = structo::arch::lazy_context_switcher<minimal_traits>;
   switcher::context_type ctx;
 
@@ -218,8 +231,7 @@ TEST(LazyContextTest, OnThreadLeaveIsANoOpForAContextThatWasNeverInitialized) {
   EXPECT_EQ(minimal_traits::disable_calls, 0);
 }
 
-TEST(LazyContextTest, OnThreadEnterReEnablesWithoutTrapWhenStillResidentOnSameCpu) {
-  minimal_traits::reset();
+TEST_F(LazyContextMinimalTraitsTest, OnThreadEnterReEnablesWithoutTrapWhenStillResidentOnSameCpu) {
   using switcher = structo::arch::lazy_context_switcher<minimal_traits>;
   switcher::context_type ctx;
   ASSERT_TRUE(switcher::on_trap(ctx, trap_frame{0}, std::size_t{0}));
@@ -232,8 +244,7 @@ TEST(LazyContextTest, OnThreadEnterReEnablesWithoutTrapWhenStillResidentOnSameCp
   EXPECT_TRUE(minimal_traits::enabled);
 }
 
-TEST(LazyContextTest, OnThreadEnterLeavesDisabledWhenContextIsDirtyOrNotResident) {
-  minimal_traits::reset();
+TEST_F(LazyContextMinimalTraitsTest, OnThreadEnterLeavesDisabledWhenContextIsDirtyOrNotResident) {
   using switcher = structo::arch::lazy_context_switcher<minimal_traits>;
   switcher::context_type ctx;
 
@@ -246,8 +257,7 @@ TEST(LazyContextTest, OnThreadEnterLeavesDisabledWhenContextIsDirtyOrNotResident
   EXPECT_FALSE(minimal_traits::enabled);
 }
 
-TEST(LazyContextTest, OnThreadLocalSyncFlushesRegistersAndSeversResidency) {
-  minimal_traits::reset();
+TEST_F(LazyContextMinimalTraitsTest, OnThreadLocalSyncFlushesRegistersAndSeversResidency) {
   using switcher = structo::arch::lazy_context_switcher<minimal_traits>;
   switcher::context_type ctx;
   ASSERT_TRUE(switcher::on_trap(ctx, trap_frame{0}, std::size_t{0}));
@@ -259,8 +269,7 @@ TEST(LazyContextTest, OnThreadLocalSyncFlushesRegistersAndSeversResidency) {
   EXPECT_EQ(ctx.last_cpu(), minimal_traits::invalid_cpu);
 }
 
-TEST(LazyContextTest, OnThreadRemoteSyncMarksDirtyWithoutTouchingHardwareAndForcesFreshRestore) {
-  minimal_traits::reset();
+TEST_F(LazyContextMinimalTraitsTest, OnThreadRemoteSyncMarksDirtyWithoutTouchingHardwareAndForcesFreshRestore) {
   using switcher = structo::arch::lazy_context_switcher<minimal_traits>;
   switcher::context_type ctx;
   ASSERT_TRUE(switcher::on_trap(ctx, trap_frame{0}, std::size_t{0}));
@@ -282,8 +291,7 @@ TEST(LazyContextTest, OnThreadRemoteSyncMarksDirtyWithoutTouchingHardwareAndForc
   EXPECT_EQ(minimal_traits::restore_calls, restores_before + 1);
 }
 
-TEST(LazyContextTest, OnThreadExitClearsActiveContextAndResetsState) {
-  minimal_traits::reset();
+TEST_F(LazyContextMinimalTraitsTest, OnThreadExitClearsActiveContextAndResetsState) {
   using switcher = structo::arch::lazy_context_switcher<minimal_traits>;
   switcher::context_type ctx;
   ASSERT_TRUE(switcher::on_trap(ctx, trap_frame{0}, std::size_t{0}));
@@ -300,14 +308,12 @@ TEST(LazyContextTest, OnThreadExitClearsActiveContextAndResetsState) {
 // destroy_context()
 // ---------------------------------------------------------------------------
 
-TEST(LazyContextTest, DynamicallyConstructedContextStartsUnconstructed) {
-  full_traits::reset();
+TEST_F(LazyContextFullTraitsTest, DynamicallyConstructedContextStartsUnconstructed) {
   structo::arch::lazy_context<full_traits> ctx;
   EXPECT_FALSE(ctx.is_constructed());
 }
 
-TEST(LazyContextTest, OnThreadConstructInvokesHookAndMarksContextConstructed) {
-  full_traits::reset();
+TEST_F(LazyContextFullTraitsTest, OnThreadConstructInvokesHookAndMarksContextConstructed) {
   using switcher = structo::arch::lazy_context_switcher<full_traits>;
   switcher::context_type ctx;
   reloco::allocator_ref alloc;
@@ -319,8 +325,7 @@ TEST(LazyContextTest, OnThreadConstructInvokesHookAndMarksContextConstructed) {
   EXPECT_TRUE(ctx.is_constructed());
 }
 
-TEST(LazyContextTest, OnLazyConstructIsIdempotentAfterTheFirstSuccess) {
-  full_traits::reset();
+TEST_F(LazyContextFullTraitsTest, OnLazyConstructIsIdempotentAfterTheFirstSuccess) {
   using switcher = structo::arch::lazy_context_switcher<full_traits>;
   switcher::context_type ctx;
   reloco::allocator_ref alloc;
@@ -333,8 +338,7 @@ TEST(LazyContextTest, OnLazyConstructIsIdempotentAfterTheFirstSuccess) {
   EXPECT_EQ(full_traits::lazy_construct_calls, 1); // already constructed: no-op
 }
 
-TEST(LazyContextTest, OnTrapCascadesUntilLazyConstructHasRunForDynamicallyConstructedState) {
-  full_traits::reset();
+TEST_F(LazyContextFullTraitsTest, OnTrapCascadesUntilLazyConstructHasRunForDynamicallyConstructedState) {
   using switcher = structo::arch::lazy_context_switcher<full_traits>;
   switcher::context_type ctx;
   ASSERT_FALSE(ctx.is_constructed());
@@ -352,8 +356,7 @@ TEST(LazyContextTest, OnTrapCascadesUntilLazyConstructHasRunForDynamicallyConstr
   EXPECT_TRUE(*after);
 }
 
-TEST(LazyContextTest, OnTrapUsesInitContextHookInsteadOfRestoreContextOnFirstTouch) {
-  full_traits::reset();
+TEST_F(LazyContextFullTraitsTest, OnTrapUsesInitContextHookInsteadOfRestoreContextOnFirstTouch) {
   using switcher = structo::arch::lazy_context_switcher<full_traits>;
   switcher::context_type ctx;
   reloco::allocator_ref alloc;
@@ -368,8 +371,7 @@ TEST(LazyContextTest, OnTrapUsesInitContextHookInsteadOfRestoreContextOnFirstTou
   EXPECT_EQ(ctx.state().value, 100);
 }
 
-TEST(LazyContextTest, OnTrapNotifiesMigrationWhenContextMovesToADifferentCpu) {
-  full_traits::reset();
+TEST_F(LazyContextFullTraitsTest, OnTrapNotifiesMigrationWhenContextMovesToADifferentCpu) {
   using switcher = structo::arch::lazy_context_switcher<full_traits>;
   switcher::context_type ctx;
   reloco::allocator_ref alloc;
@@ -386,8 +388,7 @@ TEST(LazyContextTest, OnTrapNotifiesMigrationWhenContextMovesToADifferentCpu) {
   EXPECT_EQ(full_traits::migrate_to, 1u);
 }
 
-TEST(LazyContextTest, OnThreadExitWithAllocatorPrefersTheAllocAwareDestroyHook) {
-  full_traits::reset();
+TEST_F(LazyContextFullTraitsTest, OnThreadExitWithAllocatorPrefersTheAllocAwareDestroyHook) {
   using switcher = structo::arch::lazy_context_switcher<full_traits>;
   switcher::context_type ctx;
   reloco::allocator_ref alloc;
@@ -405,7 +406,7 @@ TEST(LazyContextTest, OnThreadExitWithAllocatorPrefersTheAllocAwareDestroyHook) 
 // static_per_cpu_storage
 // ---------------------------------------------------------------------------
 
-TEST(StaticPerCpuStorageTest, OutOfRangeCpuIndicesAreIgnoredRatherThanCorrupingMemory) {
+TEST_F(StaticPerCpuStorageTest, OutOfRangeCpuIndicesAreIgnoredRatherThanCorrupingMemory) {
   structo::arch::static_per_cpu_storage<2, int> storage;
   int value = 7;
 

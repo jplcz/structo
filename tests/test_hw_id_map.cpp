@@ -10,7 +10,14 @@
 
 using structo::arch::hw_id_lut;
 
-TEST(HwIdMapTest, StartsEmptyAndFindReturnsInvalidIndex) {
+namespace {
+
+/** @brief Fixture for `hw_id_lut` tests; each test constructs its own locally-scoped `lut` with the template parameters it needs. */
+class HwIdMapTest : public ::testing::Test {};
+
+} // namespace
+
+TEST_F(HwIdMapTest, StartsEmptyAndFindReturnsInvalidIndex) {
   hw_id_lut<uint32_t, 4, 8> lut;
   EXPECT_EQ(lut.size(), 0u);
   EXPECT_EQ(lut.find(0x1234), lut.invalid_index);
@@ -20,7 +27,7 @@ TEST(HwIdMapTest, StartsEmptyAndFindReturnsInvalidIndex) {
   EXPECT_EQ(out, 123u); // lookup leaves out_idx untouched on failure
 }
 
-TEST(HwIdMapTest, InsertThenFindRoundTripsThroughL1FastPath) {
+TEST_F(HwIdMapTest, InsertThenFindRoundTripsThroughL1FastPath) {
   hw_id_lut<uint32_t, 4, 8> lut;
 
   ASSERT_TRUE(lut.insert(0x100, 0));
@@ -38,7 +45,7 @@ TEST(HwIdMapTest, InsertThenFindRoundTripsThroughL1FastPath) {
   EXPECT_EQ(out, 2u);
 }
 
-TEST(HwIdMapTest, FallsBackToL2BinarySearchOnHashCollision) {
+TEST_F(HwIdMapTest, FallsBackToL2BinarySearchOnHashCollision) {
   // L1Size = 1 forces every hw_id into the same slot, so the second insert
   // always demotes that slot to a tombstone and every lookup must resolve
   // through the sorted L2 array's binary search instead of the L1 filter.
@@ -54,7 +61,7 @@ TEST(HwIdMapTest, FallsBackToL2BinarySearchOnHashCollision) {
   EXPECT_EQ(lut.find(0x99), lut.invalid_index);
 }
 
-TEST(HwIdMapTest, ReinsertingAnExistingHwIdUpdatesItsCpuIndexInPlace) {
+TEST_F(HwIdMapTest, ReinsertingAnExistingHwIdUpdatesItsCpuIndexInPlace) {
   hw_id_lut<uint32_t, 4, 8> lut;
 
   ASSERT_TRUE(lut.insert(0x42, 0));
@@ -66,7 +73,7 @@ TEST(HwIdMapTest, ReinsertingAnExistingHwIdUpdatesItsCpuIndexInPlace) {
   EXPECT_EQ(lut.find(0x42), 3u);
 }
 
-TEST(HwIdMapTest, InsertRejectsOutOfRangeOrTombstoneCpuIndexAndFullTable) {
+TEST_F(HwIdMapTest, InsertRejectsOutOfRangeOrTombstoneCpuIndexAndFullTable) {
   hw_id_lut<uint32_t, 2, 8> lut;
 
   EXPECT_FALSE(lut.insert(0x1, 2));             // cpu_idx >= max_cpus
@@ -78,7 +85,7 @@ TEST(HwIdMapTest, InsertRejectsOutOfRangeOrTombstoneCpuIndexAndFullTable) {
   EXPECT_EQ(lut.size(), 2u);
 }
 
-TEST(HwIdMapTest, ClearResetsSizeAndEverySlotBackToEmpty) {
+TEST_F(HwIdMapTest, ClearResetsSizeAndEverySlotBackToEmpty) {
   hw_id_lut<uint32_t, 4, 8> lut;
 
   ASSERT_TRUE(lut.insert(0x10, 0));
@@ -96,7 +103,7 @@ TEST(HwIdMapTest, ClearResetsSizeAndEverySlotBackToEmpty) {
   EXPECT_EQ(lut.find(0x30), 2u);
 }
 
-TEST(HwIdMapTest, SupportsWideHwIdTypesViaTheSixtyFourBitMixerPath) {
+TEST_F(HwIdMapTest, SupportsWideHwIdTypesViaTheSixtyFourBitMixerPath) {
   hw_id_lut<uint64_t, 4, 8> lut;
 
   ASSERT_TRUE(lut.insert(0x1'0000'0001ULL, 0));
