@@ -267,6 +267,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_phys_page.cpp
         tests/test_target_ptr.cpp
         tests/test_io_address.cpp
+        tests/test_io_space_ref.cpp
         tests/test_phys_translator.cpp
         tests/test_region_set.cpp
         tests/test_sg_list.cpp
