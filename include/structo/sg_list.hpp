@@ -5,8 +5,11 @@
 #pragma once
 
 #include "phys_addr.hpp"
+#include <cstddef>
+#include <type_traits>
 #include <reloco/error.hpp>
 #include <reloco/lifetime.hpp>
+#include <reloco/type_id.hpp>
 #include <reloco/vector.hpp>
 
 namespace structo {
@@ -95,6 +98,133 @@ public:
 private:
   Container c_;
 };
+
+/**
+ * @brief Single-pass pull cursor splitting a type-erased `sg_list`'s
+ * entries into caller-sized chunks on demand, for use cases such as
+ * remapping memory where the maximum chunk size (e.g. how much can be
+ * mapped as one segment at the destination) is a runtime decision that
+ * can vary from call to call, not a single fixed limit chosen up front.
+ *
+ * Only `PhysInt` (the raw address/length integer width) remains a
+ * template parameter; the originating `sg_list`'s `Container` and
+ * `SpaceTag` are both erased at construction. This lets a cursor be
+ * handed to a low-level memory mapper that accepts chunks for several
+ * different address spaces (e.g. DMA-bus vs. CPU-physical) without that
+ * mapper needing to be templated on the list's concrete `Container`
+ * type; the mapper instead calls `holds<SpaceTag>()` to validate, at
+ * runtime, which address space the cursor actually carries before
+ * trusting `next_up_to<SpaceTag>()`'s output -- mirroring
+ * `reloco::any`'s `is<T>()`/`try_get<T>()` type-erasure idiom.
+ *
+ * Exposes no `begin()`/`end()` and no Rust-style `.iter()`: driven purely
+ * by repeated `next_up_to<SpaceTag>(max_length)` calls, each returning
+ * the next physically-contiguous chunk (never crossing an original
+ * entry's boundary, since a chunk's address range must remain
+ * contiguous) of at most `max_length` bytes -- possibly shorter, both
+ * because the remainder of the current entry may be smaller than
+ * `max_length` and because a chunk is never split across two different
+ * original entries.
+ *
+ * Holds only a type-erased pointer back into its `sg_list`, a function
+ * pointer bound to that list's concrete `Container` type, the erased
+ * entry type's `reloco::type_id`, and a small amount of plain cursor
+ * state (current entry index + consumed-so-far offset within it) -- all
+ * trivially copyable, so a caller needing more than one independent pass
+ * over the same list can simply copy the cursor before advancing it,
+ * rather than re-deriving one from the list.
+ *
+ * @tparam PhysInt The raw address/length integer width; must match the
+ * originating `sg_list`'s own `phys_int`.
+ */
+template <typename PhysInt = std::uint64_t> class sg_list_cursor {
+public:
+  using phys_int = PhysInt;
+
+  /**
+   * @brief Binds to `list`, erasing its `Container` and `SpaceTag`;
+   * `list` must outlive this cursor.
+   */
+  template <typename Container>
+  constexpr explicit sg_list_cursor(const sg_list<Container> &list RELOCO_LIFETIMEBOUND
+                                         RELOCO_LIFETIME_CAPTURE_BY_THIS) noexcept
+      : list_(&list), advance_(&advance<Container>),
+        entry_type_(type_id::of<typename sg_list<Container>::entry_type>()) {
+    static_assert(std::is_same_v<typename sg_list<Container>::phys_int, PhysInt>,
+                  "sg_list_cursor<PhysInt> requires a matching sg_list::phys_int");
+  }
+
+  /** @brief Whether this cursor was built from an `sg_list` whose entries use `SpaceTag`. */
+  template <typename SpaceTag> [[nodiscard]] bool holds() const noexcept {
+    return entry_type_ == type_id::of<sg_entry<SpaceTag, PhysInt>>();
+  }
+
+  /** @brief The erased `reloco::type_id` of the `sg_entry` specialization this cursor was built from. */
+  [[nodiscard]] type_id entry_type_id() const noexcept { return entry_type_; }
+
+  /**
+   * @brief Returns the next chunk, at most `max_length` bytes and never
+   * crossing an original entry boundary.
+   * @tparam SpaceTag The address space the caller expects this cursor to
+   * carry; validated against the erased entry type (see `holds()`).
+   * @param max_length Upper bound on the returned chunk's length; the
+   * actual chunk may be shorter (see the class docs).
+   * @return The next chunk, or `error::invalid_argument` if `max_length
+   * == 0` or `SpaceTag` does not match the erased entry type, or
+   * `error::out_of_bounds` once every entry has been fully consumed.
+   */
+  template <typename SpaceTag> [[nodiscard]] result<sg_entry<SpaceTag, PhysInt>> next_up_to(PhysInt max_length) & noexcept {
+    if (max_length == 0 || !holds<SpaceTag>()) {
+      return unexpected(error::invalid_argument);
+    }
+
+    result<raw_chunk> chunk = advance_(list_, entry_idx_, offset_, max_length);
+    if (!chunk) {
+      return unexpected(chunk.error());
+    }
+    return sg_entry<SpaceTag, PhysInt>{phys_addr<void, SpaceTag, PhysInt>{chunk->addr_value}, chunk->length};
+  }
+
+private:
+  /** @brief A chunk's raw address/length, before being re-wrapped into a typed `sg_entry`. */
+  struct raw_chunk {
+    PhysInt addr_value;
+    PhysInt length;
+  };
+
+  using advance_fn = result<raw_chunk> (*)(const void *, std::size_t &, PhysInt &, PhysInt);
+
+  /** @brief Type-erased per-`Container` chunking logic, bound to `advance_` at construction. */
+  template <typename Container>
+  static result<raw_chunk> advance(const void *ctx, std::size_t &entry_idx, PhysInt &offset,
+                                    PhysInt max_length) noexcept {
+    const auto &entries = static_cast<const sg_list<Container> *>(ctx)->base();
+    while (entry_idx < entries.size() && offset >= entries[entry_idx].length) {
+      ++entry_idx;
+      offset = 0;
+    }
+    if (entry_idx >= entries.size()) {
+      return unexpected(error::out_of_bounds);
+    }
+
+    const auto &current = entries[entry_idx];
+    PhysInt remaining = current.length - offset;
+    PhysInt chunk_length = remaining < max_length ? remaining : max_length;
+    raw_chunk chunk{current.addr.value + offset, chunk_length};
+    offset += chunk_length;
+    return chunk;
+  }
+
+  const void *list_;
+  advance_fn advance_;
+  type_id entry_type_;
+  std::size_t entry_idx_{0};
+  PhysInt offset_{0};
+};
+
+/** @brief Deduces `sg_list_cursor<PhysInt>` from an `sg_list<Container>`'s own `phys_int`. */
+template <typename Container>
+sg_list_cursor(const sg_list<Container> &) -> sg_list_cursor<typename sg_list<Container>::phys_int>;
 
 } // namespace structo
 

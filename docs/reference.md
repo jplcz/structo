@@ -24,7 +24,7 @@ exists and where.
 | `phys_page.hpp` | `page_traits<Size, Shift>`, `os_traits_base<Derived, OsPage>`, `page_view<PageTraits, OsTraits>` | Page-size traits and an OS-page-backed physical page view |
 | `phys_translator.hpp` | `phys_translator<Policy>` | Policy-based virtual/physical address translator |
 | `region_set.hpp` | `memory_region<PhysInt>`, `region_set<Capacity, PhysInt>` | Fixed-capacity collection of physical memory regions |
-| `sg_list.hpp` | `sg_entry<SpaceTag, PhysInt>`, `sg_list<Container>` | Scatter-gather entries and container |
+| `sg_list.hpp` | `sg_entry<SpaceTag, PhysInt>`, `sg_list<Container>`, `sg_list_cursor<PhysInt>` | Scatter-gather entries and container, plus a type-erased single-pass cursor splitting entries into caller-sized chunks (e.g. for remapping memory) |
 | `sg_translator.hpp` | `sg_translator` | Policy-based scatter-gather translator |
 | `fdt_reader.hpp` | `fdt_reader`, `mem_reserve_iterator` | Bounds-checked, `iterator_adaptor`-based read-only view over a caller-owned Flattened Device Tree (DTB) span, yielding `result<fdt_event>` per struct-block token |
 | `fdt_writer.hpp` | `fdt_writer` | Move-only, fallibly-constructed streaming writer for Flattened Device Tree (DTB, `/dts-v1/`) blobs into a caller-owned span, with sticky error propagation |
