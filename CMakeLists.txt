@@ -298,6 +298,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_page_table_traits.cpp
         tests/test_page_table_range.cpp
         tests/test_page_table_occupancy.cpp
+        tests/test_arch_page_table_traits.cpp
     )
     target_link_libraries(jplcz_structo_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)
@@ -328,12 +329,21 @@ if(JPLCZ_STRUCTO_BUILD_HEADER_CHECKS)
     # deliberately excluded -- it holds private implementation headers,
     # never included directly by consumers, and is not part of the public
     # API surface this target verifies.
+    #
+    # arch/ uses GLOB_RECURSE (rather than a flat "arch/*.hpp" pattern
+    # like the other subdirectories) because it itself has per-
+    # architecture subdirectories (arch/arm64/, arch/arm/, arch/riscv/,
+    # arch/x86/, ...) that would otherwise need a new explicit pattern
+    # added here every time one is introduced.
+    file(GLOB_RECURSE JPLCZ_STRUCTO_ARCH_HEADERS CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/arch/*.hpp"
+    )
     file(GLOB JPLCZ_STRUCTO_PUBLIC_HEADERS CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/*.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/arch/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/sync/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/hw/*.hpp"
     )
+    list(APPEND JPLCZ_STRUCTO_PUBLIC_HEADERS ${JPLCZ_STRUCTO_ARCH_HEADERS})
 
     function(add_jplcz_structo_header_check std)
         set(check_dir "${CMAKE_CURRENT_BINARY_DIR}/header_check_cxx${std}")
