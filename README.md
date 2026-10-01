@@ -64,6 +64,131 @@ dependency itself unless it wants to pin/vendor a specific reloco
 checkout. See [docs/package-managers.md](docs/package-managers.md) for
 Conan/vcpkg/CPM alternatives.
 
+### Copy-paste: the full 4-step resolution block
+
+The snippet below is exactly the pattern this project's own `CMakeLists.txt`
+uses internally to consume `jplcz_reloco` (and the pattern `microfmt`/
+`microvisor` use for their own dependencies). Drop it into your own
+`CMakeLists.txt`, rename every `MYPROJECT_` prefix to your own project's name,
+and it resolves `jplcz_structo` in order: an already-provided target, a local
+checkout, your own Git remote/tag, then the official repository -- giving
+downstream users of *your* project the same override knobs this project
+gives its own consumers.
+
+```cmake
+# Resolve jplcz_structo: existing target > local checkout > caller's git
+# remote/tag > official repository. Skip entirely if a parent build already
+# provided the jplcz_structo::structo target.
+if(NOT TARGET jplcz_structo::structo)
+    set(MYPROJECT_STRUCTO_SOURCE_DIR "" CACHE PATH
+        "Path to a local jplcz_structo checkout to use instead of fetching it")
+    # Optional: allow the local checkout path via an environment variable too.
+    if(NOT MYPROJECT_STRUCTO_SOURCE_DIR AND DEFINED ENV{MYPROJECT_STRUCTO_SOURCE_DIR})
+        set(MYPROJECT_STRUCTO_SOURCE_DIR "$ENV{MYPROJECT_STRUCTO_SOURCE_DIR}"
+            CACHE PATH
+            "Path to a local jplcz_structo checkout to use instead of fetching it"
+            FORCE)
+    endif()
+    set(MYPROJECT_STRUCTO_GIT_REPOSITORY "https://github.com/jplcz/structo.git"
+        CACHE STRING
+        "Git repository to fetch jplcz_structo from when MYPROJECT_STRUCTO_SOURCE_DIR is unset")
+    set(MYPROJECT_STRUCTO_GIT_TAG "master" CACHE STRING
+        "Git tag or commit to fetch jplcz_structo from when MYPROJECT_STRUCTO_SOURCE_DIR is unset")
+
+    include(FetchContent)
+    if(MYPROJECT_STRUCTO_SOURCE_DIR)
+        FetchContent_Declare(jplcz_structo
+            SOURCE_DIR "${MYPROJECT_STRUCTO_SOURCE_DIR}")
+    else()
+        FetchContent_Declare(jplcz_structo
+            GIT_REPOSITORY "${MYPROJECT_STRUCTO_GIT_REPOSITORY}"
+            GIT_TAG "${MYPROJECT_STRUCTO_GIT_TAG}")
+    endif()
+
+    # Keep structo's own development targets out of the combined build.
+    # CACHE ... FORCE is required: structo's own CMakeLists.txt declares
+    # these same variables via an unforced `set(... CACHE BOOL ...)`, which
+    # would silently clear a plain `set()` of the same name (see "Local
+    # checkout and overriding cache variables" below).
+    set(JPLCZ_STRUCTO_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(JPLCZ_STRUCTO_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(JPLCZ_STRUCTO_BUILD_HEADER_CHECKS OFF CACHE BOOL "" FORCE)
+    set(JPLCZ_STRUCTO_ENABLE_STRICT_WARNINGS OFF CACHE BOOL "" FORCE)
+    set(JPLCZ_STRUCTO_INSTALL OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(jplcz_structo)
+endif()
+
+target_link_libraries(my_target PRIVATE jplcz_structo::structo)
+```
+
+Pulling in `jplcz_reloco` directly (instead of relying on structo's own
+transitive fetch) uses the identical block with `reloco`/`RELOCO` names; see
+["Add jplcz_reloco"](https://github.com/jplcz/reloco#copy-paste-the-full-4-step-resolution-block)
+in reloco's own README for that copy-paste block.
+
+### Local checkout and overriding cache variables
+
+Point `FetchContent_Declare` at a local working copy instead of fetching from
+GitHub with `SOURCE_DIR`, and preset any `JPLCZ_STRUCTO_*` or, transitively,
+`JPLCZ_RELOCO_*` cache variable before the `FetchContent_Declare`/
+`add_subdirectory` call that brings structo (and, transitively, reloco) in:
+
+```cmake
+set(JPLCZ_STRUCTO_RELOCO_SOURCE_DIR "/path/to/local/jplcz_reloco" CACHE PATH "" FORCE)
+set(JPLCZ_STRUCTO_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+
+include(FetchContent)
+FetchContent_Declare(
+    jplcz_structo
+    SOURCE_DIR /path/to/local/jplcz_structo
+)
+FetchContent_MakeAvailable(jplcz_structo)
+```
+
+**Always preset a dependency-owned cache variable with
+`CACHE <type> "" FORCE`, never a plain `set(VAR value)`.** CMake's
+`set(<var> <value> CACHE <type> <docstring>)` (without `FORCE`) silently
+discards any plain/normal variable of the same name already in scope the
+first time it runs -- even though the cache entry did not previously exist --
+so a parent project's unforced `set(JPLCZ_STRUCTO_RELOCO_SOURCE_DIR ...)`
+executed *before* structo's own `CMakeLists.txt` declares that same variable
+gets silently overwritten with the empty default as soon as that
+`CMakeLists.txt` runs, with no warning or error -- the built-in default (an
+unpinned GitHub fetch) just wins silently. structo's own forwarded
+`JPLCZ_RELOCO_*` options (`JPLCZ_RELOCO_BUILD_TESTS OFF CACHE BOOL "" FORCE`,
+etc. in `CMakeLists.txt`) already follow this rule; apply the same pattern in
+any project that embeds structo (see `microvisor`'s `CMakeLists.txt` for a
+real-world example of the bug this avoids).
+
+### How the jplcz_reloco dependency is resolved
+
+`CMakeLists.txt` resolves its own `jplcz_reloco` dependency in a fixed order,
+each step only taken if the previous one did not already settle the question:
+
+1. **Detect an existing target.** `if(NOT TARGET jplcz_reloco::reloco)` guards
+   the whole block: if a parent build already provided the target (its own
+   `add_subdirectory`/`FetchContent_MakeAvailable(jplcz_reloco)` ran first),
+   structo reuses it as-is and skips every step below.
+2. **A local checkout, named by variable.** `JPLCZ_STRUCTO_RELOCO_SOURCE_DIR`
+   (a `CACHE PATH`, settable with `-D` or `set(... FORCE)`, or equivalently
+   the `JPLCZ_STRUCTO_RELOCO_SOURCE_DIR` environment variable when the cache
+   variable is left unset) points `FetchContent_Declare`'s `SOURCE_DIR` at a
+   local working copy, bypassing Git entirely.
+3. **A user-selected Git remote.** If no local checkout was named,
+   `JPLCZ_STRUCTO_RELOCO_GIT_REPOSITORY`/`JPLCZ_STRUCTO_RELOCO_GIT_TAG` (also
+   `CACHE STRING` variables) let a consumer point `FetchContent_Declare` at
+   their own fork, mirror, or pinned tag/commit instead of upstream.
+4. **The official repository, by default.** If neither of the above was set,
+   `JPLCZ_STRUCTO_RELOCO_GIT_REPOSITORY`/`_GIT_TAG` default to
+   `https://github.com/jplcz/reloco.git`/`master`, so a plain
+   `FetchContent_MakeAvailable(jplcz_structo)` with no extra configuration
+   still works out of the box.
+
+`microfmt`'s and `microvisor`'s `CMakeLists.txt` resolve their own
+dependencies the same way, under the matching
+`JPLCZ_MICROFMT_RELOCO_*`/`MICROVISOR_MICROFMT_*`/`MICROVISOR_STRUCTO_*`
+variable names.
+
 ## Building
 
 ```sh
