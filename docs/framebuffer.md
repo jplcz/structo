@@ -96,4 +96,6 @@ independent of any particular `PixelFormat`'s in-memory encoding, with
   decoded from `src` and re-encoded into the destination rather than
   copied byte-for-byte.
 
-See also: [`uart_ref.md`](uart_ref.md), [`timer_ref.md`](timer_ref.md).
+See also: [`uart_ref.md`](uart_ref.md), [`timer_ref.md`](timer_ref.md),
+[`framebuffer_console.md`](framebuffer_console.md) (rasterizes a text
+console onto a `framebuffer<PixelFormat>`).

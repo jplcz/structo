@@ -271,6 +271,10 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_uart_ref.cpp
         tests/test_timer_ref.cpp
         tests/test_framebuffer.cpp
+        tests/test_console_ref.cpp
+        tests/test_vga_text_console.cpp
+        tests/test_framebuffer_console.cpp
+        tests/test_vt100.cpp
         tests/test_clock_cycles.cpp
         tests/test_async_kernel_object.cpp
         tests/test_callout.cpp
