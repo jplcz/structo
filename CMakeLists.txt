@@ -275,6 +275,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_vga_text_console.cpp
         tests/test_framebuffer_console.cpp
         tests/test_vt100.cpp
+        tests/test_dejavu_font.cpp
         tests/test_clock_cycles.cpp
         tests/test_async_kernel_object.cpp
         tests/test_callout.cpp
@@ -319,7 +320,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
     )
     target_link_libraries(jplcz_structo_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)
-    target_include_directories(jplcz_structo_tests PRIVATE tests)
+    target_include_directories(jplcz_structo_tests PRIVATE tests examples)
     gtest_discover_tests(jplcz_structo_tests)
 
     # tests/test_ipc_ring_fault_injection.cpp defines
