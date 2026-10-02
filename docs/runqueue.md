@@ -100,3 +100,7 @@ See [`async_kernel_object.md`](async_kernel_object.md)/
 `callout_subsystem` can use any of these three in place of the
 sorted-list toy scheduler in
 [`examples/callout_scheduler_demo.cpp`](../examples/callout_scheduler_demo.cpp).
+See [`sched.md`](sched.md) for a concrete consumer already built this
+way: `fixed_priority_sched`/`sched_ule`/`sched_4bsd` all use
+`priority_bucket_runqueue` directly as their per-CPU state, and
+`noop_sched` uses `fifo_runqueue`.
