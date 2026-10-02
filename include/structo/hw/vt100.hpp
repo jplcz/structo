@@ -95,7 +95,27 @@ public:
     }
   }
 
+  /**
+   * @brief Returns a type-erased `reloco::sink` view of this terminal,
+   * writing through `feed()` -- i.e. interpreting every byte written to
+   * it as VT100/ANSI input (escape sequences included), not as literal
+   * glyphs -- so this `vt100_terminal` can be handed directly to
+   * `microfmt::format_to`/similar formatting pipelines
+   * (`microfmt::sink` is itself just an alias for `reloco::sink`, same
+   * `ctx`/`write_fn` shape, so no further adapting is needed). Compare
+   * with `console()`'s own underlying `console_ref::as_sink()`, which
+   * writes literally, with no escape-sequence interpretation.
+   *
+   * The returned `sink` stores a pointer back to *this* `vt100_terminal`
+   * -- it must not outlive it.
+   */
+  [[nodiscard]] reloco::sink as_sink() noexcept RELOCO_LIFETIMEBOUND { return reloco::sink{this, &sink_write_thunk}; }
+
 private:
+  static void sink_write_thunk(void *ctx, reloco::string_view sv) noexcept {
+    static_cast<vt100_terminal *>(ctx)->feed(sv);
+  }
+
   enum class state { ground, escape, csi };
 
   static constexpr std::size_t max_params = 8;

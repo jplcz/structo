@@ -6,8 +6,13 @@
  * @brief The actual demo, called from `boot.s`'s `_start` with the raw
  * `eax`/`ebx` values the bootloader left behind: validates the magic,
  * binds a VGA text console (plus its real CRTC hardware cursor) and a
- * COM1 serial port, prints a banner to both, then walks the boot
- * information structure and dumps the firmware memory map.
+ * COM1 serial port, fans both out through a single `microfmt::tee_sink`
+ * (see `out` in `kmain`, built from `console_ref::as_sink()` plus the
+ * serial UART's callback sink), prints a banner through it, then walks
+ * the boot information structure and dumps the firmware memory map --
+ * one `microfmt::format_to(out, ...)` call per line reaching both the
+ * screen and the serial port identically, rather than hand-duplicating
+ * each line's text/formatting per destination.
  *
  * Two bootloader protocols are accepted (see `multiboot1_header.cpp`/
  * `multiboot_header.cpp` for why both headers are embedded): Multiboot 2
@@ -34,6 +39,7 @@
 #include <structo/hw/vga_text_console.hpp>
 
 #include <microfmt/microfmt.hpp>
+#include <microfmt/sinks/tee_sink.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -80,18 +86,12 @@ static_assert(sizeof(multiboot1_mmap_entry) == 24);
 constexpr std::uint32_t multiboot1_info_flag_mem_map = 1u << 6;
 constexpr std::uint32_t multiboot1_mmap_type_available = 1;
 
-void write_both(structo::hw::console_ref &console, microfmt::sink serial, reloco::string_view text) noexcept {
-  console.write(text);
-  (void)microfmt::format_to(serial, "{}", text);
-}
-
-void dump_multiboot1_memory_map(structo::hw::console_ref &console, microfmt::sink serial,
-                                std::uintptr_t info_phys_addr) noexcept {
+void dump_multiboot1_memory_map(reloco::sink out, std::uintptr_t info_phys_addr) noexcept {
   const auto *info_bytes = reinterpret_cast<const std::uint8_t *>(info_phys_addr);
   std::uint32_t flags{};
   __builtin_memcpy(&flags, info_bytes + 0, sizeof(flags));
   if ((flags & multiboot1_info_flag_mem_map) == 0) {
-    write_both(console, serial, "FATAL: bootloader provided no BIOS memory map (info flags bit 6 unset)\n");
+    (void)microfmt::format_to(out, "FATAL: bootloader provided no BIOS memory map (info flags bit 6 unset)\n");
     return;
   }
 
@@ -100,7 +100,7 @@ void dump_multiboot1_memory_map(structo::hw::console_ref &console, microfmt::sin
   __builtin_memcpy(&mmap_length, info_bytes + 44, sizeof(mmap_length));
   __builtin_memcpy(&mmap_addr, info_bytes + 48, sizeof(mmap_addr));
 
-  write_both(console, serial, "Firmware memory map:\n");
+  (void)microfmt::format_to(out, "Firmware memory map:\n");
   for (std::uint32_t offset = 0; offset < mmap_length;) {
     const auto *entry =
         reinterpret_cast<const multiboot1_mmap_entry *>(static_cast<std::uintptr_t>(mmap_addr) + offset);
@@ -108,10 +108,8 @@ void dump_multiboot1_memory_map(structo::hw::console_ref &console, microfmt::sin
     // Hex only, deliberately: decimal formatting of a `uint64_t` on
     // 32-bit x86 needs a software 64-bit divide (`__udivdi3`), which
     // this freestanding, `-nostdlib` build has no libgcc to supply.
-    (void)microfmt::format_to(serial, "  base={:#018x} length={:#018x} {}\n", entry->base_addr, entry->length,
+    (void)microfmt::format_to(out, "  base={:#018x} length={:#018x} {}\n", entry->base_addr, entry->length,
                               available ? "available" : "reserved");
-    console.write(available ? "  [free]     " : "  [reserved] ");
-    console.write(available ? "available region\n" : "reserved region\n");
 
     // Each entry's actual on-disk size is `size + 4` (the `size` field
     // itself isn't counted), per spec.
@@ -156,19 +154,24 @@ extern "C" [[noreturn]] void kmain(std::uint32_t magic, std::uint32_t info_phys_
   };
   auto serial = microfmt::make_callback_sink(uart_write);
 
-  write_both(console, serial.as_sink(), "structo bare-metal x86 Multiboot demo\n");
-  write_both(console, serial.as_sink(), "================================================\n");
+  // --- Fan out everything written through `out` to both the VGA text
+  // console (literally, via `console_ref::as_sink()`) and COM1 ---
+  microfmt::tee_sink<2> tee(console.as_sink(), serial.as_sink());
+  auto out = tee.as_sink();
+
+  (void)microfmt::format_to(out, "structo bare-metal x86 Multiboot demo\n");
+  (void)microfmt::format_to(out, "================================================\n");
 
   if (magic == structo::arch::x86::multiboot2_bootloader_magic) {
-    write_both(console, serial.as_sink(), "Multiboot2 magic OK.\n");
+    (void)microfmt::format_to(out, "Multiboot2 magic OK.\n");
 
     auto info_span = reloco::span<const std::byte>(
         reinterpret_cast<const std::byte *>(static_cast<std::uintptr_t>(info_phys_addr)), max_boot_info_size);
     auto reader = structo::arch::x86::multiboot2_boot_info_reader::try_create(info_span);
     if (!reader) {
-      write_both(console, serial.as_sink(), "FATAL: failed to parse Multiboot2 boot info\n");
+      (void)microfmt::format_to(out, "FATAL: failed to parse Multiboot2 boot info\n");
     } else {
-      write_both(console, serial.as_sink(), "Firmware memory map:\n");
+      (void)microfmt::format_to(out, "Firmware memory map:\n");
       for (auto tag_r : *reader) {
         if (!tag_r)
           break;
@@ -186,10 +189,8 @@ extern "C" [[noreturn]] void kmain(std::uint32_t magic, std::uint32_t info_phys_
           // Hex only, deliberately: decimal formatting of a `uint64_t` on
           // 32-bit x86 needs a software 64-bit divide (`__udivdi3`), which
           // this freestanding, `-nostdlib` build has no libgcc to supply.
-          (void)microfmt::format_to(serial.as_sink(), "  base={:#018x} length={:#018x} {}\n", entry.base_addr,
-                                    entry.length, entry.is_available() ? "available" : "reserved");
-          console.write(entry.is_available() ? "  [free]     " : "  [reserved] ");
-          console.write(entry.is_available() ? "available region\n" : "reserved region\n");
+          (void)microfmt::format_to(out, "  base={:#018x} length={:#018x} {}\n", entry.base_addr, entry.length,
+                                    entry.is_available() ? "available" : "reserved");
         }
       }
     }
@@ -197,18 +198,18 @@ extern "C" [[noreturn]] void kmain(std::uint32_t magic, std::uint32_t info_phys_
     // The legacy path: e.g. `qemu-system-i386 -kernel ...` directly (see
     // `multiboot1_header.cpp`/README.md) -- QEMU's own built-in loader
     // never implemented Multiboot 2.
-    write_both(console, serial.as_sink(), "Multiboot1 magic OK.\n");
-    dump_multiboot1_memory_map(console, serial.as_sink(), static_cast<std::uintptr_t>(info_phys_addr));
+    (void)microfmt::format_to(out, "Multiboot1 magic OK.\n");
+    dump_multiboot1_memory_map(out, static_cast<std::uintptr_t>(info_phys_addr));
   } else {
-    (void)microfmt::format_to(serial.as_sink(), "FATAL: bad bootloader magic {:#x} (expected {:#x} or {:#x})\n", magic,
+    (void)microfmt::format_to(out, "FATAL: bad bootloader magic {:#x} (expected {:#x} or {:#x})\n", magic,
                               structo::arch::x86::multiboot2_bootloader_magic, multiboot1_bootloader_magic);
-    write_both(console, serial.as_sink(), "FATAL: not loaded via Multiboot 1 or 2 (bad magic in eax)\n");
+    (void)microfmt::format_to(out, "FATAL: not loaded via Multiboot 1 or 2 (bad magic in eax)\n");
     for (;;) {
       asm volatile("cli; hlt");
     }
   }
 
-  write_both(console, serial.as_sink(), "Demo complete -- halting.\n");
+  (void)microfmt::format_to(out, "Demo complete -- halting.\n");
 
   for (;;) {
     asm volatile("cli; hlt");

@@ -63,6 +63,7 @@
 #include <reloco/detail/assert.hpp>
 #include <reloco/detail/compat.hpp>
 #include <reloco/error.hpp>
+#include <reloco/fmt.hpp>
 #include <reloco/lifetime.hpp>
 #include <reloco/string_view.hpp>
 
@@ -411,7 +412,22 @@ public:
     }
   }
 
+  /**
+   * @brief Returns a type-erased `reloco::sink` view of this console,
+   * writing through `write()` (i.e. with `'\n'`'s friendly CR+LF
+   * convenience handling) -- so this `console_ref` can be handed
+   * directly to `microfmt::format_to`/similar formatting pipelines
+   * (`microfmt::sink` is itself just an alias for `reloco::sink`, same
+   * `ctx`/`write_fn` shape, so no further adapting is needed).
+   *
+   * The returned `sink` stores a pointer back to *this* `console_ref`
+   * (not to the bound backend) -- it must not outlive it.
+   */
+  [[nodiscard]] constexpr sink as_sink() noexcept RELOCO_LIFETIMEBOUND { return sink{this, &sink_write_thunk}; }
+
 private:
+  static void sink_write_thunk(void *ctx, string_view sv) noexcept { static_cast<console_ref *>(ctx)->write(sv); }
+
   void advance_cursor() noexcept {
     std::size_t cols = columns();
     std::size_t r = rows();
