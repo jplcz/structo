@@ -38,7 +38,8 @@ struct fake_preempt_traits {
   }
 };
 
-/** @brief Fixture for `preemption_guard`/`preempt_locked` tests; resets `fake_preempt_traits`'s mutable static state before each test. */
+/** @brief Fixture for `preemption_guard`/`preempt_locked` tests; resets `fake_preempt_traits`'s mutable static state
+ * before each test. */
 class PreemptionGuardTest : public ::testing::Test {
 protected:
   void SetUp() override { fake_preempt_traits::reset(); }

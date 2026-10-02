@@ -97,36 +97,36 @@ namespace structo::arch::arm64 {
  * input address, 512GB VA space per TTBRn).
  */
 using level1 = page_table_levels<structo::page_4k, 39, page_table_level<9, 30, true>, // L1: may block-map a 1GB region
-                                  page_table_level<9, 21, true>,                       // L2: may block-map a 2MB region
-                                  page_table_level<9, 12, true>                        // L3: always a 4KB page
-                                  >;
+                                 page_table_level<9, 21, true>,                       // L2: may block-map a 2MB region
+                                 page_table_level<9, 12, true>                        // L3: always a 4KB page
+                                 >;
 
 /**
  * @brief 4KB granule, level-2-rooted, 2-level configuration (30-bit
  * input address, 1GB VA space per TTBRn).
  */
 using level2 = page_table_levels<structo::page_4k, 30, page_table_level<9, 21, true>, // L2: may block-map a 2MB region
-                                  page_table_level<9, 12, true>                        // L3: always a 4KB page
-                                  >;
+                                 page_table_level<9, 12, true>                        // L3: always a 4KB page
+                                 >;
 
 /**
  * @brief 16KB granule, level-1-rooted, 3-level configuration (47-bit
  * input address, 128TB VA space per TTBRn).
  */
-using level1_16k = page_table_levels<structo::page_16k, 47,
-                                      page_table_level<11, 36, false>, // L1: no block mapping for this granule
-                                      page_table_level<11, 25, true>,  // L2: may block-map a 32MB region
-                                      page_table_level<11, 14, true>   // L3: always a 16KB page
-                                      >;
+using level1_16k =
+    page_table_levels<structo::page_16k, 47, page_table_level<11, 36, false>, // L1: no block mapping for this granule
+                      page_table_level<11, 25, true>,                         // L2: may block-map a 32MB region
+                      page_table_level<11, 14, true>                          // L3: always a 16KB page
+                      >;
 
 /**
  * @brief 16KB granule, level-2-rooted, 2-level configuration (36-bit
  * input address, 64GB VA space per TTBRn).
  */
-using level2_16k = page_table_levels<structo::page_16k, 36,
-                                      page_table_level<11, 25, true>, // L2: may block-map a 32MB region
-                                      page_table_level<11, 14, true>  // L3: always a 16KB page
-                                      >;
+using level2_16k =
+    page_table_levels<structo::page_16k, 36, page_table_level<11, 25, true>, // L2: may block-map a 32MB region
+                      page_table_level<11, 14, true>                         // L3: always a 16KB page
+                      >;
 
 /**
  * @brief 64KB granule, level-1-rooted, 3-level configuration (48-bit
@@ -135,18 +135,18 @@ using level2_16k = page_table_levels<structo::page_16k, 36,
  * bits a non-root 64KB-granule table would have.
  */
 using level1_64k = page_table_levels<structo::page_64k, 48,
-                                      page_table_level<6, 42, false>,  // L1 (folded): no block mapping for this granule
-                                      page_table_level<13, 29, true>,  // L2: may block-map a 512MB region
-                                      page_table_level<13, 16, true>   // L3: always a 64KB page
-                                      >;
+                                     page_table_level<6, 42, false>, // L1 (folded): no block mapping for this granule
+                                     page_table_level<13, 29, true>, // L2: may block-map a 512MB region
+                                     page_table_level<13, 16, true>  // L3: always a 64KB page
+                                     >;
 
 /**
  * @brief 64KB granule, level-2-rooted, 2-level configuration (42-bit
  * input address, 4TB VA space per TTBRn).
  */
-using level2_64k = page_table_levels<structo::page_64k, 42,
-                                      page_table_level<13, 29, true>, // L2: may block-map a 512MB region
-                                      page_table_level<13, 16, true>  // L3: always a 64KB page
-                                      >;
+using level2_64k =
+    page_table_levels<structo::page_64k, 42, page_table_level<13, 29, true>, // L2: may block-map a 512MB region
+                      page_table_level<13, 16, true>                         // L3: always a 64KB page
+                      >;
 
 } // namespace structo::arch::arm64

@@ -41,10 +41,10 @@
  * @endcode
  */
 
-#include <reloco/error.hpp>
 #include "phys_addr.hpp"
 #include <cstddef>
 #include <cstdint>
+#include <reloco/error.hpp>
 #include <type_traits>
 
 namespace structo {

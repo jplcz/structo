@@ -53,20 +53,20 @@ namespace structo::arch::arm::lpae {
  * @brief LPAE, level-1-rooted, 3-level configuration (full 32-bit input
  * address).
  */
-using level1 = page_table_levels<structo::page_4k, 32,
-                                  page_table_level<2, 30, true>, // L1: may block-map a 1GB region; only 4 entries (32-bit VA)
-                                  page_table_level<9, 21, true>, // L2: may block-map a 2MB region
-                                  page_table_level<9, 12, true>  // L3: always a 4KB page
-                                  >;
+using level1 =
+    page_table_levels<structo::page_4k, 32,
+                      page_table_level<2, 30, true>, // L1: may block-map a 1GB region; only 4 entries (32-bit VA)
+                      page_table_level<9, 21, true>, // L2: may block-map a 2MB region
+                      page_table_level<9, 12, true>  // L3: always a 4KB page
+                      >;
 
 /**
  * @brief LPAE, level-2-rooted, 2-level configuration (30-bit input
  * address, 1GB VA space).
  */
-using level2 = page_table_levels<structo::page_4k, 30,
-                                  page_table_level<9, 21, true>, // L2: may block-map a 2MB region
-                                  page_table_level<9, 12, true>  // L3: always a 4KB page
-                                  >;
+using level2 = page_table_levels<structo::page_4k, 30, page_table_level<9, 21, true>, // L2: may block-map a 2MB region
+                                 page_table_level<9, 12, true>                        // L3: always a 4KB page
+                                 >;
 
 } // namespace structo::arch::arm::lpae
 
@@ -92,8 +92,9 @@ namespace structo::arch::arm::short_descriptor {
  * modeled.
  */
 using level1 = page_table_levels<structo::page_4k, 32,
-                                  page_table_level<12, 20, true>, // L1: may leaf-map a 1MB section; 4096 entries
-                                  page_table_level<8, 12, true>   // L2: always a 4KB small page; 256 entries (the coarse table itself is 1KB: 256 * 4-byte entries)
-                                  >;
+                                 page_table_level<12, 20, true>, // L1: may leaf-map a 1MB section; 4096 entries
+                                 page_table_level<8, 12, true>   // L2: always a 4KB small page; 256 entries (the coarse
+                                                                 // table itself is 1KB: 256 * 4-byte entries)
+                                 >;
 
 } // namespace structo::arch::arm::short_descriptor

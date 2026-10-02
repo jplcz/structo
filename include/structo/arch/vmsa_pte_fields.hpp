@@ -40,21 +40,23 @@ namespace structo::arch::detail::vmsa {
  * is walking it.
  */
 struct stage1_bits {
-  using valid = pte_bit_field<0, 1>;          //!< Bit 0: descriptor is valid (present).
-  using table_or_page = pte_bit_field<1, 1>;  //!< Bit 1: 1 = table/page descriptor, 0 = block descriptor.
-  using attr_indx = pte_bit_field<2, 3>;      //!< Bits [4:2]: index into `MAIR_ELx`.
-  using ns = pte_bit_field<5, 1>;             //!< Bit 5: Non-secure (1) vs. Secure (0) output, EL1&0/EL3 regimes only.
-  using ap = pte_bit_field<6, 2>;             //!< Bits [7:6]: AP[2:1], access permission.
-  using sh = pte_bit_field<8, 2>;             //!< Bits [9:8]: shareability.
-  using af = pte_bit_field<10, 1>;            //!< Bit 10: access flag.
-  using ng = pte_bit_field<11, 1>;            //!< Bit 11: not-global.
-  using contiguous = pte_bit_field<52, 1>;    //!< Bit 52: part of a contiguous hint range.
-  using pxn = pte_bit_field<53, 1>;           //!< Bit 53: privileged execute-never.
-  using uxn = pte_bit_field<54, 1>;           //!< Bit 54: unprivileged execute-never (EL1&0 regimes) / XN (EL2 regimes).
-  using pxn_table = pte_bit_field<59, 1>;     //!< Bit 59 (table descriptors only): PXN for the next level down.
-  using xn_table = pte_bit_field<60, 1>;      //!< Bit 60 (table descriptors only): XN for the next level down.
-  using ap_table = pte_bit_field<61, 2>;      //!< Bits [62:61] (table descriptors only): AP restriction for the next level down.
-  using ns_table = pte_bit_field<63, 1>;      //!< Bit 63 (table descriptors only): forces Non-secure for the next level down.
+  using valid = pte_bit_field<0, 1>;         //!< Bit 0: descriptor is valid (present).
+  using table_or_page = pte_bit_field<1, 1>; //!< Bit 1: 1 = table/page descriptor, 0 = block descriptor.
+  using attr_indx = pte_bit_field<2, 3>;     //!< Bits [4:2]: index into `MAIR_ELx`.
+  using ns = pte_bit_field<5, 1>;            //!< Bit 5: Non-secure (1) vs. Secure (0) output, EL1&0/EL3 regimes only.
+  using ap = pte_bit_field<6, 2>;            //!< Bits [7:6]: AP[2:1], access permission.
+  using sh = pte_bit_field<8, 2>;            //!< Bits [9:8]: shareability.
+  using af = pte_bit_field<10, 1>;           //!< Bit 10: access flag.
+  using ng = pte_bit_field<11, 1>;           //!< Bit 11: not-global.
+  using contiguous = pte_bit_field<52, 1>;   //!< Bit 52: part of a contiguous hint range.
+  using pxn = pte_bit_field<53, 1>;          //!< Bit 53: privileged execute-never.
+  using uxn = pte_bit_field<54, 1>;          //!< Bit 54: unprivileged execute-never (EL1&0 regimes) / XN (EL2 regimes).
+  using pxn_table = pte_bit_field<59, 1>;    //!< Bit 59 (table descriptors only): PXN for the next level down.
+  using xn_table = pte_bit_field<60, 1>;     //!< Bit 60 (table descriptors only): XN for the next level down.
+  using ap_table =
+      pte_bit_field<61, 2>; //!< Bits [62:61] (table descriptors only): AP restriction for the next level down.
+  using ns_table =
+      pte_bit_field<63, 1>; //!< Bit 63 (table descriptors only): forces Non-secure for the next level down.
 
   [[nodiscard]] static constexpr bool is_present(std::uint64_t raw) noexcept { return valid::test(raw); }
   [[nodiscard]] static constexpr bool is_table(std::uint64_t raw) noexcept { return table_or_page::test(raw); }

@@ -204,9 +204,9 @@ TEST_F(AsidAllocatorTest, MoveConstructionTransfersState) {
 }
 
 TEST_F(AsidAllocatorTest, TaggedAsidTypesAreDistinctAcrossTags) {
-  static_assert(!std::is_same_v<asid_allocator<process_asid_tag, 4>::context_id,
-                                 asid_allocator<vmid_tag, 4>::context_id>,
-                "process_asid_tag and vmid_tag context_ids must be distinct types");
+  static_assert(
+      !std::is_same_v<asid_allocator<process_asid_tag, 4>::context_id, asid_allocator<vmid_tag, 4>::context_id>,
+      "process_asid_tag and vmid_tag context_ids must be distinct types");
   static_assert(!std::is_same_v<tagged_asid<process_asid_tag>, tagged_asid<vmid_tag>>,
                 "tagged_asid<Tag> must be distinct per Tag");
 }

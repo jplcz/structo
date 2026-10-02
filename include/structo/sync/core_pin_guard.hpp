@@ -59,8 +59,7 @@ template <typename Traits, typename = void> struct core_pin_traits_cpu_id {
   using type = std::size_t;
 };
 
-template <typename Traits>
-struct core_pin_traits_cpu_id<Traits, std::void_t<typename Traits::cpu_id_type>> {
+template <typename Traits> struct core_pin_traits_cpu_id<Traits, std::void_t<typename Traits::cpu_id_type>> {
   using type = typename Traits::cpu_id_type;
 };
 
@@ -97,8 +96,7 @@ public:
   core_pin_guard &operator=(const core_pin_guard &) = delete;
 
   /** @brief Transfers ownership of the pin; `other` is left disarmed (no-op on destruction). */
-  core_pin_guard(core_pin_guard &&other) noexcept
-      : m_cpu(other.m_cpu), m_armed(std::exchange(other.m_armed, false)) {}
+  core_pin_guard(core_pin_guard &&other) noexcept : m_cpu(other.m_cpu), m_armed(std::exchange(other.m_armed, false)) {}
 
   /** @brief Releases this guard's own pin first, then takes over `other`'s state; `other` is left disarmed. */
   core_pin_guard &operator=(core_pin_guard &&other) noexcept {

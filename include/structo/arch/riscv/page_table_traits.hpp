@@ -39,17 +39,16 @@
 namespace structo::arch::riscv {
 
 /** @brief Sv39: 3-level, 39-bit VA, 512GB of address space. */
-using sv39 = page_table_levels<structo::page_4k, 39, page_table_level<9, 30, true>,
-                                page_table_level<9, 21, true>, page_table_level<9, 12, true>>;
+using sv39 = page_table_levels<structo::page_4k, 39, page_table_level<9, 30, true>, page_table_level<9, 21, true>,
+                               page_table_level<9, 12, true>>;
 
 /** @brief Sv48: 4-level, 48-bit VA, 256TB of address space. */
-using sv48 =
-    page_table_levels<structo::page_4k, 48, page_table_level<9, 39, true>, page_table_level<9, 30, true>,
-                       page_table_level<9, 21, true>, page_table_level<9, 12, true>>;
+using sv48 = page_table_levels<structo::page_4k, 48, page_table_level<9, 39, true>, page_table_level<9, 30, true>,
+                               page_table_level<9, 21, true>, page_table_level<9, 12, true>>;
 
 /** @brief Sv57: 5-level, 57-bit VA, 128PB of address space. */
-using sv57 = page_table_levels<structo::page_4k, 57, page_table_level<9, 48, true>,
-                                page_table_level<9, 39, true>, page_table_level<9, 30, true>,
-                                page_table_level<9, 21, true>, page_table_level<9, 12, true>>;
+using sv57 =
+    page_table_levels<structo::page_4k, 57, page_table_level<9, 48, true>, page_table_level<9, 39, true>,
+                      page_table_level<9, 30, true>, page_table_level<9, 21, true>, page_table_level<9, 12, true>>;
 
 } // namespace structo::arch::riscv

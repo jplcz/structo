@@ -114,9 +114,9 @@ template <typename Tag, typename PhysSpaceTag, typename LeafPageTraits> struct s
    * `false`. See `is_leaf()`'s doc for why it only applies to the latter.
    */
   [[nodiscard]] static constexpr entry_type make_leaf_entry(phys_type frame, unsigned s2ap, unsigned sh,
-                                                             unsigned mem_attr, bool final_level = true,
-                                                             bool af = true, bool contiguous = false, bool xn = false,
-                                                             bool dbm = false) noexcept {
+                                                            unsigned mem_attr, bool final_level = true, bool af = true,
+                                                            bool contiguous = false, bool xn = false,
+                                                            bool dbm = false) noexcept {
     std::uint64_t raw = bits::valid::set(0, 1);
     raw = bits::page_or_block::set(raw, final_level ? 1 : 0);
     raw = bits::s2ap::set(raw, s2ap);
@@ -147,7 +147,6 @@ struct page_table_entry_traits<arm64::stage2_tag<LeafPageTraits>>
 template <typename LeafPageTraits>
 struct page_table_entry_traits<arm64::stage2_secure_tag<LeafPageTraits>>
     : arm64::detail::stage2_common_accessors<page_table_entry<arm64::stage2_secure_tag<LeafPageTraits>>>,
-      arm64::detail::stage2_traits_impl<arm64::stage2_secure_tag<LeafPageTraits>, secure_phys_space, LeafPageTraits> {
-};
+      arm64::detail::stage2_traits_impl<arm64::stage2_secure_tag<LeafPageTraits>, secure_phys_space, LeafPageTraits> {};
 
 } // namespace structo::arch

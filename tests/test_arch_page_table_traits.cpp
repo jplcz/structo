@@ -20,9 +20,7 @@ class ArchPageTableTraitsTest : public ::testing::Test {};
 template <typename Config, std::size_t... Is>
 constexpr std::uint64_t reassemble_impl(std::uint64_t va, std::index_sequence<Is...>) {
   std::uint64_t acc = Config::page_offset(va);
-  ((acc |= static_cast<std::uint64_t>(Config::template index_of<Is>(va))
-           << Config::template level<Is>::shift),
-   ...);
+  ((acc |= static_cast<std::uint64_t>(Config::template index_of<Is>(va)) << Config::template level<Is>::shift), ...);
   return acc;
 }
 

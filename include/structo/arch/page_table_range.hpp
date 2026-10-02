@@ -81,14 +81,14 @@
  */
 
 #include "page_table_traits.hpp"
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
 #include <reloco/contiguous_iterator.hpp>
 #include <reloco/detail/assert.hpp>
 #include <reloco/iterator.hpp>
 #include <reloco/lifetime.hpp>
 #include <reloco/span.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <iterator>
 
 namespace structo::arch {
 
@@ -141,15 +141,14 @@ public:
     [[nodiscard]] constexpr AddrInt entry_base() const noexcept { return entry_base_; }
     /** @brief Intersection of this entry's full window with the queried `[start, end)`: `max(entry_base, start)`. */
     [[nodiscard]] constexpr AddrInt range_start() const noexcept { return range_start_; }
-    /** @brief Intersection of this entry's full window with the queried `[start, end)`: `min(entry_base + entry_span, end)`. */
+    /** @brief Intersection of this entry's full window with the queried `[start, end)`: `min(entry_base + entry_span,
+     * end)`. */
     [[nodiscard]] constexpr AddrInt range_end() const noexcept { return range_end_; }
 
   private:
     friend class page_table_level_range;
-    constexpr step(std::size_t index, Entry &entry, AddrInt entry_base, AddrInt range_start,
-                    AddrInt range_end) noexcept
-        : index_(index), entry_(&entry), entry_base_(entry_base), range_start_(range_start),
-          range_end_(range_end) {}
+    constexpr step(std::size_t index, Entry &entry, AddrInt entry_base, AddrInt range_start, AddrInt range_end) noexcept
+        : index_(index), entry_(&entry), entry_base_(entry_base), range_start_(range_start), range_end_(range_end) {}
 
     std::size_t index_{0};
     Entry *entry_{nullptr};
@@ -182,13 +181,15 @@ public:
      * for why this ordering matters for `reloco::iter()` interop.
      */
     [[nodiscard]] constexpr const step &operator*() const noexcept RELOCO_LIFETIMEBOUND {
-      RELOCO_ASSERT(owner_ != nullptr && idx_ < entry_count, "page_table_level_range::iterator: dereferencing an invalid or past-the-end iterator");
+      RELOCO_ASSERT(owner_ != nullptr && idx_ < entry_count,
+                    "page_table_level_range::iterator: dereferencing an invalid or past-the-end iterator");
       recompute();
       return cached_;
     }
     /** @copydoc operator*() */
     [[nodiscard]] constexpr const step *operator->() const noexcept RELOCO_LIFETIMEBOUND {
-      RELOCO_ASSERT(owner_ != nullptr && idx_ < entry_count, "page_table_level_range::iterator: dereferencing an invalid or past-the-end iterator");
+      RELOCO_ASSERT(owner_ != nullptr && idx_ < entry_count,
+                    "page_table_level_range::iterator: dereferencing an invalid or past-the-end iterator");
       recompute();
       return &cached_;
     }
@@ -207,9 +208,7 @@ public:
     [[nodiscard]] friend constexpr bool operator==(const iterator &a, const iterator &b) noexcept {
       return a.idx_ == b.idx_;
     }
-    [[nodiscard]] friend constexpr bool operator!=(const iterator &a, const iterator &b) noexcept {
-      return !(a == b);
-    }
+    [[nodiscard]] friend constexpr bool operator!=(const iterator &a, const iterator &b) noexcept { return !(a == b); }
 
   private:
     friend class page_table_level_range;
@@ -259,7 +258,7 @@ public:
    * the caller does not need to pre-clip the range to this table.
    */
   constexpr page_table_level_range(reloco::span<Entry> table, AddrInt table_base_va, AddrInt start,
-                                    AddrInt end) noexcept
+                                   AddrInt end) noexcept
       : table_(table), table_base_(table_base_va), start_(start), end_(end) {
     RELOCO_ASSERT(table.size() == entry_count,
                   "page_table_level_range: table span size must equal this level's entry_count");

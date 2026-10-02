@@ -328,9 +328,9 @@ struct tcr_el1 {
 
 /** @brief Named bit-field accessors shared by `TTBR0_EL1`/`TTBR1_EL1` (identical layout). */
 struct ttbr_el1_bits {
-  using cnp = pte_bit_field<0, 1>;     //!< Bit 0: Common not Private (`FEAT_TTCNP`).
-  using baddr = pte_bit_field<1, 47>;  //!< Bits [47:1]: translation table base address.
-  using asid = pte_bit_field<48, 16>;  //!< Bits [63:48]: Address Space ID.
+  using cnp = pte_bit_field<0, 1>;    //!< Bit 0: Common not Private (`FEAT_TTCNP`).
+  using baddr = pte_bit_field<1, 47>; //!< Bits [47:1]: translation table base address.
+  using asid = pte_bit_field<48, 16>; //!< Bits [63:48]: Address Space ID.
 };
 
 /**
@@ -435,15 +435,18 @@ struct mair_el1 {
  * Register). Only accessible from EL3 ("Monitor" state).
  */
 struct scr_el3_bits {
-  using ns = pte_bit_field<0, 1>;   //!< Bit 0: Non-secure -- the world the next lower exception level enters.
-  using irq = pte_bit_field<1, 1>;  //!< Bit 1: physical IRQ routed to EL3 regardless of `PSTATE.I`.
-  using fiq = pte_bit_field<2, 1>;  //!< Bit 2: physical FIQ routed to EL3 regardless of `PSTATE.F`.
-  using ea = pte_bit_field<3, 1>;   //!< Bit 3: External Abort / SError routed to EL3.
-  using smd = pte_bit_field<7, 1>;  //!< Bit 7: Secure Monitor Call Disable (traps `SMC` wherever it would otherwise be usable).
-  using hce = pte_bit_field<8, 1>;  //!< Bit 8: Hypervisor Call Enable (`HVC` usable).
-  using sif = pte_bit_field<9, 1>;  //!< Bit 9: Secure Instruction Fetch (forbids Secure fetch from Non-secure memory).
-  using rw = pte_bit_field<10, 1>;  //!< Bit 10: next lower Exception level's execution state is AArch64 (1) or AArch32 (0).
-  using st = pte_bit_field<11, 1>; //!< Bit 11: Secure EL1 access to the Secure physical timer registers not trapped to EL3.
+  using ns = pte_bit_field<0, 1>;  //!< Bit 0: Non-secure -- the world the next lower exception level enters.
+  using irq = pte_bit_field<1, 1>; //!< Bit 1: physical IRQ routed to EL3 regardless of `PSTATE.I`.
+  using fiq = pte_bit_field<2, 1>; //!< Bit 2: physical FIQ routed to EL3 regardless of `PSTATE.F`.
+  using ea = pte_bit_field<3, 1>;  //!< Bit 3: External Abort / SError routed to EL3.
+  using smd =
+      pte_bit_field<7, 1>; //!< Bit 7: Secure Monitor Call Disable (traps `SMC` wherever it would otherwise be usable).
+  using hce = pte_bit_field<8, 1>; //!< Bit 8: Hypervisor Call Enable (`HVC` usable).
+  using sif = pte_bit_field<9, 1>; //!< Bit 9: Secure Instruction Fetch (forbids Secure fetch from Non-secure memory).
+  using rw =
+      pte_bit_field<10, 1>; //!< Bit 10: next lower Exception level's execution state is AArch64 (1) or AArch32 (0).
+  using st =
+      pte_bit_field<11, 1>; //!< Bit 11: Secure EL1 access to the Secure physical timer registers not trapped to EL3.
   using twi = pte_bit_field<12, 1>; //!< Bit 12: `WFI` from EL2/EL1/EL0 traps to EL3.
   using twe = pte_bit_field<13, 1>; //!< Bit 13: `WFE` from EL2/EL1/EL0 traps to EL3.
 };
@@ -550,27 +553,35 @@ struct scr_el3 {
  * `FB`/...) are out of scope here.
  */
 struct hcr_el2_bits {
-  using vm = pte_bit_field<0, 1>;    //!< Bit 0: enable stage-2 translation.
-  using swio = pte_bit_field<1, 1>;  //!< Bit 1: Set/Way Invalidation Override (EL1 set/way cache ops behave as invalidate-only).
-  using ptw = pte_bit_field<2, 1>;   //!< Bit 2: Protected Table Walk (a stage-1 walk stepping on a stage-2 Device mapping faults).
-  using fmo = pte_bit_field<3, 1>;   //!< Bit 3: physical FIQ routed to EL2.
-  using imo = pte_bit_field<4, 1>;   //!< Bit 4: physical IRQ routed to EL2.
-  using amo = pte_bit_field<5, 1>;   //!< Bit 5: physical SError routed to EL2.
-  using dc = pte_bit_field<12, 1>;   //!< Bit 12: Default Cacheability (forces cacheable when EL0/EL1 stage-1 is disabled).
+  using vm = pte_bit_field<0, 1>; //!< Bit 0: enable stage-2 translation.
+  using swio =
+      pte_bit_field<1, 1>; //!< Bit 1: Set/Way Invalidation Override (EL1 set/way cache ops behave as invalidate-only).
+  using ptw = pte_bit_field<2, 1>; //!< Bit 2: Protected Table Walk (a stage-1 walk stepping on a stage-2 Device mapping
+                                   //!< faults).
+  using fmo = pte_bit_field<3, 1>; //!< Bit 3: physical FIQ routed to EL2.
+  using imo = pte_bit_field<4, 1>; //!< Bit 4: physical IRQ routed to EL2.
+  using amo = pte_bit_field<5, 1>; //!< Bit 5: physical SError routed to EL2.
+  using dc =
+      pte_bit_field<12, 1>; //!< Bit 12: Default Cacheability (forces cacheable when EL0/EL1 stage-1 is disabled).
   using bsu = pte_bit_field<10, 2>;  //!< Bits [11:10]: Barrier Shareability Upgrade for EL1/EL0 DSB/DMB.
   using twi = pte_bit_field<13, 1>;  //!< Bit 13: `WFI` from EL1/EL0 traps to EL2.
   using twe = pte_bit_field<14, 1>;  //!< Bit 14: `WFE` from EL1/EL0 traps to EL2.
   using tsc = pte_bit_field<19, 1>;  //!< Bit 19: `SMC` from EL1 traps to EL2.
   using ttlb = pte_bit_field<25, 1>; //!< Bit 25: EL1 TLB maintenance instructions trap to EL2.
   using tvm = pte_bit_field<26, 1>;  //!< Bit 26: EL1 writes to its own stage-1 MMU control registers trap to EL2.
-  using tge = pte_bit_field<27, 1>;  //!< Bit 27: Trap General Exceptions -- routes EL0 exceptions to EL2 and disables EL1&0 stage-1 translation for EL0.
+  using tge = pte_bit_field<27, 1>;  //!< Bit 27: Trap General Exceptions -- routes EL0 exceptions to EL2 and disables
+                                     //!< EL1&0 stage-1 translation for EL0.
   using tdz = pte_bit_field<28, 1>;  //!< Bit 28: `DC ZVA` from EL1/EL0 traps to EL2.
-  using hcd = pte_bit_field<29, 1>;  //!< Bit 29: Hypervisor Call Disable (traps `HVC` wherever it would otherwise be usable).
+  using hcd =
+      pte_bit_field<29, 1>; //!< Bit 29: Hypervisor Call Disable (traps `HVC` wherever it would otherwise be usable).
   using trvm = pte_bit_field<30, 1>; //!< Bit 30: EL1 reads of its own stage-1 MMU control registers trap to EL2.
   using rw = pte_bit_field<31, 1>;   //!< Bit 31: EL1's execution state is AArch64 (1) or AArch32 (0).
-  using cd = pte_bit_field<32, 1>;   //!< Bit 32: stage-1 Data Cacheability Disable for the EL2&0 regime (`FEAT_VHE`, `E2H=1` only).
-  using id = pte_bit_field<33, 1>;   //!< Bit 33: stage-1 Instruction Cacheability Disable for the EL2&0 regime (`FEAT_VHE`, `E2H=1` only).
-  using e2h = pte_bit_field<34, 1>;  //!< Bit 34: Enable EL2 Host (`FEAT_VHE`) -- EL2 runs the "EL2&0" regime instead of its own.
+  using cd = pte_bit_field<32, 1>;   //!< Bit 32: stage-1 Data Cacheability Disable for the EL2&0 regime (`FEAT_VHE`,
+                                     //!< `E2H=1` only).
+  using id = pte_bit_field<33, 1>;   //!< Bit 33: stage-1 Instruction Cacheability Disable for the EL2&0 regime
+                                     //!< (`FEAT_VHE`, `E2H=1` only).
+  using e2h =
+      pte_bit_field<34, 1>; //!< Bit 34: Enable EL2 Host (`FEAT_VHE`) -- EL2 runs the "EL2&0" regime instead of its own.
 };
 
 /**
@@ -704,13 +715,16 @@ struct hcr_el2 {
   }
 
   /** @brief `FEAT_VHE`, `E2H=1` only: stage-1 instruction-cacheability disable for the EL2&0 regime. */
-  [[nodiscard]] constexpr bool instruction_cacheability_disabled() const noexcept { return hcr_el2_bits::id::test(raw); }
+  [[nodiscard]] constexpr bool instruction_cacheability_disabled() const noexcept {
+    return hcr_el2_bits::id::test(raw);
+  }
   constexpr hcr_el2 &set_instruction_cacheability_disabled(bool value) noexcept {
     raw = hcr_el2_bits::id::set_bit(raw, value);
     return *this;
   }
 
-  /** @brief `FEAT_VHE`: `true` makes EL2 run the "EL2&0" regime (Linux's `TTBR0_EL2`/`TTBR1_EL2` style), not plain EL2. */
+  /** @brief `FEAT_VHE`: `true` makes EL2 run the "EL2&0" regime (Linux's `TTBR0_EL2`/`TTBR1_EL2` style), not plain EL2.
+   */
   [[nodiscard]] constexpr bool e2h() const noexcept { return hcr_el2_bits::e2h::test(raw); }
   constexpr hcr_el2 &set_e2h(bool value) noexcept {
     raw = hcr_el2_bits::e2h::set_bit(raw, value);
@@ -732,16 +746,17 @@ struct hcr_el2 {
 
 /** @brief Named bit-field accessors for `VTCR_EL2` (Virtualization Translation Control Register). */
 struct vtcr_el2_bits {
-  using t0sz = pte_bit_field<0, 6>;  //!< Bits [5:0]: stage-2 input (guest-physical) address size, `64 - T0SZ`.
-  using sl0 = pte_bit_field<6, 2>;   //!< Bits [7:6]: stage-2 starting level of translation.
-  using irgn0 = pte_bit_field<8, 2>; //!< Bits [9:8]: stage-2 table-walk inner cacheability.
+  using t0sz = pte_bit_field<0, 6>;   //!< Bits [5:0]: stage-2 input (guest-physical) address size, `64 - T0SZ`.
+  using sl0 = pte_bit_field<6, 2>;    //!< Bits [7:6]: stage-2 starting level of translation.
+  using irgn0 = pte_bit_field<8, 2>;  //!< Bits [9:8]: stage-2 table-walk inner cacheability.
   using orgn0 = pte_bit_field<10, 2>; //!< Bits [11:10]: stage-2 table-walk outer cacheability.
-  using sh0 = pte_bit_field<12, 2>;  //!< Bits [13:12]: stage-2 table-walk shareability.
-  using tg0 = pte_bit_field<14, 2>;  //!< Bits [15:14]: stage-2 granule (0=4KB, 2=16KB, 1=64KB).
-  using ps = pte_bit_field<16, 3>;   //!< Bits [18:16]: stage-2 output (physical) address size, same encoding as `TCR_EL1.IPS`.
-  using vs = pte_bit_field<19, 1>;   //!< Bit 19: VMID size (0=8-bit, 1=16-bit; `FEAT_VMID16`).
-  using ha = pte_bit_field<21, 1>;   //!< Bit 21: hardware management of the stage-2 Access flag (`FEAT_HAFDBS`).
-  using hd = pte_bit_field<22, 1>;   //!< Bit 22: hardware management of stage-2 dirty state (`FEAT_HAFDBS`).
+  using sh0 = pte_bit_field<12, 2>;   //!< Bits [13:12]: stage-2 table-walk shareability.
+  using tg0 = pte_bit_field<14, 2>;   //!< Bits [15:14]: stage-2 granule (0=4KB, 2=16KB, 1=64KB).
+  using ps =
+      pte_bit_field<16, 3>; //!< Bits [18:16]: stage-2 output (physical) address size, same encoding as `TCR_EL1.IPS`.
+  using vs = pte_bit_field<19, 1>; //!< Bit 19: VMID size (0=8-bit, 1=16-bit; `FEAT_VMID16`).
+  using ha = pte_bit_field<21, 1>; //!< Bit 21: hardware management of the stage-2 Access flag (`FEAT_HAFDBS`).
+  using hd = pte_bit_field<22, 1>; //!< Bit 22: hardware management of stage-2 dirty state (`FEAT_HAFDBS`).
 };
 
 /**
@@ -755,7 +770,9 @@ struct vtcr_el2 {
 
   [[nodiscard]] static constexpr vtcr_el2 from_raw(std::uint64_t value) noexcept { return vtcr_el2{value}; }
 
-  [[nodiscard]] constexpr unsigned t0sz() const noexcept { return static_cast<unsigned>(vtcr_el2_bits::t0sz::get(raw)); }
+  [[nodiscard]] constexpr unsigned t0sz() const noexcept {
+    return static_cast<unsigned>(vtcr_el2_bits::t0sz::get(raw));
+  }
   constexpr vtcr_el2 &set_t0sz(unsigned value) noexcept {
     raw = vtcr_el2_bits::t0sz::set(raw, value);
     return *this;
@@ -836,7 +853,8 @@ struct vtcr_el2 {
 struct vttbr_el2_bits {
   using cnp = pte_bit_field<0, 1>;    //!< Bit 0: Common not Private (`FEAT_TTCNP`).
   using baddr = pte_bit_field<1, 47>; //!< Bits [47:1]: stage-2 translation table base address.
-  using vmid = pte_bit_field<48, 16>; //!< Bits [63:48]: Virtual Machine ID (width is 8 or 16 bits per `VTCR_EL2.VS`; unused high bits read as `0`).
+  using vmid = pte_bit_field<48, 16>; //!< Bits [63:48]: Virtual Machine ID (width is 8 or 16 bits per `VTCR_EL2.VS`;
+                                      //!< unused high bits read as `0`).
 };
 
 /**

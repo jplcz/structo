@@ -89,6 +89,9 @@
  * compiler's optimizer decided was convenient for a well-defined program.
  */
 
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <reloco/bytes.hpp>
 #include <reloco/default_allocator.hpp>
 #include <reloco/detail/assert.hpp>
@@ -97,9 +100,6 @@
 #include <reloco/int_ops.hpp>
 #include <reloco/span.hpp>
 #include <reloco/unique_ptr.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <cstring>
 #include <type_traits>
 
 namespace structo {
@@ -447,7 +447,8 @@ public:
   }
 
   /** @brief Reads and returns a single `T` by value, may fault in missing pages. */
-  template <typename U = T, typename = std::enable_if_t<!std::is_void_v<U>>> result<U> try_materialize() const noexcept {
+  template <typename U = T, typename = std::enable_if_t<!std::is_void_v<U>>>
+  result<U> try_materialize() const noexcept {
     return with_scratch_buffer(sizeof(U), [this](span<std::byte> storage) -> result<U> {
       if (auto res = materialize_bytes<false>(storage); !res)
         return unexpected(res.error());

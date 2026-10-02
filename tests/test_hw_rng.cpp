@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: BSD-2-Clause
 
-#include <structo/hw/rng.hpp>
 #include <gtest/gtest.h>
+#include <structo/hw/rng.hpp>
 
 #include <array>
 #include <cstddef>

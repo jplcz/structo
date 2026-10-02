@@ -4,8 +4,8 @@
 
 #if !defined(_MSC_VER) && defined(__LP64__)
 #include <gtest/gtest.h>
-#include <structo/compat_sg.hpp>
 #include <reloco/inline_vector.hpp>
+#include <structo/compat_sg.hpp>
 
 #include <array>
 #include <cstdint>
@@ -30,8 +30,7 @@ using offset_field = bitfield<32, 12>;
 using length_field = bitfield<44, 12>;
 using last_field = bitfield<56, 1>;
 using chain_field = bitfield<57, 1>;
-using compact_layout =
-    sg_descriptor_layout<uint64_t, pfn_field, offset_field, length_field, last_field>;
+using compact_layout = sg_descriptor_layout<uint64_t, pfn_field, offset_field, length_field, last_field>;
 using compact_codec = compact_sg_codec<compact_layout, page_4k, dma_bus_space>;
 
 TEST(SgTranslatorTest, SplitsScatterGatherEntriesAtPageBoundaries) {
@@ -200,8 +199,8 @@ TEST(CompactSgCodecTest, EncodesRawPageAlignedAddressesViaAnOffsetPfnField) {
 // without the codec itself knowing or caring what it holds.
 using header_pfn_field = bitfield<0, 52>;
 using header_length_field = bitfield<52, 12>;
-using headered_layout = sg_descriptor_layout<uint64_t, header_pfn_field, void, header_length_field, void,
-                                              sizeof(uint64_t)>;
+using headered_layout =
+    sg_descriptor_layout<uint64_t, header_pfn_field, void, header_length_field, void, sizeof(uint64_t)>;
 using headered_codec = compact_sg_codec<headered_layout, page_4k>;
 
 TEST(CompactSgCodecTest, ReservesAndSkipsAnOpaqueLeadingHeaderWord) {
@@ -245,8 +244,7 @@ TEST(CompactSgCodecTest, RejectsDescriptorCrossingPageBoundary) {
 }
 
 TEST(ChainedSgCodecTest, LinksPagesWhenDescriptorPageFills) {
-  using layout =
-      chained_sg_layout<uint64_t, pfn_field, offset_field, length_field, last_field, chain_field>;
+  using layout = chained_sg_layout<uint64_t, pfn_field, offset_field, length_field, last_field, chain_field>;
   using codec = chained_sg_codec<layout, page_4k, dma_bus_space>;
   using packed_type = codec::packed_type;
   using paddr_type = codec::paddr_type;

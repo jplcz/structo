@@ -39,8 +39,8 @@
  * @endcode
  */
 
-#include <reloco/error.hpp>
 #include "phys_addr.hpp"
+#include <reloco/error.hpp>
 #include <type_traits>
 #include <utility>
 

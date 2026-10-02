@@ -22,7 +22,7 @@ namespace {
 class PageTableRangeTest : public ::testing::Test {};
 
 using levels = page_table_levels<page_4k, 48, page_table_level<9, 39, false>, page_table_level<9, 30, true>,
-                                  page_table_level<9, 21, true>, page_table_level<9, 12, true>>;
+                                 page_table_level<9, 21, true>, page_table_level<9, 12, true>>;
 
 struct my_pte_tag {};
 using entry = page_table_entry<my_pte_tag>;
@@ -140,7 +140,7 @@ TEST_F(PageTableRangeTest, MakeLevelRangeHelperDeducesEntryAndAddrType) {
   reloco::array<entry, 512> leaf{};
   std::uint64_t base = 0x1000;
   auto r = make_level_range<levels, 3>(reloco::span<entry>(leaf), base, std::uint64_t(base + 0x1000),
-                                        std::uint64_t(base + 0x2000));
+                                       std::uint64_t(base + 0x2000));
   int count = 0;
   for (auto step : r) {
     (void)step;
@@ -157,8 +157,10 @@ TEST_F(PageTableRangeTest, IterSupportsRustStyleAdaptorChain) {
   l0_range r(root, 0, 10 * l0_span, 12 * l0_span);
 
   std::size_t mapped_count = 0;
-  for (auto index : r.iter().filter([](const l0_range::step &s) { return !s.entry().is_null(); }).map(
-           [](const l0_range::step &s) { return s.index(); })) {
+  for (auto index :
+       r.iter().filter([](const l0_range::step &s) { return !s.entry().is_null(); }).map([](const l0_range::step &s) {
+         return s.index();
+       })) {
     EXPECT_TRUE(index == 10u || index == 11u);
     ++mapped_count;
   }

@@ -100,7 +100,7 @@ template <> struct page_table_entry_traits<x86::ept_tag> {
   [[nodiscard]] static constexpr phys_type leaf_frame_addr(entry_type e) noexcept { return child_table_addr(e); }
 
   [[nodiscard]] static constexpr entry_type make_table_entry(phys_type child_table, bool writable = true,
-                                                              bool executable = true) noexcept {
+                                                             bool executable = true) noexcept {
     std::uint64_t raw = bits::read::set_bit(0, true);
     raw = bits::write::set_bit(raw, writable);
     raw = bits::exec::set_bit(raw, executable);
@@ -110,10 +110,9 @@ template <> struct page_table_entry_traits<x86::ept_tag> {
 
   /** @brief Builds a leaf entry; `final_level = false` sets `PS` for an intermediate-level huge-page leaf. */
   [[nodiscard]] static constexpr entry_type make_leaf_entry(phys_type frame, bool readable, bool writable,
-                                                             bool executable, unsigned mem_type,
-                                                             bool final_level = true, bool ignore_pat = false,
-                                                             bool accessed = true, bool dirty = false,
-                                                             bool suppress_ve = false) noexcept {
+                                                            bool executable, unsigned mem_type, bool final_level = true,
+                                                            bool ignore_pat = false, bool accessed = true,
+                                                            bool dirty = false, bool suppress_ve = false) noexcept {
     std::uint64_t raw = bits::read::set_bit(0, readable);
     raw = bits::write::set_bit(raw, writable);
     raw = bits::exec::set_bit(raw, executable);

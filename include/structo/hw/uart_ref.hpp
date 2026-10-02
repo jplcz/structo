@@ -160,11 +160,10 @@ namespace detail {
 template <typename Backend, typename = void> struct has_uart_traits : std::false_type {};
 
 template <typename Backend>
-struct has_uart_traits<Backend, std::void_t<decltype(uart_traits<Backend>::configure),
-                                            decltype(uart_traits<Backend>::tx_ready),
-                                            decltype(uart_traits<Backend>::rx_ready),
-                                            decltype(uart_traits<Backend>::try_put_byte),
-                                            decltype(uart_traits<Backend>::try_get_byte)>> : std::true_type {};
+struct has_uart_traits<
+    Backend, std::void_t<decltype(uart_traits<Backend>::configure), decltype(uart_traits<Backend>::tx_ready),
+                         decltype(uart_traits<Backend>::rx_ready), decltype(uart_traits<Backend>::try_put_byte),
+                         decltype(uart_traits<Backend>::try_get_byte)>> : std::true_type {};
 
 // Detects the optional Traits::current_config readback.
 template <typename Traits, typename = void> struct uart_has_current_config : std::false_type {};
@@ -421,8 +420,9 @@ private:
   }
 
   template <typename Backend>
-  static constexpr vtable s_vtbl{&configure_entry<Backend>, &current_config_entry<Backend>, &tx_ready_entry<Backend>,
-                                 &rx_ready_entry<Backend>,  &try_put_byte_entry<Backend>,    &try_get_byte_entry<Backend>};
+  static constexpr vtable s_vtbl{&configure_entry<Backend>,    &current_config_entry<Backend>,
+                                 &tx_ready_entry<Backend>,     &rx_ready_entry<Backend>,
+                                 &try_put_byte_entry<Backend>, &try_get_byte_entry<Backend>};
 
   void *ctx_ = nullptr;
   const vtable *vtbl_ = nullptr;

@@ -91,8 +91,8 @@ struct l1_bits {
   using apx = pte_bit_field<15, 1, std::uint32_t>;      // section only
   using s = pte_bit_field<16, 1, std::uint32_t>;        // section only
   using ng = pte_bit_field<17, 1, std::uint32_t>;       // section only
-  using ns_section = pte_bit_field<19, 1, std::uint32_t>; // section only
-  using table_addr = pte_bit_field<10, 22, std::uint32_t>; // coarse-page-table base, 1KB-aligned
+  using ns_section = pte_bit_field<19, 1, std::uint32_t>;    // section only
+  using table_addr = pte_bit_field<10, 22, std::uint32_t>;   // coarse-page-table base, 1KB-aligned
   using section_addr = pte_bit_field<20, 12, std::uint32_t>; // section base, 1MB-aligned
 
   [[nodiscard]] static constexpr bool is_present(std::uint32_t raw) noexcept { return type::get(raw) != 0; }
@@ -145,7 +145,8 @@ namespace structo::arch {
 /** @brief Fixed-Non-secure-output short-descriptor stage-1 L1 entry traits. */
 template <>
 struct page_table_entry_traits<arm::short_descriptor::stage1_ns_tag>
-    : arm::short_descriptor::detail::stage1_l1_common_accessors<page_table_entry<arm::short_descriptor::stage1_ns_tag>> {
+    : arm::short_descriptor::detail::stage1_l1_common_accessors<
+          page_table_entry<arm::short_descriptor::stage1_ns_tag>> {
   using entry_type = page_table_entry<arm::short_descriptor::stage1_ns_tag>;
   using phys_type = phys_addr<void, nonsecure_phys_space>;
   using bits = arm::short_descriptor::detail::l1_bits;
@@ -158,7 +159,7 @@ struct page_table_entry_traits<arm::short_descriptor::stage1_ns_tag>
   }
 
   [[nodiscard]] static constexpr entry_type make_table_entry(phys_type child_table, unsigned domain = 0,
-                                                              bool pxn_table = false) noexcept {
+                                                             bool pxn_table = false) noexcept {
     std::uint32_t raw = bits::type::set(0, 0b01);
     raw = bits::domain::set(raw, domain);
     raw = bits::pxn_table::set_bit(raw, pxn_table);
@@ -168,10 +169,10 @@ struct page_table_entry_traits<arm::short_descriptor::stage1_ns_tag>
 
   /** @brief Builds a 1MB Section leaf entry. */
   [[nodiscard]] static constexpr entry_type make_leaf_entry(phys_type frame, unsigned ap, unsigned tex,
-                                                             unsigned domain = 0, bool bufferable = false,
-                                                             bool cacheable = false, bool execute_never = false,
-                                                             bool apx = false, bool shareable = false,
-                                                             bool not_global = false) noexcept {
+                                                            unsigned domain = 0, bool bufferable = false,
+                                                            bool cacheable = false, bool execute_never = false,
+                                                            bool apx = false, bool shareable = false,
+                                                            bool not_global = false) noexcept {
     std::uint32_t raw = bits::type::set(0, 0b10);
     raw = bits::b::set_bit(raw, bufferable);
     raw = bits::c::set_bit(raw, cacheable);
@@ -211,7 +212,7 @@ struct page_table_entry_traits<arm::short_descriptor::stage1_secure_tag>
   }
 
   [[nodiscard]] static constexpr entry_type make_table_entry(phys_type child_table, bool ns_table = false,
-                                                              unsigned domain = 0, bool pxn_table = false) noexcept {
+                                                             unsigned domain = 0, bool pxn_table = false) noexcept {
     std::uint32_t raw = bits::type::set(0, 0b01);
     raw = bits::ns_table::set_bit(raw, ns_table);
     raw = bits::domain::set(raw, domain);
@@ -221,12 +222,11 @@ struct page_table_entry_traits<arm::short_descriptor::stage1_secure_tag>
   }
 
   /** @brief Builds a 1MB Section leaf entry; `ns = true` makes this region's output Non-secure. */
-  [[nodiscard]] static constexpr entry_type make_leaf_entry(phys_type frame, unsigned ap, unsigned tex,
-                                                             bool ns = false, unsigned domain = 0,
-                                                             bool bufferable = false, bool cacheable = false,
-                                                             bool execute_never = false, bool apx = false,
-                                                             bool shareable = false,
-                                                             bool not_global = false) noexcept {
+  [[nodiscard]] static constexpr entry_type make_leaf_entry(phys_type frame, unsigned ap, unsigned tex, bool ns = false,
+                                                            unsigned domain = 0, bool bufferable = false,
+                                                            bool cacheable = false, bool execute_never = false,
+                                                            bool apx = false, bool shareable = false,
+                                                            bool not_global = false) noexcept {
     std::uint32_t raw = bits::type::set(0, 0b10);
     raw = bits::ns_section::set_bit(raw, ns);
     raw = bits::b::set_bit(raw, bufferable);
@@ -275,10 +275,9 @@ template <> struct page_table_entry_traits<arm::short_descriptor::stage1_l2_tag>
 
   /** @brief Builds a 4KB small-page leaf entry. */
   [[nodiscard]] static constexpr entry_type make_leaf_entry(phys_type frame, unsigned ap, unsigned tex,
-                                                             bool execute_never = false, bool bufferable = false,
-                                                             bool cacheable = false, bool apx = false,
-                                                             bool shareable = false,
-                                                             bool not_global = false) noexcept {
+                                                            bool execute_never = false, bool bufferable = false,
+                                                            bool cacheable = false, bool apx = false,
+                                                            bool shareable = false, bool not_global = false) noexcept {
     std::uint32_t raw = bits::present::set_bit(0, true);
     raw = bits::xn::set_bit(raw, execute_never);
     raw = bits::b::set_bit(raw, bufferable);

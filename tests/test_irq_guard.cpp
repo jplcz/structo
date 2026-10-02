@@ -43,7 +43,8 @@ struct fake_irq_traits {
   }
 };
 
-/** @brief Fixture for `irq_guard`/`irq_locked` tests; resets `fake_irq_traits`'s mutable static state before each test. */
+/** @brief Fixture for `irq_guard`/`irq_locked` tests; resets `fake_irq_traits`'s mutable static state before each test.
+ */
 class IrqGuardTest : public ::testing::Test {
 protected:
   void SetUp() override { fake_irq_traits::reset(); }

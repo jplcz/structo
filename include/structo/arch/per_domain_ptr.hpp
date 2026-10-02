@@ -89,8 +89,7 @@ template <typename Tag, typename = void> struct per_domain_tag_domain_id {
   using type = std::size_t;
 };
 
-template <typename Tag>
-struct per_domain_tag_domain_id<Tag, std::void_t<typename Tag::domain_id_type>> {
+template <typename Tag> struct per_domain_tag_domain_id<Tag, std::void_t<typename Tag::domain_id_type>> {
   using type = typename Tag::domain_id_type;
 };
 
@@ -98,15 +97,13 @@ struct per_domain_tag_domain_id<Tag, std::void_t<typename Tag::domain_id_type>> 
 template <typename Tag, typename = void> struct has_get_current_domain_ptr : std::false_type {};
 
 template <typename Tag>
-struct has_get_current_domain_ptr<Tag, std::void_t<decltype(Tag::get_current_ptr())>>
-    : std::true_type {};
+struct has_get_current_domain_ptr<Tag, std::void_t<decltype(Tag::get_current_ptr())>> : std::true_type {};
 
 /** @brief True if `Tag::set_current_ptr(ptr)` is callable (dedicated current-domain fast path). */
 template <typename Tag, typename = void> struct has_set_current_domain_ptr : std::false_type {};
 
 template <typename Tag>
-struct has_set_current_domain_ptr<Tag,
-                                   std::void_t<decltype(Tag::set_current_ptr(std::declval<void *>()))>>
+struct has_set_current_domain_ptr<Tag, std::void_t<decltype(Tag::set_current_ptr(std::declval<void *>()))>>
     : std::true_type {};
 
 } // namespace detail
@@ -132,14 +129,10 @@ public:
   static inline constexpr std::size_t max_domains = Tag::max_domains;
 
   /** @brief Returns the `T*` registered for `domain` (nullptr if none was ever set). */
-  [[nodiscard]] static T *get(domain_id_type domain) noexcept {
-    return static_cast<T *>(Tag::get_ptr(domain));
-  }
+  [[nodiscard]] static T *get(domain_id_type domain) noexcept { return static_cast<T *>(Tag::get_ptr(domain)); }
 
   /** @brief Registers `ptr` as `domain`'s slot (pass `nullptr` to clear it). */
-  static void set(domain_id_type domain, T *ptr) noexcept {
-    Tag::set_ptr(domain, static_cast<void *>(ptr));
-  }
+  static void set(domain_id_type domain, T *ptr) noexcept { Tag::set_ptr(domain, static_cast<void *>(ptr)); }
 
   /**
    * @brief Returns the running domain's `T*`. Uses `Tag::get_current_ptr()`

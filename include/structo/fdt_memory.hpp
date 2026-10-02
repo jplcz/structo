@@ -40,8 +40,8 @@
  */
 
 #include "fdt_reader.hpp"
-#include <reloco/optional.hpp>
 #include "region_set.hpp"
+#include <reloco/optional.hpp>
 
 namespace structo::fdt {
 
@@ -293,11 +293,10 @@ result<void> scan_reserved_memory(fdt_reader reader, region_set<Capacity, PhysIn
       --depth;
       if (depth == 2 && in_reserved_memory && tracking_child) {
         if (!child_disabled && child_pending_reg.has_value()) {
-          auto subtracted =
-              for_each_reg_entry(*child_pending_reg, address_cells, size_cells,
-                                 [&free](uint64_t base, uint64_t size) noexcept {
-                                   return free.try_subtract(static_cast<PhysInt>(base), static_cast<PhysInt>(size));
-                                 });
+          auto subtracted = for_each_reg_entry(
+              *child_pending_reg, address_cells, size_cells, [&free](uint64_t base, uint64_t size) noexcept {
+                return free.try_subtract(static_cast<PhysInt>(base), static_cast<PhysInt>(size));
+              });
           if (!subtracted)
             return unexpected(subtracted.error());
         }
@@ -333,7 +332,7 @@ result<void> scan_reserved_memory(fdt_reader reader, region_set<Capacity, PhysIn
  */
 template <std::size_t Capacity, typename PhysInt = uint64_t>
 result<void> try_extract_memory(const fdt_reader &reader, region_set<Capacity, PhysInt> &full,
-                                 region_set<Capacity, PhysInt> &free) noexcept {
+                                region_set<Capacity, PhysInt> &free) noexcept {
   auto pass1 = detail::scan_memory_nodes(reader, full);
   if (!pass1)
     return unexpected(pass1.error());

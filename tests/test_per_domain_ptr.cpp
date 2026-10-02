@@ -68,13 +68,15 @@ struct fast_path_tag {
   }
 };
 
-/** @brief Fixture for `per_domain_ptr<array_backed_tag, T>` tests; resets the Tag's mutable static state before each test. */
+/** @brief Fixture for `per_domain_ptr<array_backed_tag, T>` tests; resets the Tag's mutable static state before each
+ * test. */
 class PerDomainPtrArrayBackedTest : public ::testing::Test {
 protected:
   void SetUp() override { array_backed_tag::reset(); }
 };
 
-/** @brief Fixture for `per_domain_ptr<fast_path_tag, T>` tests; resets the Tag's mutable static state before each test. */
+/** @brief Fixture for `per_domain_ptr<fast_path_tag, T>` tests; resets the Tag's mutable static state before each test.
+ */
 class PerDomainPtrFastPathTest : public ::testing::Test {
 protected:
   void SetUp() override { fast_path_tag::reset(); }

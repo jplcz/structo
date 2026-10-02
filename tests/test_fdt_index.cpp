@@ -5,9 +5,9 @@
 #include <gtest/gtest.h>
 #include <reloco/array.hpp>
 #include <reloco/external_vector.hpp>
+#include <reloco/vector.hpp>
 #include <structo/fdt_index.hpp>
 #include <structo/fdt_writer.hpp>
-#include <reloco/vector.hpp>
 
 using reloco::array;
 using reloco::error;
@@ -15,9 +15,9 @@ using reloco::external_vector;
 using reloco::span;
 using reloco::vector;
 using structo::fdt::fdt_index;
+using structo::fdt::fdt_index_node;
 using structo::fdt::fdt_index_npos;
 using structo::fdt::fdt_index_phandle_entry;
-using structo::fdt::fdt_index_node;
 using structo::fdt::fdt_reader;
 using structo::fdt::fdt_writer;
 using build_frame = structo::fdt::detail::fdt_index_build_frame;

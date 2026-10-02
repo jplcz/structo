@@ -65,7 +65,8 @@ struct fast_path_tag {
   }
 };
 
-/** @brief Fixture for `per_cpu_ptr<array_backed_tag, T>` tests; resets the Tag's mutable static state before each test. */
+/** @brief Fixture for `per_cpu_ptr<array_backed_tag, T>` tests; resets the Tag's mutable static state before each test.
+ */
 class PerCpuPtrArrayBackedTest : public ::testing::Test {
 protected:
   void SetUp() override { array_backed_tag::reset(); }

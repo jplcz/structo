@@ -55,9 +55,9 @@ enum class satp_mode : unsigned {
 
 /** @brief Named bit-field accessors for `satp` (RV64 layout). */
 struct satp_bits {
-  using ppn = pte_bit_field<0, 44>;  //!< Bits [43:0]: root page-table physical page number.
+  using ppn = pte_bit_field<0, 44>;   //!< Bits [43:0]: root page-table physical page number.
   using asid = pte_bit_field<44, 16>; //!< Bits [59:44]: Address Space ID.
-  using mode = pte_bit_field<60, 4>; //!< Bits [63:60]: paging mode (`satp_mode`).
+  using mode = pte_bit_field<60, 4>;  //!< Bits [63:60]: paging mode (`satp_mode`).
 };
 
 /**
@@ -69,9 +69,7 @@ struct satp {
 
   [[nodiscard]] static constexpr satp from_raw(std::uint64_t value) noexcept { return satp{value}; }
 
-  [[nodiscard]] constexpr satp_mode mode() const noexcept {
-    return static_cast<satp_mode>(satp_bits::mode::get(raw));
-  }
+  [[nodiscard]] constexpr satp_mode mode() const noexcept { return static_cast<satp_mode>(satp_bits::mode::get(raw)); }
   constexpr satp &set_mode(satp_mode value) noexcept {
     raw = satp_bits::mode::set(raw, static_cast<std::uint64_t>(value));
     return *this;

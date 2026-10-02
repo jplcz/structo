@@ -1,8 +1,8 @@
 #if !defined(_MSC_VER)
-#include <reloco/lifetime.hpp>
 #include <cerrno>
 #include <cstring>
 #include <gtest/gtest.h>
+#include <reloco/lifetime.hpp>
 #include <structo/reloco_ipc_ring.hpp>
 
 RELOCO_BEGIN_UNSAFE_BUFFER_USAGE

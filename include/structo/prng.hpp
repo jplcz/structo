@@ -75,9 +75,7 @@ using namespace reloco;
 
 namespace detail {
 
-[[nodiscard]] constexpr std::uint64_t rotl64(std::uint64_t x, int k) noexcept {
-  return (x << k) | (x >> (64 - k));
-}
+[[nodiscard]] constexpr std::uint64_t rotl64(std::uint64_t x, int k) noexcept { return (x << k) | (x >> (64 - k)); }
 
 [[nodiscard]] constexpr std::uint32_t rotr32(std::uint32_t x, int k) noexcept {
   return (x >> k) | (x << ((32 - k) & 31));
@@ -110,8 +108,8 @@ public:
    * @return The constructed generator, or whatever error `hw`'s draw
    * failed with (see `hw_rng_ref::try_generate64`).
    */
-  [[nodiscard]] static result<splitmix64> from_hw_rng(const hw::hw_rng_ref &hw,
-                                                        std::uint32_t max_retries = hw::hw_rng_ref::default_max_retries) noexcept {
+  [[nodiscard]] static result<splitmix64>
+  from_hw_rng(const hw::hw_rng_ref &hw, std::uint32_t max_retries = hw::hw_rng_ref::default_max_retries) noexcept {
     auto seed = hw.try_generate64(max_retries);
     if (!seed)
       return unexpected(seed.error());
@@ -158,8 +156,8 @@ public:
    * @return The constructed generator, or whatever error the first
    * failing draw reported.
    */
-  [[nodiscard]] static result<xoshiro256ss> from_hw_rng(const hw::hw_rng_ref &hw,
-                                                           std::uint32_t max_retries = hw::hw_rng_ref::default_max_retries) noexcept {
+  [[nodiscard]] static result<xoshiro256ss>
+  from_hw_rng(const hw::hw_rng_ref &hw, std::uint32_t max_retries = hw::hw_rng_ref::default_max_retries) noexcept {
     std::array<std::uint64_t, 4> words{};
     for (auto &word : words) {
       auto draw = hw.try_generate64(max_retries);
@@ -241,8 +239,8 @@ public:
    * @return The constructed generator, or whatever error the first
    * failing draw reported.
    */
-  [[nodiscard]] static result<pcg32> from_hw_rng(const hw::hw_rng_ref &hw,
-                                                   std::uint32_t max_retries = hw::hw_rng_ref::default_max_retries) noexcept {
+  [[nodiscard]] static result<pcg32>
+  from_hw_rng(const hw::hw_rng_ref &hw, std::uint32_t max_retries = hw::hw_rng_ref::default_max_retries) noexcept {
     auto seed = hw.try_generate64(max_retries);
     if (!seed)
       return unexpected(seed.error());

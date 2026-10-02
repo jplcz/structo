@@ -4,12 +4,12 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <reloco/array.hpp>
 #include <reloco/detail/assert.hpp>
 #include <reloco/error.hpp>
 #include <reloco/lifetime.hpp>
-#include <cstddef>
-#include <cstdint>
 
 namespace structo {
 

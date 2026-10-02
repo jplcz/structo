@@ -87,14 +87,15 @@ template <typename Traits, typename F>
 bool early_rendezvous_wait(structo_early_rendezvous_state &state, std::size_t num_cores, F &&on_spin) noexcept {
   using decayed_f = std::decay_t<F>;
   return structo_early_rendezvous_wait(&state, num_cores, &detail::early_rendezvous_spin_wait_trampoline<Traits>,
-                                        &detail::early_rendezvous_on_spin_trampoline<decayed_f>,
-                                        const_cast<void *>(static_cast<const void *>(&on_spin))) != 0;
+                                       &detail::early_rendezvous_on_spin_trampoline<decayed_f>,
+                                       const_cast<void *>(static_cast<const void *>(&on_spin))) != 0;
 }
 
 /** @brief `early_rendezvous_wait<Traits>(state, num_cores, on_spin)` with a no-op spin callback. */
-template <typename Traits> bool early_rendezvous_wait(structo_early_rendezvous_state &state, std::size_t num_cores) noexcept {
-  return structo_early_rendezvous_wait(&state, num_cores, &detail::early_rendezvous_spin_wait_trampoline<Traits>, nullptr,
-                                        nullptr) != 0;
+template <typename Traits>
+bool early_rendezvous_wait(structo_early_rendezvous_state &state, std::size_t num_cores) noexcept {
+  return structo_early_rendezvous_wait(&state, num_cores, &detail::early_rendezvous_spin_wait_trampoline<Traits>,
+                                       nullptr, nullptr) != 0;
 }
 
 } // namespace structo::sync

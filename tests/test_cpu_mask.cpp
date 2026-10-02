@@ -452,4 +452,3 @@ TEST_F(CpuMaskTest, AtomicFindAndSetConcurrentClaimsAreUniqueAndExhaustive) {
   EXPECT_EQ(total, core_mask::max_cpus);
   EXPECT_EQ(shared.count(), core_mask::max_cpus);
 }
-

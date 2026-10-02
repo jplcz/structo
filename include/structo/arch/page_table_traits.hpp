@@ -138,15 +138,14 @@ namespace detail {
 // level's shift must equal the leaf page's shift exactly.
 template <std::size_t ExpectedLeafShift, typename... Levels> struct levels_tile_contiguously;
 
-template <std::size_t ExpectedLeafShift, typename Last>
-struct levels_tile_contiguously<ExpectedLeafShift, Last> {
+template <std::size_t ExpectedLeafShift, typename Last> struct levels_tile_contiguously<ExpectedLeafShift, Last> {
   static constexpr bool value = (Last::shift == ExpectedLeafShift);
 };
 
 template <std::size_t ExpectedLeafShift, typename First, typename Second, typename... Rest>
 struct levels_tile_contiguously<ExpectedLeafShift, First, Second, Rest...> {
   static constexpr bool value = (First::shift == Second::shift + Second::index_bits) &&
-                                 levels_tile_contiguously<ExpectedLeafShift, Second, Rest...>::value;
+                                levels_tile_contiguously<ExpectedLeafShift, Second, Rest...>::value;
 };
 
 } // namespace detail

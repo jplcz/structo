@@ -25,7 +25,7 @@ class ArchPteFieldsTest : public ::testing::Test {};
 TEST_F(ArchPteFieldsTest, Arm64Stage1NsLeafRoundTripsFrameAndFields) {
   using traits = structo::arch::page_table_entry_traits<structo::arch::arm64::stage1_ns_tag<>>;
   auto leaf = traits::make_leaf_entry(traits::phys_type{0x1234'5000ull}, 0b01, 0b11, 2, /*final_level=*/true,
-                                       /*af=*/true, /*ng=*/true, /*contiguous=*/false, /*pxn=*/false, /*uxn=*/true);
+                                      /*af=*/true, /*ng=*/true, /*contiguous=*/false, /*pxn=*/false, /*uxn=*/true);
   EXPECT_TRUE(traits::is_present(leaf));
   EXPECT_EQ(traits::leaf_frame_addr(leaf).value, 0x1234'5000ull);
   EXPECT_EQ(traits::ap(leaf), 0b01u);
@@ -41,15 +41,15 @@ TEST_F(ArchPteFieldsTest, Arm64Stage1NsBlockIsLeafButPageIsNot) {
   using traits = structo::arch::page_table_entry_traits<structo::arch::arm64::stage1_ns_tag<>>;
   auto block = traits::make_leaf_entry(traits::phys_type{0x2000'0000ull}, 0, 0, 0, /*final_level=*/false);
   auto page = traits::make_leaf_entry(traits::phys_type{0x2100'0000ull}, 0, 0, 0, /*final_level=*/true);
-  EXPECT_TRUE(traits::is_leaf(block));  // bit 1 == 0 at an intermediate level
-  EXPECT_FALSE(traits::is_leaf(page));  // bit 1 == 1: a "page" descriptor, not asked about via is_leaf()
+  EXPECT_TRUE(traits::is_leaf(block)); // bit 1 == 0 at an intermediate level
+  EXPECT_FALSE(traits::is_leaf(page)); // bit 1 == 1: a "page" descriptor, not asked about via is_leaf()
   EXPECT_EQ(traits::leaf_frame_addr(page).value, 0x2100'0000ull);
 }
 
 TEST_F(ArchPteFieldsTest, Arm64Stage1NsTableEntryExposesTableAttributes) {
   using traits = structo::arch::page_table_entry_traits<structo::arch::arm64::stage1_ns_tag<>>;
   auto tbl = traits::make_table_entry(traits::phys_type{0x3000'0000ull}, /*xn_table=*/true, /*pxn_table=*/true,
-                                       /*ap_table=*/0b10);
+                                      /*ap_table=*/0b10);
   EXPECT_FALSE(traits::is_leaf(tbl));
   EXPECT_EQ(traits::child_table_addr(tbl).value, 0x3000'0000ull);
   EXPECT_TRUE(traits::xn_table(tbl));

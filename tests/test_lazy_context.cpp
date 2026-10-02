@@ -137,19 +137,22 @@ struct full_traits : structo::arch::static_per_cpu_storage<8, void, std::size_t>
 
 namespace {
 
-/** @brief Fixture for `lazy_context`/`lazy_context_switcher<minimal_traits>` tests; resets `minimal_traits`'s mutable static state before each test. */
+/** @brief Fixture for `lazy_context`/`lazy_context_switcher<minimal_traits>` tests; resets `minimal_traits`'s mutable
+ * static state before each test. */
 class LazyContextMinimalTraitsTest : public ::testing::Test {
 protected:
   void SetUp() override { minimal_traits::reset(); }
 };
 
-/** @brief Fixture for `lazy_context`/`lazy_context_switcher<full_traits>` tests; resets `full_traits`'s mutable static state before each test. */
+/** @brief Fixture for `lazy_context`/`lazy_context_switcher<full_traits>` tests; resets `full_traits`'s mutable static
+ * state before each test. */
 class LazyContextFullTraitsTest : public ::testing::Test {
 protected:
   void SetUp() override { full_traits::reset(); }
 };
 
-/** @brief Fixture for `static_per_cpu_storage` tests; no shared mutable state to reset beyond each test's own local instance. */
+/** @brief Fixture for `static_per_cpu_storage` tests; no shared mutable state to reset beyond each test's own local
+ * instance. */
 class StaticPerCpuStorageTest : public ::testing::Test {};
 
 } // namespace

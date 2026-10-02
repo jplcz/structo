@@ -12,7 +12,8 @@ using structo::arch::hw_id_lut;
 
 namespace {
 
-/** @brief Fixture for `hw_id_lut` tests; each test constructs its own locally-scoped `lut` with the template parameters it needs. */
+/** @brief Fixture for `hw_id_lut` tests; each test constructs its own locally-scoped `lut` with the template parameters
+ * it needs. */
 class HwIdMapTest : public ::testing::Test {};
 
 } // namespace
@@ -77,7 +78,7 @@ TEST_F(HwIdMapTest, InsertRejectsOutOfRangeOrTombstoneCpuIndexAndFullTable) {
   hw_id_lut<uint32_t, 2, 8> lut;
 
   EXPECT_FALSE(lut.insert(0x1, 2));             // cpu_idx >= max_cpus
-  EXPECT_FALSE(lut.insert(0x1, lut.tombstone));  // reserved sentinel value
+  EXPECT_FALSE(lut.insert(0x1, lut.tombstone)); // reserved sentinel value
 
   ASSERT_TRUE(lut.insert(0x1, 0));
   ASSERT_TRUE(lut.insert(0x2, 1));

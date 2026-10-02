@@ -102,11 +102,11 @@
  * @endcode
  */
 
-#include <reloco/detail/assert.hpp>
-#include <reloco/span.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <reloco/detail/assert.hpp>
+#include <reloco/span.hpp>
 #include <type_traits>
 
 namespace structo::arch {

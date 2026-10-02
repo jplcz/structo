@@ -85,7 +85,7 @@ template <> struct hw_rng_traits<structo::arch::riscv::seed_rng> {
     constexpr std::uint32_t k_opst_es16 = 0x80000000u;
     constexpr std::uint32_t k_opst_dead = 0xC0000000u;
     constexpr std::uint32_t k_entropy_mask = 0xFFFFu;
-    constexpr unsigned k_needed_samples = 4; // 4 x 16 bits = 64 bits
+    constexpr unsigned k_needed_samples = 4;           // 4 x 16 bits = 64 bits
     constexpr unsigned k_retry_loops_per_sample = 100; // matches Linux's SEED_RETRY_LOOPS
 
     std::uint64_t word = 0;

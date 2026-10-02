@@ -4,13 +4,13 @@
 
 #pragma once
 
-#include <algorithm>
-#include <reloco/lifetime.hpp>
-#include <reloco/packed_bits.hpp>
 #include "phys_addr.hpp"
 #include "phys_page.hpp"
 #include "sg_list.hpp"
 #include "sg_translator.hpp"
+#include <algorithm>
+#include <reloco/lifetime.hpp>
+#include <reloco/packed_bits.hpp>
 #include <reloco/speculation_defense.hpp>
 
 namespace structo {
@@ -547,10 +547,8 @@ public:
   static constexpr size_t l2_entries_per_page =
       (PageTraits::page_size - L2Layout::header_size) / sizeof(l2_packed_type);
 
-  static_assert(std::is_trivially_copyable_v<l1_packed_type> &&
-                    std::is_trivially_copyable_v<l2_packed_type> &&
-                    std::is_standard_layout_v<l1_packed_type> &&
-                    std::is_standard_layout_v<l2_packed_type>,
+  static_assert(std::is_trivially_copyable_v<l1_packed_type> && std::is_trivially_copyable_v<l2_packed_type> &&
+                    std::is_standard_layout_v<l1_packed_type> && std::is_standard_layout_v<l2_packed_type>,
                 "packed_bits must remain trivially copyable for DMA memory arrays");
   static_assert(L1Layout::header_size % sizeof(l1_packed_type) == 0 &&
                     L2Layout::header_size % sizeof(l2_packed_type) == 0,

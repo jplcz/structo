@@ -96,9 +96,9 @@ struct structo_early_rendezvous_state {
   unsigned int generation;
 };
 
-/** @brief Designated-initializer-friendly zero value, equivalent to the implicit zero-initialization of a static instance. */
-#define STRUCTO_EARLY_RENDEZVOUS_STATE_INIT \
-  { 0u, 0u }
+/** @brief Designated-initializer-friendly zero value, equivalent to the implicit zero-initialization of a static
+ * instance. */
+#define STRUCTO_EARLY_RENDEZVOUS_STATE_INIT {0u, 0u}
 
 /**
  * @brief Arrives at the barrier and spins until @p num_cores
@@ -125,8 +125,8 @@ struct structo_early_rendezvous_state {
  * every other participant in the same wave.
  */
 static inline int structo_early_rendezvous_wait(struct structo_early_rendezvous_state *state, size_t num_cores,
-                                                 void (*spin_wait)(void),
-                                                 void (*on_spin)(size_t arrived, void *user_data), void *user_data) {
+                                                void (*spin_wait)(void),
+                                                void (*on_spin)(size_t arrived, void *user_data), void *user_data) {
   const unsigned int threshold = (num_cores == 0) ? 1u : (unsigned int)num_cores;
   const unsigned int generation = __atomic_load_n(&state->generation, __ATOMIC_ACQUIRE);
 

@@ -66,8 +66,7 @@ private:
 
   template <typename Traits> friend class preemption_guard;
 
-  template <typename Traits, typename F>
-  friend decltype(auto) with_preemption_disabled(F &&f) noexcept;
+  template <typename Traits, typename F> friend decltype(auto) with_preemption_disabled(F &&f) noexcept;
 };
 
 // -----------------------------------------------------------------------------

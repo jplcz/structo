@@ -20,12 +20,11 @@ class PageTableTraitsTest : public ::testing::Test {};
 
 // ARM64 / x86-64 shaped: 4KB granule, 4 levels, 48-bit VA.
 using arm64_4k_4level = page_table_levels<page_4k, 48, page_table_level<9, 39, false>, page_table_level<9, 30, true>,
-                                           page_table_level<9, 21, true>, page_table_level<9, 12, true>>;
+                                          page_table_level<9, 21, true>, page_table_level<9, 12, true>>;
 
 // RISC-V Sv39 shaped: 4KB granule, 3 levels, 39-bit VA.
-using sv39 =
-    page_table_levels<page_4k, 39, page_table_level<9, 30, true>, page_table_level<9, 21, true>,
-                       page_table_level<9, 12, true>>;
+using sv39 = page_table_levels<page_4k, 39, page_table_level<9, 30, true>, page_table_level<9, 21, true>,
+                               page_table_level<9, 12, true>>;
 
 // A single-level, flat (identity-ish) configuration -- the degenerate case.
 using single_level = page_table_levels<page_4k, 21, page_table_level<9, 12, true>>;
@@ -65,8 +64,7 @@ TEST_F(PageTableTraitsTest, IndexOfDecomposesEveryLevelWithoutLossOrOverlap) {
   // Reassembling the pieces must reproduce the original address exactly:
   // no bit may be dropped (a gap) or counted twice (an overlap).
   std::uint64_t reassembled = (static_cast<std::uint64_t>(l0) << 39) | (static_cast<std::uint64_t>(l1) << 30) |
-                              (static_cast<std::uint64_t>(l2) << 21) | (static_cast<std::uint64_t>(l3) << 12) |
-                              offset;
+                              (static_cast<std::uint64_t>(l2) << 21) | (static_cast<std::uint64_t>(l3) << 12) | offset;
   EXPECT_EQ(reassembled, va);
 }
 

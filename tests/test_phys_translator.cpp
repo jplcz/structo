@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 #if !defined(_MSC_VER)
-#include <structo/phys_translator.hpp>
 #include <gtest/gtest.h>
+#include <structo/phys_translator.hpp>
 
 namespace {
 

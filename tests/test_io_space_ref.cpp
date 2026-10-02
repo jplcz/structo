@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: BSD-2-Clause
 
-#include <structo/io_space_ref.hpp>
 #include <gtest/gtest.h>
+#include <structo/io_space_ref.hpp>
 
 #include <array>
 #include <cstring>

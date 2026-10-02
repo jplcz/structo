@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 #if !defined(_MSC_VER) && defined(__LP64__)
-#include <structo/phys_addr.hpp>
-#include <structo/pfn_translator.hpp>
 #include <gtest/gtest.h>
+#include <structo/pfn_translator.hpp>
+#include <structo/phys_addr.hpp>
 
 namespace {
 

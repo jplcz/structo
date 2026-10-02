@@ -26,7 +26,8 @@ struct fake_spin_traits {
   static void reset() noexcept { spin_count.store(0, std::memory_order_relaxed); }
 };
 
-/** @brief Fixture for `early_rendezvous_wait` tests; resets `fake_spin_traits`'s mutable static state before each test. */
+/** @brief Fixture for `early_rendezvous_wait` tests; resets `fake_spin_traits`'s mutable static state before each test.
+ */
 class EarlyRendezvousBarrierTest : public ::testing::Test {
 protected:
   void SetUp() override { fake_spin_traits::reset(); }
@@ -111,8 +112,8 @@ TEST_F(EarlyRendezvousBarrierTest, OnSpinCallbackReceivesProvisionalArrivalCount
 
   std::thread waiter([&] {
     waiter_started.store(true, std::memory_order_release);
-    early_rendezvous_wait<fake_spin_traits>(state, 2,
-                                             [&](std::size_t arrived) { last_seen_count.store(arrived, std::memory_order_relaxed); });
+    early_rendezvous_wait<fake_spin_traits>(
+        state, 2, [&](std::size_t arrived) { last_seen_count.store(arrived, std::memory_order_relaxed); });
   });
 
   while (!waiter_started.load(std::memory_order_acquire)) {

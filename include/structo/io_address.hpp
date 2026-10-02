@@ -62,12 +62,12 @@
  * IOMMU.
  */
 
+#include <cstddef>
+#include <cstdint>
 #include <reloco/detail/assert.hpp>
 #include <reloco/detail/compat.hpp>
 #include <reloco/error.hpp>
 #include <reloco/int_ops.hpp>
-#include <cstddef>
-#include <cstdint>
 #include <type_traits>
 
 namespace structo {
@@ -335,8 +335,8 @@ template <typename RegTraits, typename T, typename SpaceTag, typename IoInt>
  * be negative to address a slot *before* `base`.
  */
 template <typename RegTraits, typename T, typename SpaceTag, typename IoInt>
-[[nodiscard]] constexpr result<io_address<T, SpaceTag, IoInt>>
-at_reg(io_address<T, SpaceTag, IoInt> base, std::make_signed_t<IoInt> index) noexcept {
+[[nodiscard]] constexpr result<io_address<T, SpaceTag, IoInt>> at_reg(io_address<T, SpaceTag, IoInt> base,
+                                                                      std::make_signed_t<IoInt> index) noexcept {
   using signed_type = std::make_signed_t<IoInt>;
   auto byte_offset = reloco::checked_mul<signed_type>(index, static_cast<signed_type>(RegTraits::reg_size));
   if (!byte_offset)
@@ -364,7 +364,7 @@ at_reg(io_address<T, SpaceTag, IoInt> base, std::make_signed_t<IoInt> index) noe
  */
 template <typename RegTraits, typename T, typename SpaceTag, typename IoInt>
 [[nodiscard]] constexpr result<std::make_signed_t<IoInt>> reg_index(io_address<T, SpaceTag, IoInt> addr,
-                                                                     io_address<T, SpaceTag, IoInt> base) noexcept {
+                                                                    io_address<T, SpaceTag, IoInt> base) noexcept {
   using signed_type = std::make_signed_t<IoInt>;
   const bool negative = addr.value < base.value;
   const IoInt byte_diff = negative ? (base.value - addr.value) : (addr.value - base.value);

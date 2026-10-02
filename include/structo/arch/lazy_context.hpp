@@ -133,7 +133,8 @@ template <typename Traits, typename CpuId> class lazy_context_switcher;
  */
 namespace detail {
 
-/** @brief Resolves `CpuId`'s sentinel "no CPU" value: `Traits::invalid_cpu` if provided, else `static_cast<CpuId>(-1)`. */
+/** @brief Resolves `CpuId`'s sentinel "no CPU" value: `Traits::invalid_cpu` if provided, else `static_cast<CpuId>(-1)`.
+ */
 template <typename T, typename CpuId, typename = void> struct get_invalid_cpu {
   static constexpr CpuId value = static_cast<CpuId>(-1);
 };
@@ -169,7 +170,8 @@ struct traits_has_on_thread_construct<
     T, S, Alloc, std::void_t<decltype(T::on_thread_construct(std::declval<S &>(), std::declval<Alloc &>()))>>
     : std::true_type {};
 
-/** @brief True if `Traits::on_lazy_construct(state, alloc)` is implemented (deferred, first-touch construction hook). */
+/** @brief True if `Traits::on_lazy_construct(state, alloc)` is implemented (deferred, first-touch construction hook).
+ */
 template <typename T, typename S, typename Alloc = reloco::allocator_ref, typename = void>
 struct traits_has_on_lazy_construct : std::false_type {};
 
@@ -208,14 +210,16 @@ struct traits_has_on_migrate<
     T, Ctx, Cpu, std::void_t<decltype(T::on_migrate(std::declval<Ctx &>(), std::declval<Cpu>(), std::declval<Cpu>()))>>
     : std::true_type {};
 
-/** @brief True if `Traits`/`State` provides any form of deferred/on-demand construction (any of the three detectors above). */
+/** @brief True if `Traits`/`State` provides any form of deferred/on-demand construction (any of the three detectors
+ * above). */
 template <typename Traits, typename State> struct is_dynamically_constructed {
   static constexpr bool value = traits_has_try_construct<Traits, State>::value ||
                                 traits_has_on_lazy_construct<Traits, State>::value ||
                                 state_has_try_construct<State>::value;
 };
 
-/** @brief Dispatches to `Traits::matches_trap(fault_ctx)` if implemented; otherwise always matches (single-extension systems). */
+/** @brief Dispatches to `Traits::matches_trap(fault_ctx)` if implemented; otherwise always matches (single-extension
+ * systems). */
 template <typename T, typename FC, typename = void> struct trap_matcher {
   static reloco::result<bool> match(const FC &) noexcept {
     // If trait doesn't provide a matcher, assume this block matches unconditionally

@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: BSD-2-Clause
 
-#include <structo/io_address.hpp>
 #include <gtest/gtest.h>
+#include <structo/io_address.hpp>
 
 namespace {
 

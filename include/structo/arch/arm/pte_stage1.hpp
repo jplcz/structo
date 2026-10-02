@@ -52,9 +52,15 @@ template <> struct page_table_entry_traits<arm::lpae::stage1_ns_tag> {
   [[nodiscard]] static constexpr bool is_present(entry_type e) noexcept { return bits::is_present(e.value); }
   [[nodiscard]] static constexpr bool is_leaf(entry_type e) noexcept { return !bits::is_table(e.value); }
 
-  [[nodiscard]] static constexpr unsigned af(entry_type e) noexcept { return static_cast<unsigned>(bits::af::get(e.value)); }
-  [[nodiscard]] static constexpr unsigned sh(entry_type e) noexcept { return static_cast<unsigned>(bits::sh::get(e.value)); }
-  [[nodiscard]] static constexpr unsigned ap(entry_type e) noexcept { return static_cast<unsigned>(bits::ap::get(e.value)); }
+  [[nodiscard]] static constexpr unsigned af(entry_type e) noexcept {
+    return static_cast<unsigned>(bits::af::get(e.value));
+  }
+  [[nodiscard]] static constexpr unsigned sh(entry_type e) noexcept {
+    return static_cast<unsigned>(bits::sh::get(e.value));
+  }
+  [[nodiscard]] static constexpr unsigned ap(entry_type e) noexcept {
+    return static_cast<unsigned>(bits::ap::get(e.value));
+  }
   [[nodiscard]] static constexpr unsigned attr_indx(entry_type e) noexcept {
     return static_cast<unsigned>(bits::attr_indx::get(e.value));
   }
@@ -68,8 +74,7 @@ template <> struct page_table_entry_traits<arm::lpae::stage1_ns_tag> {
   [[nodiscard]] static constexpr phys_type leaf_frame_addr(entry_type e) noexcept { return child_table_addr(e); }
 
   [[nodiscard]] static constexpr entry_type make_table_entry(phys_type child_table, bool xn_table = false,
-                                                              bool pxn_table = false,
-                                                              unsigned ap_table = 0) noexcept {
+                                                             bool pxn_table = false, unsigned ap_table = 0) noexcept {
     std::uint64_t raw = bits::valid::set(0, 1);
     raw = bits::table_or_page::set(raw, 1);
     raw = bits::xn_table::set_bit(raw, xn_table);
@@ -81,9 +86,9 @@ template <> struct page_table_entry_traits<arm::lpae::stage1_ns_tag> {
 
   /** @brief Builds a leaf entry; `final_level = false` builds a block descriptor instead of a page descriptor. */
   [[nodiscard]] static constexpr entry_type make_leaf_entry(phys_type frame, unsigned ap, unsigned sh,
-                                                             unsigned attr_indx, bool final_level = true,
-                                                             bool af = true, bool ng = false, bool pxn = false,
-                                                             bool uxn = false) noexcept {
+                                                            unsigned attr_indx, bool final_level = true, bool af = true,
+                                                            bool ng = false, bool pxn = false,
+                                                            bool uxn = false) noexcept {
     std::uint64_t raw = bits::valid::set(0, 1);
     raw = bits::table_or_page::set(raw, final_level ? 1 : 0);
     raw = bits::ap::set(raw, ap);
@@ -114,8 +119,8 @@ template <> struct page_table_entry_traits<arm::lpae::stage1_secure_tag> {
   [[nodiscard]] static constexpr phys_type leaf_frame_addr(entry_type e) noexcept { return child_table_addr(e); }
 
   [[nodiscard]] static constexpr entry_type make_table_entry(phys_type child_table, bool ns_table = false,
-                                                              bool xn_table = false, bool pxn_table = false,
-                                                              unsigned ap_table = 0) noexcept {
+                                                             bool xn_table = false, bool pxn_table = false,
+                                                             unsigned ap_table = 0) noexcept {
     std::uint64_t raw = bits::valid::set(0, 1);
     raw = bits::table_or_page::set(raw, 1);
     raw = bits::ns_table::set_bit(raw, ns_table);
@@ -127,10 +132,9 @@ template <> struct page_table_entry_traits<arm::lpae::stage1_secure_tag> {
   }
 
   [[nodiscard]] static constexpr entry_type make_leaf_entry(phys_type frame, unsigned ap, unsigned sh,
-                                                             unsigned attr_indx, bool ns = false,
-                                                             bool final_level = true, bool af = true,
-                                                             bool ng = false, bool pxn = false,
-                                                             bool uxn = false) noexcept {
+                                                            unsigned attr_indx, bool ns = false,
+                                                            bool final_level = true, bool af = true, bool ng = false,
+                                                            bool pxn = false, bool uxn = false) noexcept {
     std::uint64_t raw = bits::valid::set(0, 1);
     raw = bits::table_or_page::set(raw, final_level ? 1 : 0);
     raw = bits::ns::set_bit(raw, ns);

@@ -13,11 +13,11 @@
 // RELOCO_ENABLE_FAULT_INJECTION is defined locally here.
 #define RELOCO_ENABLE_FAULT_INJECTION
 
-#include <reloco/lifetime.hpp>
 #include <cerrno>
 #include <cstring>
 #include <gtest/gtest.h>
 #include <reloco/fault_injection_patterns.hpp>
+#include <reloco/lifetime.hpp>
 #include <structo/reloco_ipc_ring.hpp>
 
 RELOCO_BEGIN_UNSAFE_BUFFER_USAGE

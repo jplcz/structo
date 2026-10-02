@@ -132,8 +132,7 @@ struct page_table_entry_traits<arm64::stage1_ns_tag<LeafPageTraits>>
   [[nodiscard]] static constexpr phys_type leaf_frame_addr(entry_type e) noexcept { return child_table_addr(e); }
 
   [[nodiscard]] static constexpr entry_type make_table_entry(phys_type child_table, bool xn_table = false,
-                                                              bool pxn_table = false,
-                                                              unsigned ap_table = 0) noexcept {
+                                                             bool pxn_table = false, unsigned ap_table = 0) noexcept {
     using bits = structo::arch::detail::vmsa::stage1_bits;
     std::uint64_t raw = bits::valid::set(0, 1);
     raw = bits::table_or_page::set(raw, 1);
@@ -155,9 +154,9 @@ struct page_table_entry_traits<arm64::stage1_ns_tag<LeafPageTraits>>
    * leaf without needing to ask.
    */
   [[nodiscard]] static constexpr entry_type make_leaf_entry(phys_type frame, unsigned ap, unsigned sh,
-                                                             unsigned attr_indx, bool final_level = true,
-                                                             bool af = true, bool ng = false, bool contiguous = false,
-                                                             bool pxn = false, bool uxn = false) noexcept {
+                                                            unsigned attr_indx, bool final_level = true, bool af = true,
+                                                            bool ng = false, bool contiguous = false, bool pxn = false,
+                                                            bool uxn = false) noexcept {
     using bits = structo::arch::detail::vmsa::stage1_bits;
     std::uint64_t raw = bits::valid::set(0, 1);
     raw = bits::table_or_page::set(raw, final_level ? 1 : 0);
@@ -199,8 +198,8 @@ struct page_table_entry_traits<arm64::stage1_secure_tag<LeafPageTraits>>
   [[nodiscard]] static constexpr phys_type leaf_frame_addr(entry_type e) noexcept { return child_table_addr(e); }
 
   [[nodiscard]] static constexpr entry_type make_table_entry(phys_type child_table, bool ns_table = false,
-                                                              bool xn_table = false, bool pxn_table = false,
-                                                              unsigned ap_table = 0) noexcept {
+                                                             bool xn_table = false, bool pxn_table = false,
+                                                             unsigned ap_table = 0) noexcept {
     using bits = structo::arch::detail::vmsa::stage1_bits;
     std::uint64_t raw = bits::valid::set(0, 1);
     raw = bits::table_or_page::set(raw, 1);
@@ -214,10 +213,10 @@ struct page_table_entry_traits<arm64::stage1_secure_tag<LeafPageTraits>>
 
   /** @brief Builds a leaf entry; see the overload in `stage1_ns_tag`'s traits for `final_level`'s meaning. */
   [[nodiscard]] static constexpr entry_type make_leaf_entry(phys_type frame, unsigned ap, unsigned sh,
-                                                             unsigned attr_indx, bool ns = false,
-                                                             bool final_level = true, bool af = true,
-                                                             bool ng = false, bool contiguous = false,
-                                                             bool pxn = false, bool uxn = false) noexcept {
+                                                            unsigned attr_indx, bool ns = false,
+                                                            bool final_level = true, bool af = true, bool ng = false,
+                                                            bool contiguous = false, bool pxn = false,
+                                                            bool uxn = false) noexcept {
     using bits = structo::arch::detail::vmsa::stage1_bits;
     std::uint64_t raw = bits::valid::set(0, 1);
     raw = bits::table_or_page::set(raw, final_level ? 1 : 0);
@@ -249,8 +248,7 @@ struct page_table_entry_traits<arm64::stage1_secure_el2_tag<LeafPageTraits>>
   [[nodiscard]] static constexpr phys_type leaf_frame_addr(entry_type e) noexcept { return child_table_addr(e); }
 
   [[nodiscard]] static constexpr entry_type make_table_entry(phys_type child_table, bool xn_table = false,
-                                                              bool pxn_table = false,
-                                                              unsigned ap_table = 0) noexcept {
+                                                             bool pxn_table = false, unsigned ap_table = 0) noexcept {
     using bits = structo::arch::detail::vmsa::stage1_bits;
     std::uint64_t raw = bits::valid::set(0, 1);
     raw = bits::table_or_page::set(raw, 1);
@@ -263,9 +261,9 @@ struct page_table_entry_traits<arm64::stage1_secure_el2_tag<LeafPageTraits>>
 
   /** @brief Builds a leaf entry; see the overload in `stage1_ns_tag`'s traits for `final_level`'s meaning. */
   [[nodiscard]] static constexpr entry_type make_leaf_entry(phys_type frame, unsigned ap, unsigned sh,
-                                                             unsigned attr_indx, bool final_level = true,
-                                                             bool af = true, bool ng = false, bool contiguous = false,
-                                                             bool pxn = false, bool uxn = false) noexcept {
+                                                            unsigned attr_indx, bool final_level = true, bool af = true,
+                                                            bool ng = false, bool contiguous = false, bool pxn = false,
+                                                            bool uxn = false) noexcept {
     using bits = structo::arch::detail::vmsa::stage1_bits;
     std::uint64_t raw = bits::valid::set(0, 1);
     raw = bits::table_or_page::set(raw, final_level ? 1 : 0);

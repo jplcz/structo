@@ -46,7 +46,9 @@ template <> struct page_table_entry_traits<arm::lpae::stage2_tag> {
   }
   [[nodiscard]] static constexpr bool readable(entry_type e) noexcept { return (s2ap(e) & 0b01u) != 0; }
   [[nodiscard]] static constexpr bool writable(entry_type e) noexcept { return (s2ap(e) & 0b10u) != 0; }
-  [[nodiscard]] static constexpr unsigned sh(entry_type e) noexcept { return static_cast<unsigned>(bits::sh::get(e.value)); }
+  [[nodiscard]] static constexpr unsigned sh(entry_type e) noexcept {
+    return static_cast<unsigned>(bits::sh::get(e.value));
+  }
   [[nodiscard]] static constexpr bool af(entry_type e) noexcept { return bits::af::test(e.value); }
   [[nodiscard]] static constexpr bool xn(entry_type e) noexcept { return bits::xn::test(e.value); }
 
@@ -64,8 +66,8 @@ template <> struct page_table_entry_traits<arm::lpae::stage2_tag> {
 
   /** @brief Builds a leaf entry; `final_level = false` builds a block descriptor instead of a page descriptor. */
   [[nodiscard]] static constexpr entry_type make_leaf_entry(phys_type frame, unsigned s2ap, unsigned sh,
-                                                             unsigned mem_attr, bool final_level = true,
-                                                             bool af = true, bool xn = false) noexcept {
+                                                            unsigned mem_attr, bool final_level = true, bool af = true,
+                                                            bool xn = false) noexcept {
     std::uint64_t raw = bits::valid::set(0, 1);
     raw = bits::page_or_block::set(raw, final_level ? 1 : 0);
     raw = bits::s2ap::set(raw, s2ap);

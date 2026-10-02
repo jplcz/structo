@@ -25,7 +25,8 @@ struct fake_spin_traits {
   static void reset() noexcept { spin_count.store(0, std::memory_order_relaxed); }
 };
 
-/** @brief Fixture for `core_rendezvous_barrier` tests; resets `fake_spin_traits`'s mutable static state before each test. */
+/** @brief Fixture for `core_rendezvous_barrier` tests; resets `fake_spin_traits`'s mutable static state before each
+ * test. */
 class CoreRendezvousBarrierTest : public ::testing::Test {
 protected:
   void SetUp() override { fake_spin_traits::reset(); }

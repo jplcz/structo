@@ -71,9 +71,7 @@ template <std::size_t LowBit, std::size_t NumBits, typename Int = std::uint64_t>
   [[nodiscard]] static constexpr Int field_mask() noexcept { return static_cast<Int>(value_mask() << LowBit); }
 
   /** @brief Extracts this field's value out of `raw`, right-justified. */
-  [[nodiscard]] static constexpr Int get(Int raw) noexcept {
-    return static_cast<Int>((raw >> LowBit) & value_mask());
-  }
+  [[nodiscard]] static constexpr Int get(Int raw) noexcept { return static_cast<Int>((raw >> LowBit) & value_mask()); }
 
   /** @brief Returns `raw` with this field replaced by `value` (low `NumBits` bits of `value`, others ignored). */
   [[nodiscard]] static constexpr Int set(Int raw, Int value) noexcept {

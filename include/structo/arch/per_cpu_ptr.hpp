@@ -87,8 +87,8 @@ struct has_get_current_ptr<Tag, std::void_t<decltype(Tag::get_current_ptr())>> :
 template <typename Tag, typename = void> struct has_set_current_ptr : std::false_type {};
 
 template <typename Tag>
-struct has_set_current_ptr<Tag, std::void_t<decltype(Tag::set_current_ptr(std::declval<void *>()))>>
-    : std::true_type {};
+struct has_set_current_ptr<Tag, std::void_t<decltype(Tag::set_current_ptr(std::declval<void *>()))>> : std::true_type {
+};
 
 } // namespace detail
 

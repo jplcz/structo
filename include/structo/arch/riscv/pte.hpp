@@ -121,9 +121,9 @@ template <typename Tag, typename PhysSpaceTag> struct pte_traits_impl {
   }
 
   [[nodiscard]] static constexpr entry_type make_leaf_entry(phys_type frame, bool readable, bool writable,
-                                                             bool executable, bool user_accessible = false,
-                                                             bool global_mapping = false, bool accessed = true,
-                                                             bool dirty = false, unsigned rsw = 0) noexcept {
+                                                            bool executable, bool user_accessible = false,
+                                                            bool global_mapping = false, bool accessed = true,
+                                                            bool dirty = false, unsigned rsw = 0) noexcept {
     std::uint64_t raw = bits::valid::set(0, 1);
     raw = bits::read::set_bit(raw, readable);
     raw = bits::write::set_bit(raw, writable);
@@ -144,7 +144,8 @@ template <typename Tag, typename PhysSpaceTag> struct pte_traits_impl {
 
 namespace structo::arch {
 
-template <> struct page_table_entry_traits<riscv::pte_tag> : riscv::detail::pte_traits_impl<riscv::pte_tag, default_phys_space> {};
+template <>
+struct page_table_entry_traits<riscv::pte_tag> : riscv::detail::pte_traits_impl<riscv::pte_tag, default_phys_space> {};
 
 template <>
 struct page_table_entry_traits<riscv::pte_g_stage_tag>

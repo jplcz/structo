@@ -119,9 +119,9 @@ struct cr0 {
 
 /** @brief Named bit-field accessors for `CR3`. */
 struct cr3_bits {
-  using pwt = pte_bit_field<3, 1>;     //!< Bit 3: Page-level Write-Through (only meaningful without PCID).
-  using pcd = pte_bit_field<4, 1>;     //!< Bit 4: Page-level Cache Disable (only meaningful without PCID).
-  using pcid = pte_bit_field<0, 12>;   //!< Bits [11:0]: Process-Context Identifier (only meaningful with `CR4.PCIDE`).
+  using pwt = pte_bit_field<3, 1>;   //!< Bit 3: Page-level Write-Through (only meaningful without PCID).
+  using pcd = pte_bit_field<4, 1>;   //!< Bit 4: Page-level Cache Disable (only meaningful without PCID).
+  using pcid = pte_bit_field<0, 12>; //!< Bits [11:0]: Process-Context Identifier (only meaningful with `CR4.PCIDE`).
   using base_addr = pte_bit_field<12, 40>; //!< Bits [51:12]: top-level page-table physical base address.
 };
 
@@ -157,9 +157,7 @@ struct cr3 {
     return *this;
   }
 
-  [[nodiscard]] constexpr std::uint64_t base_addr() const noexcept {
-    return cr3_bits::base_addr::get(raw) << 12;
-  }
+  [[nodiscard]] constexpr std::uint64_t base_addr() const noexcept { return cr3_bits::base_addr::get(raw) << 12; }
   /** @brief Sets the top-level page-table base address. `addr`'s low 12 bits must be `0` (masked off regardless). */
   constexpr cr3 &set_base_addr(std::uint64_t addr) noexcept {
     raw = cr3_bits::base_addr::set(raw, addr >> 12);
@@ -181,12 +179,12 @@ struct cr3 {
 
 /** @brief Named bit-field accessors for `CR4`. */
 struct cr4_bits {
-  using pae = pte_bit_field<5, 1, std::uint64_t>;   //!< Bit 5: Physical Address Extension.
-  using pge = pte_bit_field<7, 1, std::uint64_t>;   //!< Bit 7: Page Global Enable.
+  using pae = pte_bit_field<5, 1, std::uint64_t>;    //!< Bit 5: Physical Address Extension.
+  using pge = pte_bit_field<7, 1, std::uint64_t>;    //!< Bit 7: Page Global Enable.
   using pcide = pte_bit_field<17, 1, std::uint64_t>; //!< Bit 17: PCID Enable.
-  using smep = pte_bit_field<20, 1, std::uint64_t>; //!< Bit 20: Supervisor Mode Execution Prevention.
-  using smap = pte_bit_field<21, 1, std::uint64_t>; //!< Bit 21: Supervisor Mode Access Prevention.
-  using la57 = pte_bit_field<12, 1, std::uint64_t>; //!< Bit 12: Enable 5-level paging (57-bit linear addresses).
+  using smep = pte_bit_field<20, 1, std::uint64_t>;  //!< Bit 20: Supervisor Mode Execution Prevention.
+  using smap = pte_bit_field<21, 1, std::uint64_t>;  //!< Bit 21: Supervisor Mode Access Prevention.
+  using la57 = pte_bit_field<12, 1, std::uint64_t>;  //!< Bit 12: Enable 5-level paging (57-bit linear addresses).
 };
 
 /** @brief Parsed/built view of `CR4`. */

@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: BSD-2-Clause
 
-#include <structo/target_ptr.hpp>
 #include <gtest/gtest.h>
+#include <structo/target_ptr.hpp>
 
 #include <array>
 #include <cstring>
@@ -115,8 +115,7 @@ struct arith_space {};
 
 template <typename TP, typename = void> struct has_try_materialize : std::false_type {};
 template <typename TP>
-struct has_try_materialize<TP, std::void_t<decltype(std::declval<const TP &>().try_materialize())>> : std::true_type {
-};
+struct has_try_materialize<TP, std::void_t<decltype(std::declval<const TP &>().try_materialize())>> : std::true_type {};
 
 struct small_payload {
   std::int32_t a;
@@ -128,10 +127,13 @@ struct small_payload {
 struct large_payload {
   std::uint8_t data[64];
 
-  bool operator==(const large_payload &other) const noexcept { return std::memcmp(data, other.data, sizeof(data)) == 0; }
+  bool operator==(const large_payload &other) const noexcept {
+    return std::memcmp(data, other.data, sizeof(data)) == 0;
+  }
 };
 
-static_assert(sizeof(large_payload) > 32, "large_payload must exceed the stack-inline threshold for this test to be meaningful");
+static_assert(sizeof(large_payload) > 32,
+              "large_payload must exceed the stack-inline threshold for this test to be meaningful");
 
 static_assert(has_try_materialize<target_ptr<small_payload, test_user_space>>::value,
               "materialize must be available for a non-void T");

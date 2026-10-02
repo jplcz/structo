@@ -93,7 +93,9 @@ template <typename Tag, typename PhysSpaceTag> struct pte_traits_impl {
   /** @brief The raw bit-7 value: huge-page leaf (intermediate level) or PAT (final level) -- see the file doc. */
   [[nodiscard]] static constexpr bool ps_or_pat(entry_type e) noexcept { return bits::ps_or_pat::test(e.value); }
   [[nodiscard]] static constexpr bool global_mapping(entry_type e) noexcept { return bits::global::test(e.value); }
-  [[nodiscard]] static constexpr unsigned avl(entry_type e) noexcept { return static_cast<unsigned>(bits::avl::get(e.value)); }
+  [[nodiscard]] static constexpr unsigned avl(entry_type e) noexcept {
+    return static_cast<unsigned>(bits::avl::get(e.value));
+  }
   [[nodiscard]] static constexpr bool execute_disabled(entry_type e) noexcept { return bits::xd::test(e.value); }
 
   [[nodiscard]] static constexpr phys_type child_table_addr(entry_type e) noexcept {
@@ -102,7 +104,7 @@ template <typename Tag, typename PhysSpaceTag> struct pte_traits_impl {
   [[nodiscard]] static constexpr phys_type leaf_frame_addr(entry_type e) noexcept { return child_table_addr(e); }
 
   [[nodiscard]] static constexpr entry_type make_table_entry(phys_type child_table, bool writable = true,
-                                                              bool user_accessible = false) noexcept {
+                                                             bool user_accessible = false) noexcept {
     std::uint64_t raw = bits::present::set(0, 1);
     raw = bits::rw::set_bit(raw, writable);
     raw = bits::us::set_bit(raw, user_accessible);
@@ -116,10 +118,10 @@ template <typename Tag, typename PhysSpaceTag> struct pte_traits_impl {
    * intermediate-level huge-page leaf instead of `PAT`.
    */
   [[nodiscard]] static constexpr entry_type make_leaf_entry(phys_type frame, bool writable, bool user_accessible,
-                                                             bool final_level = true, bool pwt = false,
-                                                             bool pcd = false, bool accessed = true,
-                                                             bool dirty = false, bool global_mapping = false,
-                                                             bool execute_disabled = false, unsigned avl = 0) noexcept {
+                                                            bool final_level = true, bool pwt = false, bool pcd = false,
+                                                            bool accessed = true, bool dirty = false,
+                                                            bool global_mapping = false, bool execute_disabled = false,
+                                                            unsigned avl = 0) noexcept {
     std::uint64_t raw = bits::present::set(0, 1);
     raw = bits::rw::set_bit(raw, writable);
     raw = bits::us::set_bit(raw, user_accessible);
@@ -142,8 +144,10 @@ template <typename Tag, typename PhysSpaceTag> struct pte_traits_impl {
 
 namespace structo::arch {
 
-template <> struct page_table_entry_traits<x86::pte_tag> : x86::detail::pte_traits_impl<x86::pte_tag, default_phys_space> {};
+template <>
+struct page_table_entry_traits<x86::pte_tag> : x86::detail::pte_traits_impl<x86::pte_tag, default_phys_space> {};
 
-template <> struct page_table_entry_traits<x86::npt_tag> : x86::detail::pte_traits_impl<x86::npt_tag, host_phys_space> {};
+template <>
+struct page_table_entry_traits<x86::npt_tag> : x86::detail::pte_traits_impl<x86::npt_tag, host_phys_space> {};
 
 } // namespace structo::arch

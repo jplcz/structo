@@ -211,7 +211,7 @@ public:
    */
   template <std::size_t MaxActive>
   [[nodiscard]] result<bool> activate(asid_allocator<AsidTag, MaxActive> &allocator, std::size_t cpu,
-                                       std::memory_order mask_order = std::memory_order_release) noexcept {
+                                      std::memory_order mask_order = std::memory_order_release) noexcept {
     auto alloc_res = allocator.allocate(cpu, asid_);
     if (!alloc_res) {
       return unexpected(alloc_res.error());

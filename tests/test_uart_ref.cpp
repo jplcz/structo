@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: BSD-2-Clause
 
-#include <structo/hw/uart_ref.hpp>
 #include <gtest/gtest.h>
+#include <structo/hw/uart_ref.hpp>
 
 #include <array>
 #include <deque>

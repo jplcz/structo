@@ -358,7 +358,7 @@ public:
 
   /** @brief Fallible variant of `atomic_test()`. */
   [[nodiscard]] result<bool> atomic_try_test(std::size_t cpu,
-                                              std::memory_order order = std::memory_order_seq_cst) const noexcept {
+                                             std::memory_order order = std::memory_order_seq_cst) const noexcept {
     if (cpu >= MaxCpus) {
       return unexpected(error::out_of_range);
     }
@@ -389,7 +389,7 @@ public:
 
   /** @brief `atomic_set()` without range-checking; UB if `cpu >= MaxCpus`. */
   RELOCO_UNSAFE_BUFFER_USAGE void unsafe_atomic_set(std::size_t cpu,
-                                                     std::memory_order order = std::memory_order_seq_cst) noexcept {
+                                                    std::memory_order order = std::memory_order_seq_cst) noexcept {
     __atomic_fetch_or(&words_[cpu / bits_per_word], std::uint64_t{1} << (cpu % bits_per_word), to_atomic_order(order));
   }
 
@@ -410,8 +410,9 @@ public:
 
   /** @brief `atomic_clear()` without range-checking; UB if `cpu >= MaxCpus`. */
   RELOCO_UNSAFE_BUFFER_USAGE void unsafe_atomic_clear(std::size_t cpu,
-                                                       std::memory_order order = std::memory_order_seq_cst) noexcept {
-    __atomic_fetch_and(&words_[cpu / bits_per_word], ~(std::uint64_t{1} << (cpu % bits_per_word)), to_atomic_order(order));
+                                                      std::memory_order order = std::memory_order_seq_cst) noexcept {
+    __atomic_fetch_and(&words_[cpu / bits_per_word], ~(std::uint64_t{1} << (cpu % bits_per_word)),
+                       to_atomic_order(order));
   }
 
   /** @brief Atomically flips `cpu`. Traps if `cpu >= MaxCpus`. */
@@ -431,7 +432,7 @@ public:
 
   /** @brief `atomic_toggle()` without range-checking; UB if `cpu >= MaxCpus`. */
   RELOCO_UNSAFE_BUFFER_USAGE void unsafe_atomic_toggle(std::size_t cpu,
-                                                        std::memory_order order = std::memory_order_seq_cst) noexcept {
+                                                       std::memory_order order = std::memory_order_seq_cst) noexcept {
     __atomic_fetch_xor(&words_[cpu / bits_per_word], std::uint64_t{1} << (cpu % bits_per_word), to_atomic_order(order));
   }
 
@@ -455,8 +456,8 @@ public:
   }
 
   /** @brief `atomic_test_and_set()` without range-checking; UB if `cpu >= MaxCpus`. */
-  RELOCO_UNSAFE_BUFFER_USAGE bool unsafe_atomic_test_and_set(std::size_t cpu,
-                                                              std::memory_order order = std::memory_order_seq_cst) noexcept {
+  RELOCO_UNSAFE_BUFFER_USAGE bool
+  unsafe_atomic_test_and_set(std::size_t cpu, std::memory_order order = std::memory_order_seq_cst) noexcept {
     std::uint64_t bit = std::uint64_t{1} << (cpu % bits_per_word);
     std::uint64_t prev = __atomic_fetch_or(&words_[cpu / bits_per_word], bit, to_atomic_order(order));
     return (prev & bit) != 0;
@@ -474,7 +475,7 @@ public:
 
   /** @brief Fallible variant of `atomic_test_and_clear()`. */
   result<bool> atomic_try_test_and_clear(std::size_t cpu,
-                                          std::memory_order order = std::memory_order_seq_cst) noexcept {
+                                         std::memory_order order = std::memory_order_seq_cst) noexcept {
     if (cpu >= MaxCpus) {
       return unexpected(error::out_of_range);
     }
@@ -501,7 +502,7 @@ public:
 
   /** @brief Fallible variant of `atomic_test_and_toggle()`. */
   result<bool> atomic_try_test_and_toggle(std::size_t cpu,
-                                           std::memory_order order = std::memory_order_seq_cst) noexcept {
+                                          std::memory_order order = std::memory_order_seq_cst) noexcept {
     if (cpu >= MaxCpus) {
       return unexpected(error::out_of_range);
     }
@@ -518,14 +519,14 @@ public:
 
   /** @brief Atomically loads the raw backing word at `index`. Traps if `index >= word_count`. */
   [[nodiscard]] std::uint64_t atomic_word(std::size_t index,
-                                           std::memory_order order = std::memory_order_seq_cst) const noexcept {
+                                          std::memory_order order = std::memory_order_seq_cst) const noexcept {
     RELOCO_ASSERT(index < word_count, "cpu_mask: atomic_word() index out of range");
     return __atomic_load_n(&words_[index], to_atomic_order(order));
   }
 
   /** @brief Fallible variant of `atomic_word()`. */
-  [[nodiscard]] result<std::uint64_t> atomic_try_word(std::size_t index,
-                                                       std::memory_order order = std::memory_order_seq_cst) const noexcept {
+  [[nodiscard]] result<std::uint64_t>
+  atomic_try_word(std::size_t index, std::memory_order order = std::memory_order_seq_cst) const noexcept {
     if (index >= word_count) {
       return unexpected(error::out_of_range);
     }
@@ -600,7 +601,7 @@ public:
         }
         std::uint64_t desired = expected | (std::uint64_t{1} << bit_in_word);
         if (__atomic_compare_exchange_n(&words_[word_idx], &expected, desired, /*weak=*/true, to_atomic_order(order),
-                                         to_atomic_order(order))) {
+                                        to_atomic_order(order))) {
           return cpu;
         }
         // `expected` was refreshed with the current value by the failed CAS; retry.
@@ -730,9 +731,7 @@ public:
   [[nodiscard]] constexpr cpu_mask difference(const cpu_mask &other) const noexcept { return *this & ~other; }
 
   /** @brief CPUs set in exactly one of `*this`/`other`. Matches `operator^`. */
-  [[nodiscard]] constexpr cpu_mask symmetric_difference(const cpu_mask &other) const noexcept {
-    return *this ^ other;
-  }
+  [[nodiscard]] constexpr cpu_mask symmetric_difference(const cpu_mask &other) const noexcept { return *this ^ other; }
 
   /** @brief Every CPU in `[0, MaxCpus)` NOT set in `*this`. Matches `operator~`. */
   [[nodiscard]] constexpr cpu_mask complement() const noexcept { return ~*this; }

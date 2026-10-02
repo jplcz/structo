@@ -89,12 +89,12 @@
  * 8 mandatory functions above.
  */
 
+#include "io_address.hpp"
 #include <reloco/detail/assert.hpp>
 #include <reloco/detail/compat.hpp>
 #include <reloco/error.hpp>
 #include <reloco/lifetime.hpp>
 #include <reloco/span.hpp>
-#include "io_address.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -123,14 +123,12 @@ namespace detail {
 template <typename Backend, typename = void> struct has_io_space_traits : std::false_type {};
 
 template <typename Backend>
-struct has_io_space_traits<Backend, std::void_t<decltype(io_space_traits<Backend>::read8),
-                                                decltype(io_space_traits<Backend>::read16),
-                                                decltype(io_space_traits<Backend>::read32),
-                                                decltype(io_space_traits<Backend>::read64),
-                                                decltype(io_space_traits<Backend>::write8),
-                                                decltype(io_space_traits<Backend>::write16),
-                                                decltype(io_space_traits<Backend>::write32),
-                                                decltype(io_space_traits<Backend>::write64)>> : std::true_type {};
+struct has_io_space_traits<
+    Backend, std::void_t<decltype(io_space_traits<Backend>::read8), decltype(io_space_traits<Backend>::read16),
+                         decltype(io_space_traits<Backend>::read32), decltype(io_space_traits<Backend>::read64),
+                         decltype(io_space_traits<Backend>::write8), decltype(io_space_traits<Backend>::write16),
+                         decltype(io_space_traits<Backend>::write32), decltype(io_space_traits<Backend>::write64)>>
+    : std::true_type {};
 
 // Detects an optional Traits::read_repN/write_repN "rep" string-I/O fast
 // path; absent widths are synthesized generically from readN/writeN.
@@ -242,7 +240,8 @@ public:
    * `error::unsupported_operation` if this ref is unbound, or whatever
    * the backend itself reports.
    */
-  template <typename T, typename IoInt> [[nodiscard]] result<T> read(io_address<T, SpaceTag, IoInt> addr) const noexcept {
+  template <typename T, typename IoInt>
+  [[nodiscard]] result<T> read(io_address<T, SpaceTag, IoInt> addr) const noexcept {
     static_assert(!std::is_void_v<T>,
                   "read<T>() requires a concrete register type -- cast_type<U>() a void io_address first");
     static_assert(std::is_trivially_copyable_v<T>, "read<T>() memcpy's T's raw bytes, so T must be trivially copyable");
@@ -283,7 +282,8 @@ public:
   [[nodiscard]] result<void> write(io_address<T, SpaceTag, IoInt> addr, const T &value) const noexcept {
     static_assert(!std::is_void_v<T>,
                   "write<T>() requires a concrete register type -- cast_type<U>() a void io_address first");
-    static_assert(std::is_trivially_copyable_v<T>, "write<T>() memcpy's T's raw bytes, so T must be trivially copyable");
+    static_assert(std::is_trivially_copyable_v<T>,
+                  "write<T>() memcpy's T's raw bytes, so T must be trivially copyable");
     static_assert(sizeof(T) == 1 || sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8,
                   "write<T>() only supports 1/2/4/8-byte register widths");
     if (!vtbl_)
@@ -378,7 +378,8 @@ private:
   template <typename Backend> static result<std::uint64_t> read64_entry(void *ctx, std::uint64_t addr) noexcept {
     return io_space_traits<Backend>::read64(*static_cast<Backend *>(ctx), addr);
   }
-  template <typename Backend> static result<void> write8_entry(void *ctx, std::uint64_t addr, std::uint8_t val) noexcept {
+  template <typename Backend>
+  static result<void> write8_entry(void *ctx, std::uint64_t addr, std::uint8_t val) noexcept {
     return io_space_traits<Backend>::write8(*static_cast<Backend *>(ctx), addr, val);
   }
   template <typename Backend>
@@ -525,11 +526,12 @@ private:
   }
 
   template <typename Backend>
-  static constexpr vtable s_vtbl{
-      &read8_entry<Backend>,      &read16_entry<Backend>,      &read32_entry<Backend>,      &read64_entry<Backend>,
-      &write8_entry<Backend>,     &write16_entry<Backend>,     &write32_entry<Backend>,     &write64_entry<Backend>,
-      &read_rep8_entry<Backend>,  &read_rep16_entry<Backend>,  &read_rep32_entry<Backend>,  &read_rep64_entry<Backend>,
-      &write_rep8_entry<Backend>, &write_rep16_entry<Backend>, &write_rep32_entry<Backend>, &write_rep64_entry<Backend>};
+  static constexpr vtable s_vtbl{&read8_entry<Backend>,      &read16_entry<Backend>,      &read32_entry<Backend>,
+                                 &read64_entry<Backend>,     &write8_entry<Backend>,      &write16_entry<Backend>,
+                                 &write32_entry<Backend>,    &write64_entry<Backend>,     &read_rep8_entry<Backend>,
+                                 &read_rep16_entry<Backend>, &read_rep32_entry<Backend>,  &read_rep64_entry<Backend>,
+                                 &write_rep8_entry<Backend>, &write_rep16_entry<Backend>, &write_rep32_entry<Backend>,
+                                 &write_rep64_entry<Backend>};
 
   void *ctx_ = nullptr;
   const vtable *vtbl_ = nullptr;

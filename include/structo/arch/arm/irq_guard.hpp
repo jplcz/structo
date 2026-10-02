@@ -36,9 +36,7 @@ struct irq_traits {
     return cpsr;
   }
 
-  static void hw_restore_irqs(flags_type cpsr) noexcept {
-    asm volatile("msr cpsr_c, %0" : : "r"(cpsr) : "memory");
-  }
+  static void hw_restore_irqs(flags_type cpsr) noexcept { asm volatile("msr cpsr_c, %0" : : "r"(cpsr) : "memory"); }
 };
 
 } // namespace structo::arch::arm

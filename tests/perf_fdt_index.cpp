@@ -125,8 +125,15 @@ std::size_t libfdt_enumerate_all(const void *fdt) {
 
 constexpr const char *k_property_name = "compatible";
 constexpr const char *k_paths[] = {
-    "/", "/cpus", "/cpus/cpu@0", "/cpus/cpu@3", "/memory@40000000", "/chosen", "/intc@8000000/v2m@8020000",
-    "/pl011@9000000", "/no/such/node",
+    "/",
+    "/cpus",
+    "/cpus/cpu@0",
+    "/cpus/cpu@3",
+    "/memory@40000000",
+    "/chosen",
+    "/intc@8000000/v2m@8020000",
+    "/pl011@9000000",
+    "/no/such/node",
 };
 constexpr std::size_t k_path_count = sizeof(k_paths) / sizeof(k_paths[0]);
 

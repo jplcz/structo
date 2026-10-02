@@ -47,10 +47,10 @@
  * plain C API in `reloco_ipc_ring.h` is `static inline`, hence internal
  * linkage per TU, and is safe to mix.)
  */
+#include <cstdlib>
 #include <reloco/error.hpp>
 #include <reloco/expected.hpp>
 #include <reloco/span.hpp>
-#include <cstdlib>
 #include <type_traits>
 
 // Pulled in here, before RELOCO_BEGIN_UNSAFE_BUFFER_USAGE opens below,

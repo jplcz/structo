@@ -4,10 +4,10 @@
 
 #pragma once
 
+#include "phys_addr.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <reloco/inline_vector.hpp>
-#include "phys_addr.hpp"
 
 namespace structo {
 

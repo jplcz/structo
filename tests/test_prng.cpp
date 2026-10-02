@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: BSD-2-Clause
 
-#include <structo/prng.hpp>
 #include <gtest/gtest.h>
+#include <structo/prng.hpp>
 
 #include <deque>
 #include <set>

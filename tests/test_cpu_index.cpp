@@ -39,7 +39,8 @@ struct multicore_tag {
 /** @brief Fixture for `cpu_index<uniprocessor_tag>` tests; no shared mutable state to reset. */
 class CpuIndexUniprocessorTest : public ::testing::Test {};
 
-/** @brief Fixture for `cpu_index<multicore_tag>` tests; resets `multicore_tag`'s mutable static state before/after each test. */
+/** @brief Fixture for `cpu_index<multicore_tag>` tests; resets `multicore_tag`'s mutable static state before/after each
+ * test. */
 class CpuIndexMulticoreTest : public ::testing::Test {
 protected:
   void SetUp() override {

@@ -4,10 +4,10 @@
 
 #pragma once
 
+#include <cstdint>
 #include <reloco/detail/assert.hpp>
 #include <reloco/detail/compat.hpp>
 #include <reloco/error.hpp>
-#include <cstdint>
 #include <type_traits>
 
 namespace structo {

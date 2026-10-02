@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: BSD-2-Clause
 
-#include <structo/hw/rng_combinator.hpp>
 #include <gtest/gtest.h>
+#include <structo/hw/rng_combinator.hpp>
 
 #include <array>
 #include <deque>

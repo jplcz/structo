@@ -6,11 +6,11 @@
 
 #include "phys_addr.hpp"
 #include <cstddef>
-#include <type_traits>
 #include <reloco/error.hpp>
 #include <reloco/lifetime.hpp>
 #include <reloco/type_id.hpp>
 #include <reloco/vector.hpp>
+#include <type_traits>
 
 namespace structo {
 
@@ -146,8 +146,8 @@ public:
    * `list` must outlive this cursor.
    */
   template <typename Container>
-  constexpr explicit sg_list_cursor(const sg_list<Container> &list RELOCO_LIFETIMEBOUND
-                                         RELOCO_LIFETIME_CAPTURE_BY_THIS) noexcept
+  constexpr explicit sg_list_cursor(
+      const sg_list<Container> &list RELOCO_LIFETIMEBOUND RELOCO_LIFETIME_CAPTURE_BY_THIS) noexcept
       : list_(&list), advance_(&advance<Container>),
         entry_type_(type_id::of<typename sg_list<Container>::entry_type>()) {
     static_assert(std::is_same_v<typename sg_list<Container>::phys_int, PhysInt>,
@@ -173,7 +173,8 @@ public:
    * == 0` or `SpaceTag` does not match the erased entry type, or
    * `error::out_of_bounds` once every entry has been fully consumed.
    */
-  template <typename SpaceTag> [[nodiscard]] result<sg_entry<SpaceTag, PhysInt>> next_up_to(PhysInt max_length) & noexcept {
+  template <typename SpaceTag>
+  [[nodiscard]] result<sg_entry<SpaceTag, PhysInt>> next_up_to(PhysInt max_length) & noexcept {
     if (max_length == 0 || !holds<SpaceTag>()) {
       return unexpected(error::invalid_argument);
     }
@@ -197,7 +198,7 @@ private:
   /** @brief Type-erased per-`Container` chunking logic, bound to `advance_` at construction. */
   template <typename Container>
   static result<raw_chunk> advance(const void *ctx, std::size_t &entry_idx, PhysInt &offset,
-                                    PhysInt max_length) noexcept {
+                                   PhysInt max_length) noexcept {
     const auto &entries = static_cast<const sg_list<Container> *>(ctx)->base();
     while (entry_idx < entries.size() && offset >= entries[entry_idx].length) {
       ++entry_idx;

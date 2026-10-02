@@ -86,8 +86,7 @@ public:
    * own documented `0`-participant behavior: every call would otherwise
    * release immediately without ever counting a generation of arrivals.
    */
-  explicit core_rendezvous_barrier(std::size_t num_cores) noexcept
-      : m_threshold(num_cores == 0 ? 1 : num_cores) {}
+  explicit core_rendezvous_barrier(std::size_t num_cores) noexcept : m_threshold(num_cores == 0 ? 1 : num_cores) {}
 
   core_rendezvous_barrier(const core_rendezvous_barrier &) = delete;
   core_rendezvous_barrier &operator=(const core_rendezvous_barrier &) = delete;

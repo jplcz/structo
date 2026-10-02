@@ -660,9 +660,7 @@ private:
     }
   }
 
-  [[nodiscard]] bool test_bit(raw_type asid) const noexcept {
-    return ((bitmap_[asid / 64] >> (asid % 64)) & 1u) != 0;
-  }
+  [[nodiscard]] bool test_bit(raw_type asid) const noexcept { return ((bitmap_[asid / 64] >> (asid % 64)) & 1u) != 0; }
   void mark_used(raw_type asid) noexcept { bitmap_[asid / 64] |= (std::uint64_t{1} << (asid % 64)); }
   void clear_bit(raw_type asid) noexcept { bitmap_[asid / 64] &= ~(std::uint64_t{1} << (asid % 64)); }
 

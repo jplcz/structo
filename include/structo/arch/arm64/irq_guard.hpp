@@ -36,9 +36,7 @@ struct irq_traits {
     return daif;
   }
 
-  static void hw_restore_irqs(flags_type daif) noexcept {
-    asm volatile("msr daif, %0" : : "r"(daif) : "memory");
-  }
+  static void hw_restore_irqs(flags_type daif) noexcept { asm volatile("msr daif, %0" : : "r"(daif) : "memory"); }
 };
 
 } // namespace structo::arch::arm64

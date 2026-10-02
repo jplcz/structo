@@ -162,9 +162,9 @@ struct sctlr {
 
 /** @brief Named bit-field accessors for `TTBCR` in short-descriptor mode (`EAE == 0`). */
 struct ttbcr_short_bits {
-  using n = pte_bit_field<0, 3, std::uint32_t>;   //!< Bits [2:0]: TTBR0 boundary size (0 = full 4GB).
-  using pd0 = pte_bit_field<4, 1, std::uint32_t>; //!< Bit 4: disable TTBR0 table walks.
-  using pd1 = pte_bit_field<5, 1, std::uint32_t>; //!< Bit 5: disable TTBR1 table walks.
+  using n = pte_bit_field<0, 3, std::uint32_t>;    //!< Bits [2:0]: TTBR0 boundary size (0 = full 4GB).
+  using pd0 = pte_bit_field<4, 1, std::uint32_t>;  //!< Bit 4: disable TTBR0 table walks.
+  using pd1 = pte_bit_field<5, 1, std::uint32_t>;  //!< Bit 5: disable TTBR1 table walks.
   using eae = pte_bit_field<31, 1, std::uint32_t>; //!< Bit 31: Extended Address Enable (selects LPAE when set).
 };
 
@@ -335,9 +335,7 @@ template <bool IsTtbr1> struct ttbr_short {
 
   [[nodiscard]] static constexpr ttbr_short from_raw(std::uint32_t value) noexcept { return ttbr_short{value}; }
 
-  [[nodiscard]] constexpr std::uint32_t base_addr() const noexcept {
-    return ttbr_short_bits::baddr::get(raw) << 14;
-  }
+  [[nodiscard]] constexpr std::uint32_t base_addr() const noexcept { return ttbr_short_bits::baddr::get(raw) << 14; }
   /** @brief Sets the translation table base address. `addr`'s low 14 bits must be `0` (masked off regardless). */
   constexpr ttbr_short &set_base_addr(std::uint32_t addr) noexcept {
     raw = ttbr_short_bits::baddr::set(raw, addr >> 14);
@@ -494,7 +492,8 @@ struct scr_bits {
   using net = pte_bit_field<6, 1, std::uint32_t>; //!< Bit 6: Not Early Termination (reserved on some cores).
   using scd = pte_bit_field<7, 1, std::uint32_t>; //!< Bit 7: Secure Monitor Call Disable (traps `SMC` from Non-secure).
   using hce = pte_bit_field<8, 1, std::uint32_t>; //!< Bit 8: Hyp Call Enable (`HVC` usable from Non-secure state).
-  using sif = pte_bit_field<9, 1, std::uint32_t>; //!< Bit 9: Secure Instruction Fetch (forbids Secure fetch from Non-secure memory).
+  using sif = pte_bit_field<9, 1, std::uint32_t>; //!< Bit 9: Secure Instruction Fetch (forbids Secure fetch from
+                                                  //!< Non-secure memory).
 };
 
 /**
@@ -587,8 +586,10 @@ struct scr {
  */
 struct nsacr_bits {
   using cp_access = pte_bit_field<0, 14, std::uint32_t>; //!< Bits [13:0]: Non-secure access enable, one bit per CP<n>.
-  using nsd32dis = pte_bit_field<14, 1, std::uint32_t>;  //!< Bit 14: disables Non-secure use of the upper 16 VFP D registers.
-  using nsasedis = pte_bit_field<15, 1, std::uint32_t>;  //!< Bit 15: disables Non-secure Advanced SIMD (ASIMD) functionality.
+  using nsd32dis =
+      pte_bit_field<14, 1, std::uint32_t>; //!< Bit 14: disables Non-secure use of the upper 16 VFP D registers.
+  using nsasedis =
+      pte_bit_field<15, 1, std::uint32_t>; //!< Bit 15: disables Non-secure Advanced SIMD (ASIMD) functionality.
 };
 
 /**
@@ -654,23 +655,30 @@ struct nsacr {
  * interrupt-virtualization bits are out of scope here.
  */
 struct hcr_bits {
-  using vm = pte_bit_field<0, 1, std::uint32_t>;    //!< Bit 0: enable stage-2 translation.
-  using swio = pte_bit_field<1, 1, std::uint32_t>;  //!< Bit 1: Set/Way Invalidation Override (PL1 set/way cache ops behave as invalidate-only).
-  using ptw = pte_bit_field<2, 1, std::uint32_t>;   //!< Bit 2: Protected Table Walk (a stage-1 walk stepping on a stage-2 Device mapping faults).
-  using fmo = pte_bit_field<3, 1, std::uint32_t>;   //!< Bit 3: physical FIQ routed to Hyp mode.
-  using imo = pte_bit_field<4, 1, std::uint32_t>;   //!< Bit 4: physical IRQ routed to Hyp mode.
-  using amo = pte_bit_field<5, 1, std::uint32_t>;   //!< Bit 5: physical external abort routed to Hyp mode.
-  using dc = pte_bit_field<12, 1, std::uint32_t>;   //!< Bit 12: Default Cacheability (forces cacheable when PL0/PL1 stage-1 is disabled).
-  using bsu = pte_bit_field<10, 2, std::uint32_t>;   //!< Bits [11:10]: Barrier Shareability Upgrade for PL1/PL0 DSB/DMB.
+  using vm = pte_bit_field<0, 1, std::uint32_t>;   //!< Bit 0: enable stage-2 translation.
+  using swio = pte_bit_field<1, 1, std::uint32_t>; //!< Bit 1: Set/Way Invalidation Override (PL1 set/way cache ops
+                                                   //!< behave as invalidate-only).
+  using ptw = pte_bit_field<2, 1, std::uint32_t>; //!< Bit 2: Protected Table Walk (a stage-1 walk stepping on a stage-2
+                                                  //!< Device mapping faults).
+  using fmo = pte_bit_field<3, 1, std::uint32_t>; //!< Bit 3: physical FIQ routed to Hyp mode.
+  using imo = pte_bit_field<4, 1, std::uint32_t>; //!< Bit 4: physical IRQ routed to Hyp mode.
+  using amo = pte_bit_field<5, 1, std::uint32_t>; //!< Bit 5: physical external abort routed to Hyp mode.
+  using dc = pte_bit_field<12, 1, std::uint32_t>; //!< Bit 12: Default Cacheability (forces cacheable when PL0/PL1
+                                                  //!< stage-1 is disabled).
+  using bsu = pte_bit_field<10, 2, std::uint32_t>;  //!< Bits [11:10]: Barrier Shareability Upgrade for PL1/PL0 DSB/DMB.
   using twi = pte_bit_field<13, 1, std::uint32_t>;  //!< Bit 13: `WFI` from PL1/PL0 traps to Hyp mode.
   using twe = pte_bit_field<14, 1, std::uint32_t>;  //!< Bit 14: `WFE` from PL1/PL0 traps to Hyp mode.
   using tsc = pte_bit_field<19, 1, std::uint32_t>;  //!< Bit 19: `SMC` from PL1 traps to Hyp mode.
   using ttlb = pte_bit_field<25, 1, std::uint32_t>; //!< Bit 25: PL1 TLB maintenance instructions trap to Hyp mode.
-  using tvm = pte_bit_field<26, 1, std::uint32_t>;  //!< Bit 26: PL1 writes to its own stage-1 MMU control registers trap to Hyp mode.
-  using tge = pte_bit_field<27, 1, std::uint32_t>;  //!< Bit 27: Trap General Exceptions -- routes PL0 exceptions to Hyp mode and disables PL1&0 stage-1 translation for PL0.
-  using tdz = pte_bit_field<28, 1, std::uint32_t>;  //!< Bit 28: `DC ZVA` from PL1/PL0 traps to Hyp mode.
-  using hcd = pte_bit_field<29, 1, std::uint32_t>;  //!< Bit 29: Hyp Call Disable (traps `HVC` wherever it would otherwise be usable).
-  using trvm = pte_bit_field<30, 1, std::uint32_t>; //!< Bit 30: PL1 reads of its own stage-1 MMU control registers trap to Hyp mode.
+  using tvm = pte_bit_field<26, 1, std::uint32_t>; //!< Bit 26: PL1 writes to its own stage-1 MMU control registers trap
+                                                   //!< to Hyp mode.
+  using tge = pte_bit_field<27, 1, std::uint32_t>; //!< Bit 27: Trap General Exceptions -- routes PL0 exceptions to Hyp
+                                                   //!< mode and disables PL1&0 stage-1 translation for PL0.
+  using tdz = pte_bit_field<28, 1, std::uint32_t>; //!< Bit 28: `DC ZVA` from PL1/PL0 traps to Hyp mode.
+  using hcd = pte_bit_field<29, 1, std::uint32_t>; //!< Bit 29: Hyp Call Disable (traps `HVC` wherever it would
+                                                   //!< otherwise be usable).
+  using trvm = pte_bit_field<30, 1, std::uint32_t>; //!< Bit 30: PL1 reads of its own stage-1 MMU control registers trap
+                                                    //!< to Hyp mode.
 };
 
 /**
@@ -726,9 +734,7 @@ struct hcr {
     return *this;
   }
 
-  [[nodiscard]] constexpr unsigned barrier_shareability_upgrade() const noexcept {
-    return hcr_bits::bsu::get(raw);
-  }
+  [[nodiscard]] constexpr unsigned barrier_shareability_upgrade() const noexcept { return hcr_bits::bsu::get(raw); }
   constexpr hcr &set_barrier_shareability_upgrade(unsigned value) noexcept {
     raw = hcr_bits::bsu::set(raw, value);
     return *this;
@@ -811,10 +817,10 @@ struct hcr {
  */
 struct vtcr_bits {
   using t0sz = pte_bit_field<0, 4, std::uint32_t>;   //!< Bits [3:0]: stage-2 input (guest-physical) address size.
-  using sl0 = pte_bit_field<6, 2, std::uint32_t>;     //!< Bits [7:6]: stage-2 starting level of translation.
-  using irgn0 = pte_bit_field<8, 2, std::uint32_t>;   //!< Bits [9:8]: stage-2 table-walk inner cacheability.
-  using orgn0 = pte_bit_field<10, 2, std::uint32_t>;  //!< Bits [11:10]: stage-2 table-walk outer cacheability.
-  using sh0 = pte_bit_field<12, 2, std::uint32_t>;    //!< Bits [13:12]: stage-2 table-walk shareability.
+  using sl0 = pte_bit_field<6, 2, std::uint32_t>;    //!< Bits [7:6]: stage-2 starting level of translation.
+  using irgn0 = pte_bit_field<8, 2, std::uint32_t>;  //!< Bits [9:8]: stage-2 table-walk inner cacheability.
+  using orgn0 = pte_bit_field<10, 2, std::uint32_t>; //!< Bits [11:10]: stage-2 table-walk outer cacheability.
+  using sh0 = pte_bit_field<12, 2, std::uint32_t>;   //!< Bits [13:12]: stage-2 table-walk shareability.
 };
 
 /**
