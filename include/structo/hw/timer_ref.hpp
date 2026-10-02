@@ -20,12 +20,15 @@
  * HPET/TSC-deadline, RISC-V `mtimecmp`, or a unit test's software fake)
  * implements `timer_traits<Backend>` however it needs to.
  *
- * Only polled completion is modeled, matching `uart_ref`'s `tx_ready`/
- * `rx_ready`: whether a timer has expired is always checked explicitly
- * (`try_wait`), never awaited via a completion callback -- wiring an
- * actual interrupt to call back into software (if the backend supports
- * one at all) is left entirely to the backend/platform, outside this
- * header's scope.
+ * Completion can be observed either way -- polled, exactly matching
+ * `uart_ref`'s `tx_ready`/`rx_ready` (`try_wait`/`wait`), or pushed via an
+ * optional completion callback (`set_callback`/`clear_callback`) for a
+ * backend that can actually wire an interrupt to call back into
+ * software. A backend need not support both: a polling-only backend
+ * simply leaves the optional callback members of `timer_traits`
+ * unimplemented, and `set_callback`/`clear_callback` then fail with
+ * `error::unsupported_operation`, exactly like `remaining`/
+ * `capabilities` do when unimplemented.
  *
  * ## Why type-erased, like `uart_ref`/`hw_rng_ref`
  *
@@ -94,6 +97,42 @@
  * absent, `timer_ref::remaining()`/`timer_ref::capabilities()` fail with
  * `error::unsupported_operation`.
  *
+ * A backend that can wire an interrupt to the timer's expiry may also
+ * supply `set_callback`/`clear_callback`, to be pushed a completion
+ * notification instead of/in addition to being polled via `try_wait`:
+ *
+ * @code
+ * static reloco::result<void> set_callback(my_backend &, reloco::function_ref<void()> cb) noexcept;
+ * static reloco::result<void> clear_callback(my_backend &) noexcept;
+ * @endcode
+ *
+ * - `set_callback` registers `cb` to be invoked -- typically from
+ *   whatever interrupt context the backend's hardware expiry signal
+ *   actually fires in -- every time the timer expires (once, for
+ *   `timer_mode::one_shot`; repeatedly, for `timer_mode::periodic`),
+ *   replacing any previously registered callback. `cb` is a
+ *   `reloco::function_ref`: two words, no allocation, matching
+ *   `timer_ref`'s own non-owning design -- the backend stores this
+ *   pointer pair as-is, so the *referenced* callable (e.g. a capturing
+ *   lambda) must remain valid for as long as the callback stays
+ *   registered (until `clear_callback`/`cancel`/the timer's destruction
+ *   -- not merely until the end of the calling statement, unlike
+ *   `function_ref`'s other, synchronous-call-only uses elsewhere in
+ *   `reloco`/`structo`). The registered callable is invoked with no
+ *   arguments and must itself be interrupt-safe: short, non-blocking,
+ *   and performing no allocation, exactly the discipline any real ISR
+ *   handler requires.
+ * - `clear_callback` unregisters whatever callback is currently set, if
+ *   any; idempotent, like `cancel`.
+ *
+ * Detected via the same SFINAE idiom as `remaining`/`capabilities`; if
+ * either is absent, `timer_ref::set_callback()`/`clear_callback()` fail
+ * with `error::unsupported_operation`. A backend that implements these
+ * should also report `timer_capabilities::supports_callback = true` from
+ * its `capabilities()`, so a caller can decide between polling and
+ * callback-driven completion without having to speculatively call
+ * `set_callback` first.
+ *
  * `timer_capabilities::clock_hz` pairs with the separate
  * `clock_cycles.hpp` header's `checked_duration_to_cycles`/
  * `checked_cycles_to_duration` to convert a `duration` to/from this
@@ -109,6 +148,7 @@
 #include <reloco/detail/compat.hpp>
 #include <reloco/duration.hpp>
 #include <reloco/error.hpp>
+#include <reloco/function_ref.hpp>
 #include <reloco/lifetime.hpp>
 
 #include <cstdint>
@@ -173,6 +213,12 @@ struct timer_capabilities {
    * period is rounded to a multiple of this by the backend. The
    * default-constructed "zero" duration conventionally means "unknown". */
   duration resolution{};
+  /** @brief Whether this backend implements the optional
+   * `timer_traits::set_callback`/`clear_callback` pair, i.e. can push a
+   * completion notification instead of requiring `try_wait`/`wait`
+   * polling. `false` does not mean the timer itself lacks hardware
+   * interrupt capability, only that this binding doesn't expose it. */
+  bool supports_callback = false;
   /** @brief The frequency, in Hz, of the clock the backend counts
    * against (e.g. a generic timer's `CNTFRQ_EL0`, a TSC-deadline
    * backend's calibrated TSC rate). `0` conventionally means "unknown".
@@ -184,7 +230,7 @@ struct timer_capabilities {
   [[nodiscard]] friend constexpr bool operator==(const timer_capabilities &a, const timer_capabilities &b) noexcept {
     return a.supports_one_shot == b.supports_one_shot && a.supports_periodic == b.supports_periodic &&
            a.min_period == b.min_period && a.max_period == b.max_period && a.resolution == b.resolution &&
-           a.clock_hz == b.clock_hz && a.is_per_cpu == b.is_per_cpu;
+           a.clock_hz == b.clock_hz && a.is_per_cpu == b.is_per_cpu && a.supports_callback == b.supports_callback;
   }
   [[nodiscard]] friend constexpr bool operator!=(const timer_capabilities &a, const timer_capabilities &b) noexcept {
     return !(a == b);
@@ -225,6 +271,14 @@ template <typename Traits, typename = void> struct timer_has_capabilities : std:
 template <typename Traits>
 struct timer_has_capabilities<Traits, std::void_t<decltype(Traits::capabilities)>> : std::true_type {};
 
+// Detects the optional Traits::set_callback/clear_callback pair -- both
+// or neither, mirroring `remaining`/`capabilities` being independently
+// optional but each all-or-nothing in themselves.
+template <typename Traits, typename = void> struct timer_has_callback : std::false_type {};
+template <typename Traits>
+struct timer_has_callback<Traits, std::void_t<decltype(Traits::set_callback), decltype(Traits::clear_callback)>>
+    : std::true_type {};
+
 } // namespace detail
 
 // ============================================================================
@@ -254,6 +308,8 @@ public:
     result<void> (*try_wait)(void *ctx) noexcept;
     result<duration> (*remaining)(void *ctx) noexcept;
     result<timer_capabilities> (*capabilities)(void *ctx) noexcept;
+    result<void> (*set_callback)(void *ctx, function_ref<void()> cb) noexcept;
+    result<void> (*clear_callback)(void *ctx) noexcept;
   };
 
   /** @brief Constructs an unbound ref. */
@@ -361,6 +417,46 @@ public:
     return vtbl_->capabilities(ctx_);
   }
 
+  /**
+   * @brief Registers @p cb to be invoked every time the timer expires
+   * (once for `timer_mode::one_shot`, repeatedly for
+   * `timer_mode::periodic`), typically from whatever interrupt context
+   * the backend's hardware expiry signal fires in -- pushed completion,
+   * as an alternative to polling via `try_wait`/`wait` (see the
+   * @file-level docs above). Replaces any previously registered
+   * callback.
+   *
+   * `cb` is a non-owning `function_ref`: the backend stores only its two
+   * words as-is, so the callable @p cb was constructed from must remain
+   * valid for as long as the callback stays registered -- until
+   * `clear_callback()`, `cancel()`, or this ref's backend is destroyed,
+   * *not* merely until the end of the calling statement. The callable
+   * itself must be interrupt-safe: short, non-blocking, and performing
+   * no allocation.
+   *
+   * Fails with `error::unsupported_operation` if this ref is unbound, or
+   * if the bound backend does not implement the optional
+   * `timer_traits::set_callback`/`clear_callback` pair.
+   */
+  [[nodiscard]] result<void> set_callback(function_ref<void()> cb) const noexcept {
+    if (!vtbl_)
+      return unexpected(error::unsupported_operation);
+    return vtbl_->set_callback(ctx_, cb);
+  }
+
+  /**
+   * @brief Unregisters whatever completion callback is currently set, if
+   * any. Idempotent, like `cancel()`.
+   * Fails with `error::unsupported_operation` if this ref is unbound, or
+   * if the bound backend does not implement the optional
+   * `timer_traits::set_callback`/`clear_callback` pair.
+   */
+  [[nodiscard]] result<void> clear_callback() const noexcept {
+    if (!vtbl_)
+      return unexpected(error::unsupported_operation);
+    return vtbl_->clear_callback(ctx_);
+  }
+
   // --------------------------------------------------------------------
   // Generic conveniences, synthesized purely from the four mandatory
   // operations above -- no further backend support is required for any
@@ -448,9 +544,32 @@ private:
     }
   }
 
+  template <typename Backend> static result<void> set_callback_entry(void *ctx, function_ref<void()> cb) noexcept {
+    using traits = timer_traits<Backend>;
+    if constexpr (detail::timer_has_callback<traits>::value) {
+      return traits::set_callback(*static_cast<Backend *>(ctx), cb);
+    } else {
+      (void)ctx;
+      (void)cb;
+      return unexpected(error::unsupported_operation);
+    }
+  }
+
+  template <typename Backend> static result<void> clear_callback_entry(void *ctx) noexcept {
+    using traits = timer_traits<Backend>;
+    if constexpr (detail::timer_has_callback<traits>::value) {
+      return traits::clear_callback(*static_cast<Backend *>(ctx));
+    } else {
+      (void)ctx;
+      return unexpected(error::unsupported_operation);
+    }
+  }
+
   template <typename Backend>
-  static constexpr vtable s_vtbl{&try_start_entry<Backend>, &cancel_entry<Backend>,    &is_active_entry<Backend>,
-                                 &try_wait_entry<Backend>,  &remaining_entry<Backend>, &capabilities_entry<Backend>};
+  static constexpr vtable s_vtbl{&try_start_entry<Backend>,    &cancel_entry<Backend>,
+                                 &is_active_entry<Backend>,    &try_wait_entry<Backend>,
+                                 &remaining_entry<Backend>,    &capabilities_entry<Backend>,
+                                 &set_callback_entry<Backend>, &clear_callback_entry<Backend>};
 
   void *ctx_ = nullptr;
   const vtable *vtbl_ = nullptr;

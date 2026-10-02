@@ -22,12 +22,15 @@ concrete backend (ARM generic timer `CNTP_*_EL0`, x86 LAPIC timer/HPET/
 TSC-deadline, RISC-V `mtimecmp`, or a unit test's software fake)
 implements `timer_traits<Backend>` however it needs to.
 
-Only polled completion is modeled, matching `uart_ref`'s `tx_ready`/
-`rx_ready`: whether a timer has expired is always checked explicitly
-(`try_wait`), never awaited via a completion callback -- wiring an actual
-interrupt to call back into software (if the backend supports one at
-all) is left entirely to the backend/platform, outside this header's
-scope.
+Completion can be observed either way -- polled, exactly matching
+`uart_ref`'s `tx_ready`/`rx_ready` (`try_wait`/`wait`), or pushed via an
+optional completion callback (`set_callback`/`clear_callback`) for a
+backend that can actually wire an interrupt to call back into software.
+A backend need not support both: a polling-only backend simply leaves
+the optional callback members of `timer_traits` unimplemented, and
+`set_callback`/`clear_callback` then fail with
+`error::unsupported_operation`, exactly like `remaining`/`capabilities`
+do when unimplemented.
 
 ## Why `structo::hw`
 
@@ -73,9 +76,12 @@ enum class timer_mode : std::uint8_t { one_shot, periodic };
 struct timer_capabilities {
   bool supports_one_shot = true;
   bool supports_periodic = true;
+  bool is_per_cpu = false;
+  bool supports_callback = false;
   duration min_period{};
   duration max_period{}; // zero conventionally means "no known upper bound"
   duration resolution{}; // zero conventionally means "unknown"
+  std::uint64_t clock_hz = 0; // zero conventionally means "unknown"
 };
 ```
 
@@ -123,6 +129,29 @@ Detected via SFINAE (the same optional-member idiom
 absent, `timer_ref::remaining()`/`timer_ref::capabilities()` return
 `unexpected(error::unsupported_operation)`.
 
+A backend that can wire an interrupt to the timer's expiry may also
+supply the `set_callback`/`clear_callback` pair (both or neither):
+
+```cpp
+static reloco::result<void> set_callback(my_backend &, reloco::function_ref<void()> cb) noexcept;
+static reloco::result<void> clear_callback(my_backend &) noexcept;
+```
+
+- `set_callback` registers `cb` to be invoked -- typically from whatever
+  interrupt context the backend's hardware expiry signal actually fires
+  in -- every time the timer expires, replacing any previously
+  registered callback. `cb` is a `reloco::function_ref`: two words, no
+  allocation, matching `timer_ref`'s own non-owning design -- the
+  *referenced* callable must remain valid for as long as the callback
+  stays registered (until `clear_callback`/`cancel`/the timer's
+  destruction, not merely the calling statement), and must itself be
+  interrupt-safe: short, non-blocking, no allocation.
+- `clear_callback` unregisters whatever callback is currently set, if
+  any; idempotent.
+
+A backend implementing these should report
+`timer_capabilities::supports_callback = true`.
+
 ## Operations
 
 Forwarded directly to the bound backend's trait functions:
@@ -133,6 +162,8 @@ Forwarded directly to the bound backend's trait functions:
 - `try_wait()`
 - `remaining()` (optional; see above)
 - `capabilities()` (optional; see above)
+- `set_callback(reloco::function_ref<void()>)` (optional; see above)
+- `clear_callback()` (optional; see above)
 
 Synthesized generically on top of the four mandatory operations, needing
 no further backend support:

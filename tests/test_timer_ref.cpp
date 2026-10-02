@@ -5,6 +5,8 @@
 #include <gtest/gtest.h>
 #include <structo/hw/timer_ref.hpp>
 
+#include <optional>
+
 namespace {
 
 using namespace structo;
@@ -13,7 +15,9 @@ using namespace structo::hw;
 // --------------------------------------------------------------------
 // A fake, fully-featured timer backend: tracks armed mode/period and a
 // pending-expiry latch a test can set directly. Implements both optional
-// members (remaining, capabilities).
+// members (remaining, capabilities) plus the optional callback pair --
+// `fire()` is the test's stand-in for the backend's own interrupt,
+// invoking whatever callback is currently registered, if any.
 // --------------------------------------------------------------------
 struct fake_timer {
   bool active = false;
@@ -21,6 +25,13 @@ struct fake_timer {
   duration period{};
   duration left{};
   bool expired = false;
+  bool has_cb = false;
+  std::optional<reloco::function_ref<void()>> cb;
+
+  void fire() {
+    if (has_cb && cb)
+      (*cb)();
+  }
 };
 
 } // namespace
@@ -64,7 +75,17 @@ template <> struct structo::hw::timer_traits<fake_timer> {
     caps.resolution = duration::from_micros(1);
     caps.clock_hz = 1'000'000;
     caps.is_per_cpu = true;
+    caps.supports_callback = true;
     return caps;
+  }
+  static reloco::result<void> set_callback(fake_timer &b, reloco::function_ref<void()> cb) noexcept {
+    b.cb = cb;
+    b.has_cb = true;
+    return {};
+  }
+  static reloco::result<void> clear_callback(fake_timer &b) noexcept {
+    b.has_cb = false;
+    return {};
   }
 };
 
@@ -105,6 +126,8 @@ TEST(TimerRefTest, UnboundRefFailsEveryOperation) {
   EXPECT_FALSE(unbound.try_wait().has_value());
   EXPECT_FALSE(unbound.remaining().has_value());
   EXPECT_FALSE(unbound.capabilities().has_value());
+  EXPECT_FALSE(unbound.set_callback([]() noexcept {}).has_value());
+  EXPECT_FALSE(unbound.clear_callback().has_value());
 
   auto r = unbound.wait();
   ASSERT_FALSE(r.has_value());
@@ -243,8 +266,66 @@ TEST(TimerRefTest, CapabilitiesReportsBackendLimits) {
   EXPECT_EQ(caps.value().max_period, duration::from_secs(3600));
   EXPECT_EQ(caps.value().clock_hz, 1'000'000u);
   EXPECT_TRUE(caps.value().is_per_cpu);
+  EXPECT_TRUE(caps.value().supports_callback);
   EXPECT_TRUE(caps.value() == caps.value());
   EXPECT_FALSE(caps.value() != caps.value());
+}
+
+TEST(TimerRefTest, SetCallbackInvokedOnFire) {
+  fake_timer dev;
+  timer_ref ref(dev);
+  ASSERT_TRUE(ref.start(duration::from_millis(5)).has_value());
+
+  int calls = 0;
+  ASSERT_TRUE(ref.set_callback([&calls]() noexcept { ++calls; }).has_value());
+  EXPECT_EQ(calls, 0);
+
+  dev.fire();
+  EXPECT_EQ(calls, 1);
+
+  dev.fire();
+  EXPECT_EQ(calls, 2);
+}
+
+TEST(TimerRefTest, SetCallbackReplacesPreviousCallback) {
+  fake_timer dev;
+  timer_ref ref(dev);
+
+  int first_calls = 0;
+  int second_calls = 0;
+  ASSERT_TRUE(ref.set_callback([&first_calls]() noexcept { ++first_calls; }).has_value());
+  ASSERT_TRUE(ref.set_callback([&second_calls]() noexcept { ++second_calls; }).has_value());
+
+  dev.fire();
+  EXPECT_EQ(first_calls, 0);
+  EXPECT_EQ(second_calls, 1);
+}
+
+TEST(TimerRefTest, ClearCallbackStopsFurtherInvocations) {
+  fake_timer dev;
+  timer_ref ref(dev);
+
+  int calls = 0;
+  ASSERT_TRUE(ref.set_callback([&calls]() noexcept { ++calls; }).has_value());
+  dev.fire();
+  EXPECT_EQ(calls, 1);
+
+  ASSERT_TRUE(ref.clear_callback().has_value());
+  dev.fire();
+  EXPECT_EQ(calls, 1);
+}
+
+TEST(TimerRefTest, SetCallbackUnsupportedOnBareBackend) {
+  bare_timer bare;
+  timer_ref ref(bare);
+
+  auto r = ref.set_callback([]() noexcept {});
+  ASSERT_FALSE(r.has_value());
+  EXPECT_EQ(r.error(), error::unsupported_operation);
+
+  auto c = ref.clear_callback();
+  ASSERT_FALSE(c.has_value());
+  EXPECT_EQ(c.error(), error::unsupported_operation);
 }
 
 TEST(TimerRefTest, RemainingUnsupportedOnBareBackend) {
