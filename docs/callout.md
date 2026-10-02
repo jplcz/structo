@@ -134,5 +134,8 @@ structo::callout<fake_subsystem> co;
 (void)co.drain(); // before `co` goes out of scope
 ```
 
-See also: [`async_kernel_object.md`](async_kernel_object.md) (the
-generic, subsystem-agnostic base this header builds on).
+See [`examples/callout_scheduler_demo.cpp`](../examples/callout_scheduler_demo.cpp)
+for a runnable demo of a toy single-core callout subsystem built on
+`reloco::c_tailq` and `hook_type`, and
+[`async_kernel_object.md`](async_kernel_object.md) (the generic,
+subsystem-agnostic base this header builds on).

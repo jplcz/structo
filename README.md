@@ -38,11 +38,16 @@ demonstrated in [examples/](examples):
   DTB into a caller-owned-storage `structo::device_tree` and reads its
   `/chosen` node's `bootargs`/`stdout-path` properties, the first two
   things almost every kernel/hypervisor boot path looks for.
+- **[`callout_scheduler_demo.cpp`](examples/callout_scheduler_demo.cpp)**
+  -- a toy, single-core `callout` subsystem built on
+  `reloco::c_tailq`/`structo::callout`'s `hook_type` customization point,
+  driving a periodic and a one-shot `structo::callout` off a simulated
+  software clock.
 
-Both build on the OS-development building blocks moved in from
-`jplcz_reloco` (typed physical addresses/pages, scatter-gather
-translation, and the Flattened Device Tree reader/writer/index), each
-documented on its own [docs/](docs) page.
+All three build on this library's own building blocks (typed physical
+addresses/pages and the Flattened Device Tree reader/writer/index moved
+in from `jplcz_reloco`; `async_kernel_object`/`callout` native to
+`structo` itself), each documented on its own [docs/](docs) page.
 
 ## Using structo
 

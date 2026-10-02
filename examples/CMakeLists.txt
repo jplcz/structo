@@ -9,9 +9,11 @@ endfunction()
 
 add_jplcz_structo_example(boot_memory_map_demo)
 add_jplcz_structo_example(device_tree_demo)
+add_jplcz_structo_example(callout_scheduler_demo)
 
 add_custom_target(jplcz_structo_examples
     DEPENDS
         boot_memory_map_demo
         device_tree_demo
+        callout_scheduler_demo
 )
