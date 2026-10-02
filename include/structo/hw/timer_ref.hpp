@@ -80,8 +80,9 @@
  *
  * Optionally, a backend may also supply `remaining` (time left until the
  * next expiry, for hardware that can read its own down-counter back) and
- * `capabilities` (the backend's supported modes/period range/
- * resolution):
+ * `capabilities` (the backend's supported modes, period range,
+ * resolution, counting-clock frequency in Hz, and whether it is a
+ * per-CPU or single shared instance):
  *
  * @code
  * static reloco::result<reloco::duration> remaining(my_backend &) noexcept;
@@ -92,6 +93,16 @@
  * `uart_traits::current_config`/`hw_rng_traits::is_available` use); if
  * absent, `timer_ref::remaining()`/`timer_ref::capabilities()` fail with
  * `error::unsupported_operation`.
+ *
+ * `timer_capabilities::clock_hz` pairs with the separate
+ * `clock_cycles.hpp` header's `checked_duration_to_cycles`/
+ * `checked_cycles_to_duration` to convert a `duration` to/from this
+ * backend's own opaque `structo::hw::cycles` count (e.g. to program a
+ * down-counter register directly, or interpret one read back) -- kept in
+ * its own header since
+ * it is a plain, `timer_ref`-independent frequency/duration conversion
+ * utility also useful for a raw cycle-counter backend (`CNTVCT_EL0`,
+ * the TSC, RISC-V `mtime`) that isn't a `timer_ref` backend at all.
  */
 
 #include <reloco/detail/assert.hpp>
@@ -140,6 +151,17 @@ struct timer_capabilities {
   bool supports_one_shot = true;
   /** @brief Whether `timer_mode::periodic` is supported by `try_start`. */
   bool supports_periodic = true;
+  /** @brief Whether each CPU core has its own independent instance of
+   * this timer (`true`, e.g. the ARM generic timer's per-core `CNTP_*`
+   * registers, an x86 LAPIC timer/TSC-deadline), as opposed to a single
+   * instance shared -- and requiring arbitration -- across every core
+   * (`false`, e.g. a PIT/HPET). A caller binding a per-CPU backend's
+   * `timer_ref` must do so once per core (the same restriction
+   * `per_cpu_ptr.hpp` documents for its own per-CPU resolvers); a
+   * non-per-CPU backend's single `timer_ref` may be shared/serialized
+   * across cores by whatever external locking the caller already uses
+   * for it. */
+  bool is_per_cpu = false;
   /** @brief The shortest period `try_start` can reliably arm for. */
   duration min_period{};
   /** @brief The longest period `try_start` can reliably arm for; the
@@ -151,10 +173,18 @@ struct timer_capabilities {
    * period is rounded to a multiple of this by the backend. The
    * default-constructed "zero" duration conventionally means "unknown". */
   duration resolution{};
+  /** @brief The frequency, in Hz, of the clock the backend counts
+   * against (e.g. a generic timer's `CNTFRQ_EL0`, a TSC-deadline
+   * backend's calibrated TSC rate). `0` conventionally means "unknown".
+   * Pairs with `clock_cycles.hpp`'s `checked_duration_to_cycles`/
+   * `checked_cycles_to_duration` to convert a `duration` to/from this
+   * backend's own raw cycle count. */
+  std::uint64_t clock_hz = 0;
 
   [[nodiscard]] friend constexpr bool operator==(const timer_capabilities &a, const timer_capabilities &b) noexcept {
     return a.supports_one_shot == b.supports_one_shot && a.supports_periodic == b.supports_periodic &&
-           a.min_period == b.min_period && a.max_period == b.max_period && a.resolution == b.resolution;
+           a.min_period == b.min_period && a.max_period == b.max_period && a.resolution == b.resolution &&
+           a.clock_hz == b.clock_hz && a.is_per_cpu == b.is_per_cpu;
   }
   [[nodiscard]] friend constexpr bool operator!=(const timer_capabilities &a, const timer_capabilities &b) noexcept {
     return !(a == b);

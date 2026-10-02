@@ -62,6 +62,8 @@ template <> struct structo::hw::timer_traits<fake_timer> {
     caps.min_period = duration::from_micros(1);
     caps.max_period = duration::from_secs(3600);
     caps.resolution = duration::from_micros(1);
+    caps.clock_hz = 1'000'000;
+    caps.is_per_cpu = true;
     return caps;
   }
 };
@@ -239,6 +241,8 @@ TEST(TimerRefTest, CapabilitiesReportsBackendLimits) {
   EXPECT_TRUE(caps.value().supports_periodic);
   EXPECT_EQ(caps.value().min_period, duration::from_micros(1));
   EXPECT_EQ(caps.value().max_period, duration::from_secs(3600));
+  EXPECT_EQ(caps.value().clock_hz, 1'000'000u);
+  EXPECT_TRUE(caps.value().is_per_cpu);
   EXPECT_TRUE(caps.value() == caps.value());
   EXPECT_FALSE(caps.value() != caps.value());
 }

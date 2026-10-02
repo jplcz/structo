@@ -270,6 +270,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_io_space_ref.cpp
         tests/test_uart_ref.cpp
         tests/test_timer_ref.cpp
+        tests/test_clock_cycles.cpp
         tests/test_phys_translator.cpp
         tests/test_region_set.cpp
         tests/test_sg_list.cpp
