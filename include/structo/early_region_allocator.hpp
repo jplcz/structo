@@ -6,39 +6,41 @@
 
 /** @file early_region_allocator.hpp
  * @brief `structo::early_region_allocator<Capacity, PhysInt>`: a
- * minimal, allocation-free physical-range allocator operating directly
- * on a caller-owned `reloco::region_set` (e.g. `boot_memory_map::free`)
- * -- the smallest allocator a boot path needs before any page-
- * granularity allocator (`buddy_allocator`, a slab, ...) exists.
+ * minimal, allocation-free physical-range allocator seeded from a
+ * caller-owned `reloco::region_set` (e.g. `boot_memory_map::free`) --
+ * the smallest allocator a boot path needs before any page-granularity
+ * allocator (`buddy_allocator`, a slab, ...) exists.
  *
  * `region_set` *is* the boot memory map: a sorted, auto-merging set of
- * free physical ranges. `early_region_allocator` doesn't own a copy of
- * it or parse anything itself -- it is constructed directly from an
- * existing `region_set` (by reference) and does nothing more than carve
- * ranges out of it (`try_alloc`/`try_reserve`, both backed by
- * `region_set::try_subtract`) and heal them back in
- * (`free`, backed by `region_set::try_add`). Because it mutates the
- * caller's `region_set` in place, the exact same free-region accounting
- * that fed it can be hand straight to `buddy_allocator::init()` (or
- * folded in region-by-region) once a real page allocator is ready to
- * take over -- every early allocation already punched its hole out.
+ * free physical ranges. The boot memory map is typically the *full*
+ * authoritative record of installed/reserved RAM for the whole boot --
+ * other, unrelated code may still read it later, so
+ * `early_region_allocator` must not mutate it. Instead, `try_create()`
+ * takes an immutable snapshot of the seed `region_set` into its own,
+ * separate internal `region_set` at construction time; every subsequent
+ * `try_alloc`/`try_reserve`/`free` call only ever mutates that private
+ * copy. The seed `region_set` the allocator was built from is left
+ * completely untouched and can keep being read (or handed to something
+ * else) for as long as the caller likes.
  *
  * @code
  * auto map = structo::boot_memory_map<32>::try_from_dtb(dtb_blob);
  * // ... handle map.error() ...
  *
- * structo::early_region_allocator early(map->free);
+ * auto early = structo::early_region_allocator<32>::try_create(map->free);
+ * // ... handle early.error() ...
+ * // `map->free` itself is untouched by everything below.
  *
  * // Reserve a region whose address is already known (e.g. the kernel
  * // image itself, loaded by the bootloader before `free` was computed):
- * (void)early.try_reserve(kernel_phys_base, kernel_phys_size);
+ * (void)early->try_reserve(kernel_phys_base, kernel_phys_size);
  *
  * // Carve out scratch memory for early page tables, 4 KiB-aligned:
- * auto page_table_mem = early.try_alloc(16 * 4096, 4096);
+ * auto page_table_mem = early->try_alloc(16 * 4096, 4096);
  * // ... handle page_table_mem.error() ...
  *
  * // Once the real page allocator exists, seed it from what's left:
- * for (auto &region : map->free) {
+ * for (auto &region : early->regions()) {
  *   // buddy_allocator::init() each region, or feed region_set-size chunks in
  * }
  * @endcode
@@ -54,29 +56,47 @@ namespace structo {
 using namespace reloco;
 
 /**
- * @brief Non-owning, allocation-free physical-range allocator built
- * directly on top of a caller-owned `region_set<Capacity, PhysInt>`.
+ * @brief Allocation-free physical-range allocator tracking its own,
+ * private `region_set<Capacity, PhysInt>`, snapshotted from a seed
+ * `region_set` at construction time.
  *
  * Every operation here is simply a thin, bookkeeping-free wrapper
- * around the underlying `region_set`'s own `try_subtract`/`try_add` --
+ * around the internal `region_set`'s own `try_subtract`/`try_add` --
  * this class adds exactly one thing `region_set` doesn't already do on
  * its own: *finding* a free range of a requested size/alignment to
- * subtract in the first place (`try_alloc`'s best-fit search).
+ * subtract in the first place (`try_alloc`'s best-fit search). The seed
+ * `region_set` passed to `try_create()` is read once and never modified.
  *
- * @tparam Capacity Must match the `region_set` passed to the
- * constructor (enforced at compile time, not merely by convention).
+ * @tparam Capacity Must match the seed `region_set` passed to
+ * `try_create` (enforced at compile time, not merely by convention).
  * @tparam PhysInt Physical-address integer type (default: `uint64_t`).
  */
 template <size_t Capacity, typename PhysInt = uint64_t> class early_region_allocator {
 public:
   using region_set_type = region_set<Capacity, PhysInt>;
 
+  constexpr early_region_allocator() noexcept = default;
+
   /**
-   * @brief Binds this allocator to @p regions, mutated in place by
-   * every subsequent `try_alloc`/`try_reserve`/`free` call. @p regions
-   * must outlive this `early_region_allocator`.
+   * @brief Builds an allocator whose internal free-region bookkeeping
+   * starts as a copy of every region in @p seed. @p seed itself is only
+   * read here and is never mutated, by this call or by any later
+   * `try_alloc`/`try_reserve`/`free` on the returned allocator.
+   * @return `error::capacity_exceeded` if @p seed's regions can't all
+   * be copied in (should not happen: both sets share `Capacity`, so
+   * this can only occur if @p seed's own merging invariant was somehow
+   * violated via direct `inline_vector` access).
    */
-  constexpr explicit early_region_allocator(region_set_type &regions) noexcept : regions_(&regions) {}
+  [[nodiscard]] static result<early_region_allocator> try_create(const region_set_type &seed) noexcept {
+    early_region_allocator alloc;
+    for (size_t i = 0; i < seed.size(); ++i) {
+      auto add_res = alloc.regions_.try_add(seed[i].base, seed[i].size);
+      if (!add_res) {
+        return unexpected(add_res.error());
+      }
+    }
+    return alloc;
+  }
 
   /**
    * @brief Allocates @p size bytes aligned to @p alignment (must be a
@@ -96,8 +116,8 @@ public:
     PhysInt best_base = 0;
     PhysInt best_waste = 0;
 
-    for (size_t i = 0; i < regions_->size(); ++i) {
-      const auto &r = (*regions_)[i];
+    for (size_t i = 0; i < regions_.size(); ++i) {
+      const auto &r = regions_[i];
 
       PhysInt aligned_base = (r.base + (alignment - 1)) & ~(alignment - 1);
       if (aligned_base < r.base) {
@@ -126,7 +146,7 @@ public:
       return unexpected(error::allocation_failed);
     }
 
-    auto sub_res = regions_->try_subtract(best_base, size);
+    auto sub_res = regions_.try_subtract(best_base, size);
     if (!sub_res) {
       return unexpected(sub_res.error());
     }
@@ -152,45 +172,46 @@ public:
     if (!is_entirely_free(base, size)) {
       return unexpected(error::invalid_state);
     }
-    return regions_->try_subtract(base, size);
+    return regions_.try_subtract(base, size);
   }
 
   /**
-   * @brief Returns `[base, base + size)` back to the free set, merging
-   * with adjacent free regions exactly like `region_set::try_add`.
+   * @brief Returns `[base, base + size)` back to this allocator's own
+   * free set, merging with adjacent free regions exactly like
+   * `region_set::try_add`.
    */
-  result<void> free(PhysInt base, PhysInt size) noexcept { return regions_->try_add(base, size); }
+  result<void> free(PhysInt base, PhysInt size) noexcept { return regions_.try_add(base, size); }
 
-  /** @brief Whether the underlying `region_set` has no free regions left. */
-  [[nodiscard]] bool empty() const noexcept { return regions_->empty(); }
+  /** @brief Whether this allocator's internal free set is empty. */
+  [[nodiscard]] bool empty() const noexcept { return regions_.empty(); }
 
   /** @brief Total number of free bytes across every region. */
   [[nodiscard]] PhysInt free_bytes() const noexcept {
     PhysInt total = 0;
-    for (size_t i = 0; i < regions_->size(); ++i) {
-      total += (*regions_)[i].size;
+    for (size_t i = 0; i < regions_.size(); ++i) {
+      total += regions_[i].size;
     }
     return total;
   }
 
   /** @brief The single largest currently-free region (zero-sized if none). */
-  [[nodiscard]] memory_region<PhysInt> largest_region() const noexcept { return regions_->largest_region(); }
+  [[nodiscard]] memory_region<PhysInt> largest_region() const noexcept { return regions_.largest_region(); }
 
-  /** @brief The underlying `region_set` this allocator mutates. */
-  [[nodiscard]] region_set_type &regions() const noexcept { return *regions_; }
+  /** @brief This allocator's own, private free-region bookkeeping (not the seed it was built from). */
+  [[nodiscard]] const region_set_type &regions() const noexcept { return regions_; }
 
 private:
   [[nodiscard]] bool is_entirely_free(PhysInt base, PhysInt size) const noexcept {
     PhysInt end = base + size;
-    for (size_t i = 0; i < regions_->size(); ++i) {
-      if ((*regions_)[i].base <= base && (*regions_)[i].end() >= end) {
+    for (size_t i = 0; i < regions_.size(); ++i) {
+      if (regions_[i].base <= base && regions_[i].end() >= end) {
         return true;
       }
     }
     return false;
   }
 
-  region_set_type *regions_;
+  region_set_type regions_{};
 };
 
 } // namespace structo
