@@ -19,4 +19,5 @@ is a fixed-capacity collection of merged, non-overlapping `memory_region`s,
 used by [`boot_memory_map`](reference.md) and
 [`try_extract_memory`](fdt_memory.md) to describe installed/available RAM.
 
-See also: [`fdt_memory.md`](fdt_memory.md), [`phys_page.md`](phys_page.md).
+See also: [`fdt_memory.md`](fdt_memory.md), [`phys_page.md`](phys_page.md),
+[`early_region_allocator.md`](early_region_allocator.md).

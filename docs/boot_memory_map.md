@@ -29,3 +29,5 @@ auto seed = map->try_largest_free_region();
 See [`examples/boot_memory_map_demo.cpp`](../examples/boot_memory_map_demo.cpp)
 for a runnable demo, and [`fdt_memory.md`](fdt_memory.md)/
 [`region_set.md`](region_set.md) for the underlying building blocks.
+Once you have `free`, [`early_region_allocator.md`](early_region_allocator.md)
+is the allocator that bootstraps directly from it.

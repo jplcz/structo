@@ -313,6 +313,87 @@ public:
     }
   }
 
+  /**
+   * @brief "Un-frees" one specific page the allocator currently
+   * considers free, splitting its containing free block as needed and
+   * marking only that exact page allocated -- every sibling half
+   * produced by the split is returned to the free lists untouched.
+   *
+   * Unlike `allocate()`/`allocate_n()`/`allocate_constrained()`, which
+   * all let the allocator pick *which* physical pages to hand back,
+   * `reserve()` lets the caller demand one specific, already-known
+   * physical page. This is the common need when a page is discovered
+   * to already be in use strictly *after* `init()` has already carved
+   * the whole region into free blocks assuming it was available --
+   * e.g. a firmware/bootloader-reserved region only enumerated from
+   * ACPI/UEFI tables once the buddy allocator for the whole zone has
+   * already been built from a coarser memory map.
+   *
+   * @return `error::invalid_state` if @p p is not currently free --
+   * either because it is already allocated/reserved, or because it
+   * does not lie within any block this allocator currently tracks at
+   * all (e.g. outside the managed region, or never passed to `init()`).
+   */
+  [[nodiscard]] result<void> reserve(page_type p) noexcept {
+    RELOCO_ASSERT(!p.is_null(), "buddy_allocator: Attempted to reserve a null page");
+
+    size_t order = MaxOrder;
+    while (true) {
+      size_t block_pages = 1ULL << order;
+
+      for (auto os_page : free_areas_[order]) {
+        page_type block = page_type::from_os_page(os_page);
+        uint64_t block_pfn = block.pfn();
+
+        if (p.pfn() < block_pfn || p.pfn() >= block_pfn + block_pages) {
+          continue; // `p` is not inside this free block
+        }
+
+        // Found the free block containing `p`. Pull it off the free
+        // list whole, then split down one level at a time: whichever
+        // half does *not* contain `p` goes straight back to the free
+        // list at its own (smaller) order, and the half that *does*
+        // contain `p` is narrowed into on the next iteration.
+        free_areas_[order].remove(block.get_os_page());
+        block.set_buddy_free(false);
+
+        page_type current = block;
+        size_t current_order = order;
+        while (current_order > 0) {
+          current_order--;
+          size_t half_pages = 1ULL << current_order;
+
+          auto buddy_res = current.try_add(half_pages);
+          RELOCO_ASSERT(buddy_res.has_value(), "buddy_allocator: reserve split crossed illegal zone boundary");
+          page_type buddy = *buddy_res;
+
+          if (p.pfn() < buddy.pfn()) {
+            // `p` is in the lower half; the upper half is untouched.
+            buddy.set_buddy_order(static_cast<uint16_t>(current_order));
+            buddy.set_buddy_free(true);
+            free_areas_[current_order].push_front(buddy.get_os_page());
+          } else {
+            // `p` is in the upper half; the lower half is untouched.
+            current.set_buddy_order(static_cast<uint16_t>(current_order));
+            current.set_buddy_free(true);
+            free_areas_[current_order].push_front(current.get_os_page());
+            current = buddy;
+          }
+        }
+
+        current.set_buddy_order(0);
+        current.set_buddy_free(false);
+        return {};
+      }
+
+      if (order == 0)
+        break;
+      order--;
+    }
+
+    return unexpected(error::invalid_state);
+  }
+
   /** @brief Physical constraints applied when selecting a page range. */
   struct physical_constraint {
     uint64_t low_pfn{0};         // Minimum acceptable PFN

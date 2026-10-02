@@ -489,6 +489,89 @@ TEST_F(BuddyAllocatorTest, AllocateUpTo_InvalidArguments) {
   EXPECT_EQ(zero_res.error(), error::invalid_argument);
 }
 
+// ============================================================================
+// reserve()
+// ============================================================================
+
+TEST_F(BuddyAllocatorTest, ReserveSplitsContainingBlockDownToExactPage) {
+  test_allocator allocator;
+  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 16)); // Order 4 pool
+
+  // Reserve PFN 10, deep inside the single Order 4 (16-page) free block.
+  auto res = allocator.reserve(test_page::from_os_page(10));
+  ASSERT_TRUE(res.has_value());
+
+  // PFN 10 must now be allocated, as an exact Order 0 page.
+  EXPECT_FALSE(mock_ram[10].is_free);
+  EXPECT_EQ(mock_ram[10].buddy_order, 0);
+
+  // Every sibling split off along the way must have been returned to
+  // the free lists, untouched: [0..8) Order 3, [8..10) Order 1, 11 Order 0,
+  // [12..16) Order 2.
+  EXPECT_TRUE(mock_ram[0].is_free);
+  EXPECT_EQ(mock_ram[0].buddy_order, 3);
+
+  EXPECT_TRUE(mock_ram[8].is_free);
+  EXPECT_EQ(mock_ram[8].buddy_order, 1);
+
+  EXPECT_TRUE(mock_ram[11].is_free);
+  EXPECT_EQ(mock_ram[11].buddy_order, 0);
+
+  EXPECT_TRUE(mock_ram[12].is_free);
+  EXPECT_EQ(mock_ram[12].buddy_order, 2);
+}
+
+TEST_F(BuddyAllocatorTest, ReserveOfAnAlreadyAlignedOrderZeroBlock) {
+  test_allocator allocator;
+  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 2)); // Single Order 1 block
+
+  auto res = allocator.reserve(test_page::from_os_page(0));
+  ASSERT_TRUE(res.has_value());
+
+  EXPECT_FALSE(mock_ram[0].is_free);
+  EXPECT_EQ(mock_ram[0].buddy_order, 0);
+
+  // The buddy (PFN 1) must still be free, standing alone at Order 0.
+  EXPECT_TRUE(mock_ram[1].is_free);
+  EXPECT_EQ(mock_ram[1].buddy_order, 0);
+}
+
+TEST_F(BuddyAllocatorTest, ReserveFailsOnAlreadyAllocatedPage) {
+  test_allocator allocator;
+  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 16));
+
+  auto allocated = allocator.allocate(2); // Consumes PFN 0..3
+  ASSERT_TRUE(allocated.has_value());
+
+  auto res = allocator.reserve(test_page::from_os_page(1));
+  EXPECT_FALSE(res.has_value());
+  EXPECT_EQ(res.error(), error::invalid_state);
+}
+
+TEST_F(BuddyAllocatorTest, ReserveFailsOutsideManagedRegion) {
+  test_allocator allocator;
+  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 16));
+
+  // PFN 100 was never handed to init() at all.
+  auto res = allocator.reserve(test_page::from_os_page(100));
+  EXPECT_FALSE(res.has_value());
+  EXPECT_EQ(res.error(), error::invalid_state);
+}
+
+TEST_F(BuddyAllocatorTest, ReservedPageCanBeFreedBackNormally) {
+  test_allocator allocator;
+  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 16));
+
+  ASSERT_TRUE(allocator.reserve(test_page::from_os_page(10)).has_value());
+
+  // Freeing the reserved page back should coalesce it with its
+  // untouched siblings all the way back to the original Order 4 block.
+  allocator.free(test_page::from_os_page(10), 0);
+
+  EXPECT_TRUE(mock_ram[0].is_free);
+  EXPECT_EQ(mock_ram[0].buddy_order, 4);
+}
+
 } // namespace
 
 #endif

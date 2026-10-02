@@ -23,6 +23,14 @@ blocks it can; `allocate()`/`allocate_n()`/`allocate_constrained()` split
 blocks on demand and `free()`/`free_n()` coalesce them back, including a
 `physical_constraint` path for DMA/hardware-mandated low-PFN, alignment,
 and boundary-crossing rules, and an opportunistic `allocate_up_to()` for
-greedy best-effort allocation.
+greedy best-effort allocation. `reserve(page)` "un-frees" one specific,
+caller-chosen page that the allocator currently considers free --
+splitting its containing block down as needed while returning every
+untouched sibling half back to the free lists -- for retroactively
+marking a page in-use once it's discovered to be reserved (e.g. a
+firmware/ACPI table) only *after* `init()` already assumed the whole
+region was free.
 
-See also: [`phys_page.md`](phys_page.md), [`region_set.md`](region_set.md).
+See also: [`phys_page.md`](phys_page.md), [`region_set.md`](region_set.md),
+[`early_region_allocator.md`](early_region_allocator.md) (the earlier-boot
+allocator this one typically takes over from).
