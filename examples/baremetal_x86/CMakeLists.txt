@@ -67,6 +67,7 @@ endforeach()
 add_executable(baremetal_x86_demo
     boot.s
     multiboot_header.cpp
+    multiboot1_header.cpp
     panic.cpp
     kmain.cpp
     thirdparty/freebsd_libc/strlen.c
@@ -188,3 +189,23 @@ if(GRUB_MKRESCUE)
         )
     endif()
 endif()
+
+# A second, much simpler convenience target: QEMU's own `-kernel` loader
+# understands the Multiboot *1* header `multiboot1_header.cpp` embeds, so
+# `qemu-system-i386` can load this exact same ELF image directly -- no
+# GRUB/ISO/OVMF detour at all. See README.md for why the ISO/OVMF path
+# above exists in the first place (Multiboot 2 has no such shortcut).
+find_program(QEMU_SYSTEM_I386 qemu-system-i386)
+if(QEMU_SYSTEM_I386)
+    add_custom_target(run_baremetal_x86_demo_mb1
+        COMMAND ${QEMU_SYSTEM_I386}
+            -kernel "$<TARGET_FILE:baremetal_x86_demo>"
+            -m 256
+            -serial stdio
+            -no-reboot
+        DEPENDS baremetal_x86_demo
+        COMMENT "Booting baremetal_x86_demo.elf directly under qemu-system-i386 (Multiboot 1)"
+        USES_TERMINAL
+    )
+endif()
+
