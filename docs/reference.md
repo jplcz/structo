@@ -24,6 +24,7 @@ exists and where.
 | `hw/rng_combinator.hpp` | `structo::hw::hw_rng_combinator` | Combines several `hw_rng_ref` sources (e.g. a real hardware RNG plus weak fallback jitter sources) by `XOR`-folding every successful draw and avalanche-mixing the result; itself bindable through another `hw_rng_ref` |
 | `hw/timer_ref.hpp` | `structo::hw::timer_ref`, `structo::hw::timer_traits<Backend>`, `structo::hw::timer_mode`, `structo::hw::timer_capabilities` | Type-erased, non-owning handle over a hardware countdown/interval timer -- arm one-shot/periodic, cancel, is_active, poll for expiry, query remaining time/capabilities -- via a customizable backend; `try_wait`/`wait` follow Rust `embedded-hal`'s `nb::Result` non-blocking-poll shape and periods/readback use `reloco::duration` |
 | `async_kernel_object.hpp` | `async_kernel_object<Traits, Capacity>` | Memory-safe, owning base for any kernel object whose completion fires asynchronously (interrupt, other CPU, softirq, timer-wheel sweep, ...) -- `try_submit`/`cancel`/`drain`/`deactivate` plus `is_pending`/`is_active`/`is_firing`, atomic `callout(9)`-style cancel/drain semantics, via a compile-time `Traits::submit`/`cancel` policy; subsystem-agnostic base for a future `callout`-like timer object |
+| `callout.hpp` | `callout<Subsystem, Capacity>` | FreeBSD-`callout(9)`-like one-shot/periodic deferred callback built on `async_kernel_object` -- `reset`/`reset_periodic`/`stop`/`drain`/`deactivate`/`pending`/`active`/`firing`, callback invoked as `void(callout &)`, scheduling policy supplied by a `Subsystem` ("callout subsystem") implementing `submit(Obj &, reloco::duration)`/`cancel(Obj &)` |
 | `pfn_translator.hpp` | `phys_pfn<SpaceTag, PageTraits, PhysInt>` | Typed physical page-frame number and address conversion |
 | `phys_page.hpp` | `page_traits<Size, Shift>`, `os_traits_base<Derived, OsPage>`, `page_view<PageTraits, OsTraits>` | Page-size traits and an OS-page-backed physical page view |
 | `phys_translator.hpp` | `phys_translator<Policy>` | Policy-based virtual/physical address translator |
@@ -86,6 +87,7 @@ exists and where.
 - [`hw_rng.md`](hw_rng.md) -- type-erased hardware RNG handle, per-architecture backends, and the entropy-source combinator
 - [`timer_ref.md`](timer_ref.md) -- type-erased hardware countdown/interval timer, in `include/structo/hw/`
 - [`async_kernel_object.md`](async_kernel_object.md) -- memory-safe, owning base for any asynchronously-completing kernel object (subsystem-agnostic, timer-independent)
+- [`callout.md`](callout.md) -- FreeBSD-`callout(9)`-like one-shot/periodic deferred callback built on `async_kernel_object`
 - [`prng.md`](prng.md) -- `splitmix64`/`xoshiro256ss`/`pcg32` pseudo-random generators, seedable from a hardware RNG
 
 ## OS-development building blocks (from `jplcz_reloco`)

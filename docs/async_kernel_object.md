@@ -152,8 +152,8 @@ structo::async_kernel_object<fake_subsystem_traits> obj;
 (void)obj.drain(); // before `obj` goes out of scope
 ```
 
-See also: [`timer_ref.md`](timer_ref.md) (a type-erased, non-owning
-hardware timer handle this header is independent of -- a future
-callout-like object is expected to be built on top of
-`async_kernel_object` and could compose with `timer_ref`-backed
-subsystems).
+See also: [`callout.md`](callout.md) (a FreeBSD-`callout(9)`-like
+one-shot/periodic deferred callback built directly on top of this
+header), [`timer_ref.md`](timer_ref.md) (a type-erased, non-owning
+hardware timer handle this header is independent of, but which a
+`callout` subsystem could compose with to actually drive `fire()`).
