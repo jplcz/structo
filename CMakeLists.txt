@@ -268,6 +268,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_target_ptr.cpp
         tests/test_io_address.cpp
         tests/test_io_space_ref.cpp
+        tests/test_mmio_space.cpp
         tests/test_uart_ref.cpp
         tests/test_timer_ref.cpp
         tests/test_irqc_ref.cpp
