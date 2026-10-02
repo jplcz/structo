@@ -270,6 +270,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_io_space_ref.cpp
         tests/test_uart_ref.cpp
         tests/test_timer_ref.cpp
+        tests/test_irqc_ref.cpp
         tests/test_framebuffer.cpp
         tests/test_console_ref.cpp
         tests/test_vga_text_console.cpp
