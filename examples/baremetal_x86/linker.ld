@@ -39,6 +39,19 @@ SECTIONS
     *(.data*)
   }
 
+  /* Global/static C++ objects with non-trivial constructors (see
+   * `crt0.cpp`, called from `boot.s` before `kmain`): the compiler emits
+   * one function-pointer entry per translation unit's constructors here,
+   * in link order. `__init_array_start`/`__init_array_end` bound the
+   * array for `crt0.cpp` to walk; no `.fini_array` counterpart is kept
+   * since this kernel never exits to run global destructors. */
+  .init_array : ALIGN(4) {
+    __init_array_start = .;
+    KEEP(*(.init_array))
+    KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*)))
+    __init_array_end = .;
+  }
+
   .bss : ALIGN(4K) {
     *(COMMON)
     *(.bss*)
@@ -48,5 +61,6 @@ SECTIONS
     *(.comment)
     *(.eh_frame*)
     *(.note*)
+    *(.fini_array*)
   }
 }

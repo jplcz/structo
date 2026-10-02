@@ -66,9 +66,11 @@ endforeach()
 
 add_executable(baremetal_x86_demo
     boot.s
+    crt0.cpp
     multiboot_header.cpp
     multiboot1_header.cpp
     panic.cpp
+    monotonic_allocator.cpp
     kmain.cpp
     thirdparty/freebsd_libc/strlen.c
     thirdparty/freebsd_libc/memchr.c
@@ -95,8 +97,15 @@ target_include_directories(baremetal_x86_demo PRIVATE
 # anything else, so that declaration (and RELOCO_KERNEL_PANIC's
 # definition) is visible before the first reloco header is ever parsed,
 # regardless of this file's own #include order.
+#
+# RELOCO_DEFAULT_ALLOCATOR_CUSTOM (see monotonic_allocator.hpp/.cpp)
+# suppresses reloco's own built-in reloco::default_allocator() (the
+# process heap, via std::malloc -- unavailable in this -nostdlib build
+# anyway) so monotonic_allocator.cpp's single out-of-line definition is
+# the only one that exists.
 target_compile_definitions(baremetal_x86_demo PRIVATE
     RELOCO_KERNEL=1
+    RELOCO_DEFAULT_ALLOCATOR_CUSTOM=1
     MICROFMT_DISABLE_ASSERT_STDIO=1
 )
 target_compile_options(baremetal_x86_demo PRIVATE
@@ -106,6 +115,13 @@ target_compile_options(baremetal_x86_demo PRIVATE
     $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>
     $<$<COMPILE_LANGUAGE:CXX>:-fno-stack-protector>
     $<$<COMPILE_LANGUAGE:CXX>:-fno-pic>
+    # No threads exist in this freestanding kernel, and -nostdlib has no
+    # libsupc++ to supply the __cxa_guard_acquire/release pair GCC would
+    # otherwise emit to make function-local statics (see
+    # monotonic_allocator.cpp's heap_allocator()) thread-safe: without
+    # this flag, the very first such static anywhere in the program
+    # would fail to link.
+    $<$<COMPILE_LANGUAGE:CXX>:-fno-threadsafe-statics>
     $<$<COMPILE_LANGUAGE:CXX>:-mno-sse>
     $<$<COMPILE_LANGUAGE:CXX>:-mno-mmx>
     $<$<COMPILE_LANGUAGE:CXX>:-mno-80387>

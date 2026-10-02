@@ -10,6 +10,8 @@
  * arguments (cdecl: pushed right-to-left).
  */
 
+// clang-format off
+
 .section .bss
 .align 16
 stack_bottom:
@@ -23,6 +25,17 @@ _start:
   cli
   mov $stack_top, %esp
   mov %esp, %ebp
+
+  /* eax/ebx (the bootloader magic/boot-info address) must survive this
+   * call -- crt0.cpp's structo_run_global_constructors() takes no
+   * arguments and every global constructor it runs is itself
+   * cdecl/caller-saves-compliant, so plain registers (not the stack)
+   * are enough here. */
+  push %ebx
+  push %eax
+  call structo_run_global_constructors
+  pop %eax
+  pop %ebx
 
   /* kmain(std::uint32_t magic, std::uint32_t info_phys_addr) */
   push %ebx

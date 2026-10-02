@@ -27,11 +27,13 @@ build it entirely on its own, from this directory.
 | File | Role |
 |---|---|
 | `panic.hpp` / `panic.cpp` | Declares/defines `baremetal_panic`, wired up as `RELOCO_KERNEL_PANIC` (see below) -- writes directly to the VGA buffer and halts, since it must work even if the rest of the kernel's state is suspect. |
-| `boot.s` | The real entry point (`_start`): sets up a stack, then calls `kmain(magic, info_phys_addr)` with the values the bootloader left in `eax`/`ebx`, regardless of which Multiboot protocol it used. |
+| `boot.s` | The real entry point (`_start`): sets up a stack, calls `crt0.cpp`'s `structo_run_global_constructors()`, then calls `kmain(magic, info_phys_addr)` with the values the bootloader left in `eax`/`ebx`, regardless of which Multiboot protocol it used. |
+| `crt0.cpp` | Runs every translation unit's `.init_array` global-constructor entries (see `linker.ld`), exactly as a hosted `crt1.o` would before `main()` -- without this, `kmain.cpp`'s/`monotonic_allocator.cpp`'s global objects' constructors would never run. |
+| `monotonic_allocator.hpp` / `monotonic_allocator.cpp` | A basic monotonic (bump-pointer) `reloco::stack_allocator` over one fixed static arena, backing both `reloco::default_allocator()` (via `RELOCO_DEFAULT_ALLOCATOR_CUSTOM`) and global `operator new`/`operator delete` -- this `-nostdlib` build has neither a process heap nor a libstdc++-provided default otherwise. |
 | `multiboot1_header.cpp` | Embeds a hand-rolled, classic Multiboot 1 header (magic `0x1BADB002`) in a `.multiboot1` section, purely so `qemu-system-i386 -kernel` can load this image directly (see below). |
 | `multiboot_header.cpp` | Embeds `structo::arch::x86::make_basic_header()`'s result in a dedicated `.multiboot` linker section so a real Multiboot2-aware bootloader (GRUB2) finds it within the first 32 KiB of the image. |
 | `kmain.cpp` | The actual demo: validates whichever bootloader magic is present, binds VGA text console + CRTC cursor + COM1 `ns16550_uart` (mirroring all console output to serial), walks the boot information structure (via `multiboot2_boot_info_reader` for Multiboot 2, or a small local helper for Multiboot 1 -- see below), prints a banner and the memory map, then halts. |
-| `linker.ld` | Places `.multiboot1` then `.multiboot` first, sets the entry point, and lays out the rest of a flat, non-relocatable image loaded at `1 MiB` (the conventional Multiboot load address). |
+| `linker.ld` | Places `.multiboot1` then `.multiboot` first, sets the entry point, lays out a `.init_array` section for `crt0.cpp` (see above), and lays out the rest of a flat, non-relocatable image loaded at `1 MiB` (the conventional Multiboot load address). |
 | `thirdparty/freebsd_libc/` | A handful of FreeBSD libc string routines (see below), vendored because this demo links `-nostdlib` yet still needs `strlen`/`memchr`/etc., which libstdc++'s own `std::char_traits<char>` implementation calls internally. |
 | `toolchain-i686.cmake` | CMake toolchain file selecting the `i686-linux-gnu-{gcc,g++}` cross-compiler. |
 

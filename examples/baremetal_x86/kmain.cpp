@@ -26,8 +26,18 @@
  * The serial mirror exists so the demo is verifiable headlessly (e.g.
  * `qemu-system-i386 -kernel ... -display none -serial stdio`), not just
  * by eye against the VGA text buffer.
+ *
+ * `boot.s` also calls `crt0.cpp`'s `structo_run_global_constructors()`
+ * (running every translation unit's `.init_array` entries) before
+ * `kmain` itself, and `monotonic_allocator.cpp` provides a monotonic
+ * (bump-pointer) allocator backing both global `operator new` (used by
+ * `g_boot_proof` below, proof that it's already up before any global
+ * constructor runs) and `reloco::default_allocator()` -- exercised here
+ * by `kmain`'s own `reloco::vector<std::uint64_t>`, collecting every
+ * "available" memory-map region's length as it's walked.
  */
 
+#include "monotonic_allocator.hpp"
 #include "panic.hpp"
 
 #include <structo/arch/x86/multiboot2.hpp>
@@ -40,6 +50,9 @@
 
 #include <microfmt/microfmt.hpp>
 #include <microfmt/sinks/tee_sink.hpp>
+
+#include <reloco/iterator.hpp>
+#include <reloco/vector.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -86,7 +99,38 @@ static_assert(sizeof(multiboot1_mmap_entry) == 24);
 constexpr std::uint32_t multiboot1_info_flag_mem_map = 1u << 6;
 constexpr std::uint32_t multiboot1_mmap_type_available = 1;
 
-void dump_multiboot1_memory_map(reloco::sink out, std::uintptr_t info_phys_addr) noexcept {
+/**
+ * @brief Rust-style, `reloco::iterator_adaptor`-derived walk over a legacy
+ * Multiboot 1 `mmap_addr`/`mmap_length` BIOS memory map, mirroring
+ * `structo::arch::x86::multiboot2_mmap_iterator`'s shape (see
+ * `multiboot2.hpp`) so both bootloader protocols are consumed through the
+ * same `.for_each()`-style call, not a hand-rolled byte-offset `for` loop.
+ */
+class multiboot1_mmap_iterator : public reloco::iterator_adaptor<multiboot1_mmap_iterator, multiboot1_mmap_entry> {
+public:
+  using item_type = multiboot1_mmap_entry;
+
+  multiboot1_mmap_iterator(std::uintptr_t mmap_addr, std::uint32_t mmap_length) noexcept
+      : addr_(mmap_addr), length_(mmap_length) {}
+
+  [[nodiscard]] reloco::optional<item_type> next_impl() noexcept {
+    if (offset_ >= length_)
+      return reloco::nullopt;
+    const auto *entry = reinterpret_cast<const multiboot1_mmap_entry *>(addr_ + offset_);
+    // Each entry's actual on-disk size is `size + 4` (the `size` field
+    // itself isn't counted), per spec.
+    offset_ += entry->size + 4;
+    return reloco::optional<item_type>(*entry);
+  }
+
+private:
+  std::uintptr_t addr_;
+  std::uint32_t length_;
+  std::uint32_t offset_ = 0;
+};
+
+void dump_multiboot1_memory_map(reloco::sink out, std::uintptr_t info_phys_addr,
+                                reloco::vector<std::uint64_t> &available_lengths) noexcept {
   const auto *info_bytes = reinterpret_cast<const std::uint8_t *>(info_phys_addr);
   std::uint32_t flags{};
   __builtin_memcpy(&flags, info_bytes + 0, sizeof(flags));
@@ -101,21 +145,31 @@ void dump_multiboot1_memory_map(reloco::sink out, std::uintptr_t info_phys_addr)
   __builtin_memcpy(&mmap_addr, info_bytes + 48, sizeof(mmap_addr));
 
   (void)microfmt::format_to(out, "Firmware memory map:\n");
-  for (std::uint32_t offset = 0; offset < mmap_length;) {
-    const auto *entry =
-        reinterpret_cast<const multiboot1_mmap_entry *>(static_cast<std::uintptr_t>(mmap_addr) + offset);
-    bool available = entry->type == multiboot1_mmap_type_available;
-    // Hex only, deliberately: decimal formatting of a `uint64_t` on
-    // 32-bit x86 needs a software 64-bit divide (`__udivdi3`), which
-    // this freestanding, `-nostdlib` build has no libgcc to supply.
-    (void)microfmt::format_to(out, "  base={:#018x} length={:#018x} {}\n", entry->base_addr, entry->length,
-                              available ? "available" : "reserved");
-
-    // Each entry's actual on-disk size is `size + 4` (the `size` field
-    // itself isn't counted), per spec.
-    offset += entry->size + 4;
-  }
+  multiboot1_mmap_iterator(static_cast<std::uintptr_t>(mmap_addr), mmap_length)
+      .for_each([&](const multiboot1_mmap_entry &entry) {
+        bool available = entry.type == multiboot1_mmap_type_available;
+        // Hex only, deliberately: decimal formatting of a `uint64_t` on
+        // 32-bit x86 needs a software 64-bit divide (`__udivdi3`), which
+        // this freestanding, `-nostdlib` build has no libgcc to supply.
+        (void)microfmt::format_to(out, "  base={:#018x} length={:#018x} {}\n", entry.base_addr, entry.length,
+                                  available ? "available" : "reserved");
+        if (available)
+          (void)available_lengths.try_push_back(entry.length);
+      });
 }
+
+// Exists purely to prove, at runtime, that `.init_array` global
+// constructors really do run before `kmain` (see `crt0.cpp`), and that
+// `operator new`/the monotonic allocator (`monotonic_allocator.cpp`)
+// are already usable from inside one. `marker` is heap-allocated
+// (rather than just a plain data member) specifically so this exercises
+// `new`, not merely construction order.
+struct boot_proof {
+  unsigned *marker;
+
+  boot_proof() noexcept : marker(new unsigned(0xC0FFEEu)) {}
+};
+boot_proof g_boot_proof;
 
 } // namespace
 
@@ -161,6 +215,17 @@ extern "C" [[noreturn]] void kmain(std::uint32_t magic, std::uint32_t info_phys_
 
   (void)microfmt::format_to(out, "structo bare-metal x86 Multiboot demo\n");
   (void)microfmt::format_to(out, "================================================\n");
+  (void)microfmt::format_to(out, "Global constructors + monotonic allocator OK (marker={:#x}).\n",
+                            *g_boot_proof.marker);
+
+  // `reloco::vector<std::uint64_t>::try_create()` allocates through
+  // `reloco::default_allocator()` -- `monotonic_allocator.cpp`'s override
+  // -- collecting every "available" memory-map region's length below as
+  // proof that a real allocator-backed `reloco` container works here,
+  // not just raw `operator new` (see `g_boot_proof` above).
+  auto available_lengths_result = reloco::vector<std::uint64_t>::try_create();
+  RELOCO_ASSERT(available_lengths_result.has_value(), "vector<uint64_t>::try_create");
+  auto &available_lengths = *available_lengths_result;
 
   if (magic == structo::arch::x86::multiboot2_bootloader_magic) {
     (void)microfmt::format_to(out, "Multiboot2 magic OK.\n");
@@ -172,34 +237,42 @@ extern "C" [[noreturn]] void kmain(std::uint32_t magic, std::uint32_t info_phys_
       (void)microfmt::format_to(out, "FATAL: failed to parse Multiboot2 boot info\n");
     } else {
       (void)microfmt::format_to(out, "Firmware memory map:\n");
-      for (auto tag_r : *reader) {
-        if (!tag_r)
-          break;
-        const auto &tag = *tag_r;
-        if (tag.type != structo::arch::x86::multiboot2_tag_type::memory_map)
-          continue;
-
-        auto entries_r = structo::arch::x86::multiboot2_mmap_entries(tag);
-        if (!entries_r)
-          continue;
-        for (auto entry_r : *entries_r) {
-          if (!entry_r)
-            break;
-          const auto &entry = *entry_r;
-          // Hex only, deliberately: decimal formatting of a `uint64_t` on
-          // 32-bit x86 needs a software 64-bit divide (`__udivdi3`), which
-          // this freestanding, `-nostdlib` build has no libgcc to supply.
-          (void)microfmt::format_to(out, "  base={:#018x} length={:#018x} {}\n", entry.base_addr, entry.length,
-                                    entry.is_available() ? "available" : "reserved");
-        }
-      }
+      // `*reader` already derives from `reloco::iterator_adaptor` (see
+      // `multiboot2.hpp`), so the "find every `memory_map` tag, ignoring
+      // any trailing parse error" walk is a `.filter().for_each()` chain
+      // rather than a manual range-for with an explicit `break`/`continue`
+      // -- a malformed tag still surfaces as a filtered-out `reloco::error`
+      // item exactly once, and the adaptor is then permanently exhausted,
+      // so `for_each()` drains cleanly without needing an early-break.
+      reader
+          ->filter([](const auto &tag_r) {
+            return tag_r.has_value() && tag_r->type == structo::arch::x86::multiboot2_tag_type::memory_map;
+          })
+          .for_each([&](const auto &tag_r) {
+            auto entries_r = structo::arch::x86::multiboot2_mmap_entries(*tag_r);
+            if (!entries_r)
+              return;
+            entries_r->for_each([&](const auto &entry_r) {
+              if (!entry_r)
+                return;
+              const auto &entry = *entry_r;
+              // Hex only, deliberately: decimal formatting of a
+              // `uint64_t` on 32-bit x86 needs a software 64-bit divide
+              // (`__udivdi3`), which this freestanding, `-nostdlib`
+              // build has no libgcc to supply.
+              (void)microfmt::format_to(out, "  base={:#018x} length={:#018x} {}\n", entry.base_addr, entry.length,
+                                        entry.is_available() ? "available" : "reserved");
+              if (entry.is_available())
+                (void)available_lengths.try_push_back(entry.length);
+            });
+          });
     }
   } else if (magic == multiboot1_bootloader_magic) {
     // The legacy path: e.g. `qemu-system-i386 -kernel ...` directly (see
     // `multiboot1_header.cpp`/README.md) -- QEMU's own built-in loader
     // never implemented Multiboot 2.
     (void)microfmt::format_to(out, "Multiboot1 magic OK.\n");
-    dump_multiboot1_memory_map(out, static_cast<std::uintptr_t>(info_phys_addr));
+    dump_multiboot1_memory_map(out, static_cast<std::uintptr_t>(info_phys_addr), available_lengths);
   } else {
     (void)microfmt::format_to(out, "FATAL: bad bootloader magic {:#x} (expected {:#x} or {:#x})\n", magic,
                               structo::arch::x86::multiboot2_bootloader_magic, multiboot1_bootloader_magic);
@@ -208,6 +281,16 @@ extern "C" [[noreturn]] void kmain(std::uint32_t magic, std::uint32_t info_phys_
       asm volatile("cli; hlt");
     }
   }
+
+  // Rust `Iterator::sum()`, via the vector's own `.iter()` convenience
+  // (equivalent to `reloco::iter(available_lengths)`) -- a left-fold over
+  // `operator+` draining a fresh borrowing iterator, not a manual indexed
+  // `for` loop.
+  std::uint64_t total_available = available_lengths.iter().sum();
+  (void)microfmt::format_to(out,
+                            "reloco::vector<uint64_t> (default_allocator-backed): {} available region(s), "
+                            "total={:#018x} bytes.\n",
+                            available_lengths.size(), total_available);
 
   (void)microfmt::format_to(out, "Demo complete -- halting.\n");
 
