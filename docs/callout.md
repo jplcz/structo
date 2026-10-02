@@ -136,6 +136,8 @@ structo::callout<fake_subsystem> co;
 
 See [`examples/callout_scheduler_demo.cpp`](../examples/callout_scheduler_demo.cpp)
 for a runnable demo of a toy single-core callout subsystem built on
-`reloco::c_tailq` and `hook_type`, and
-[`async_kernel_object.md`](async_kernel_object.md) (the generic,
-subsystem-agnostic base this header builds on).
+`reloco::c_tailq` and `hook_type`, [`runqueue.md`](runqueue.md) for
+pluggable FIFO/priority-list/priority-bucket runqueue policies a
+`Subsystem` could schedule due callouts with instead of a single sorted
+list, and [`async_kernel_object.md`](async_kernel_object.md) (the
+generic, subsystem-agnostic base this header builds on).
