@@ -112,6 +112,18 @@ TEST_F(CpuMaskTest, WordAccessorsRoundTrip) {
   EXPECT_FALSE(m.try_word(core_mask::word_count).has_value());
 }
 
+TEST_F(CpuMaskTest, WordsSpanDecaysOverEveryBackingWord) {
+  core_mask m;
+  m.set(0);
+  m.set(63);
+  m.set(64);
+
+  auto words = m.words();
+  ASSERT_EQ(words.size(), core_mask::word_count);
+  EXPECT_EQ(words[0], m.word(0));
+  EXPECT_EQ(words[1], m.word(1));
+}
+
 TEST_F(CpuMaskTest, UnionIntersectionDifferenceSymmetricDifference) {
   core_mask a;
   a.set(1);

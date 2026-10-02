@@ -137,7 +137,9 @@
 #include <reloco/detail/assert.hpp>
 #include <reloco/error.hpp>
 #include <reloco/expected.hpp>
+#include <reloco/lifetime.hpp>
 #include <reloco/optional.hpp>
+#include <reloco/span.hpp>
 
 #if !defined(__GNUC__) && !defined(__clang__)
 #error "cpu_mask's atomic_* operations require GCC or Clang (__atomic_* builtins)"
@@ -315,6 +317,20 @@ public:
       return unexpected(error::out_of_range);
     }
     return words_[index];
+  }
+
+  /**
+   * @brief A non-owning, `word_count`-long view over this mask's raw
+   * backing words (word `i` holds CPUs `[i * 64, i * 64 + 64)`),
+   * letting any `MaxCpus`-templated `cpu_mask` "decay" to a
+   * type-erased word sequence for an API (e.g. `irqc_ref::send_ipi`)
+   * that does not want to be templated on `Tag`/`MaxCpus` itself.
+   * `&`-qualified (and `RELOCO_LIFETIMEBOUND`) since the returned span
+   * borrows this mask's own storage: it must not outlive it, and may
+   * not be taken from a temporary.
+   */
+  [[nodiscard]] constexpr span<const std::uint64_t> words() const & noexcept RELOCO_LIFETIMEBOUND {
+    return span<const std::uint64_t>(words_, word_count);
   }
 
   // ---------------------------------------------------------------------------

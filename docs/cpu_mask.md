@@ -127,6 +127,10 @@ data race like any other.
 - `set`/`clear`/`test`/`toggle` (checked/`try_`/`unsafe_` tri-tier) --
   per-CPU accessors.
 - `word(index)`/`try_word(index)` -- raw backing-word access.
+- `words()` -- `&`-qualified, `reloco::span<const std::uint64_t>`-
+  returning view over every backing word; lets this mask "decay" to a
+  type-erased word sequence for an API not templated on `Tag`/`MaxCpus`
+  (e.g. `hw::irqc_ref::send_ipi`'s `target_mask` parameter).
 - `count()`, `any()`, `none()`, `all()` -- whole-mask queries.
 - `lowest_set()`/`lowest_set_from(start)`, `highest_set()` -- bit-scan
   queries, `reloco::optional<std::size_t>`-returning.

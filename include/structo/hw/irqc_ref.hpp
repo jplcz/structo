@@ -30,6 +30,7 @@
  * | `PIC_MAP_INTR` | `irqc_ref::map_intr` |
  * | `PIC_BIND` (`assign_cpu`) | `irqc_ref::assign_cpu` |
  * | `PIC_PRE_ITHREAD`/`PIC_POST_ITHREAD`/`PIC_POST_FILTER` | `irqc_ref::pre_ithread`/`post_ithread`/`post_filter` |
+ * | *(not a FreeBSD `INTRNG` concept)* | `irqc_ref::assign_security_domain`/`send_ipi` |
  *
  * What is deliberately *not* ported: FreeBSD's ithread scheduling itself
  * (there is no kernel thread here to schedule -- `pre_ithread`/
@@ -77,6 +78,43 @@
  * line's `.source` member -- every other `irqc_traits` operation then
  * takes/returns plain `irq_source &`, so the backend's own extra fields
  * never need to appear in `irqc_ref`'s type-erased surface at all.
+ *
+ * ## Security domains and domain-targeted IPIs (ARM TrustZone-inspired)
+ *
+ * Real-world PICs on TrustZone-capable cores (every ARM GICv2/v3) are
+ * not a single flat namespace of interrupts: each source additionally
+ * belongs to a *security domain* (GIC "Group 0"/secure, "Group 1"/
+ * non-secure, and -- on an Arm CCA/RME-aware GIC -- further realm
+ * partitions), and software running in one domain cannot unmask or
+ * redirect a source that belongs to another. `irq_security_domain` is
+ * `structo`'s generalization of that: a thin, type-safe wrapper around
+ * a single backend-defined `std::uint8_t` domain identifier (see its
+ * own docs below for why it is deliberately not a fixed secure/
+ * non-secure `enum class`), which every `irq_source` now carries
+ * (`irq_source::security_domain()`, default domain `0`). An
+ * `irqc_traits<Backend>` may optionally implement
+ * `assign_security_domain` to actually move a source between domains at
+ * the controller (e.g. flipping a GIC's `GICD_IGROUPR`/`GICD_IGRPMODR`
+ * bit for that source's INTID), and `send_ipi` to send a
+ * domain-targeted inter-processor interrupt to any subset of logical
+ * CPUs in one call -- a GIC Software Generated Interrupt (SGI) carries
+ * both a target-CPU list/affinity-routing field and an `NSATT` bit
+ * determining whether it lands in each target core's secure or
+ * non-secure state, exactly what `send_ipi(target_mask, domain,
+ * ipi_id)` models. `target_mask` is a `span<const std::uint64_t>` view
+ * over raw bitmask words (word `i` holds CPUs `[i * 64, i * 64 + 64)`),
+ * the same raw, allocation-free IPI-target convention
+ * `asid_allocator.hpp`'s own TLB shootdown guide uses, generalized to
+ * any CPU count instead of a per-CPU loop -- `arch::cpu_mask<Tag,
+ * MaxCpus>::words()` "decays" directly into it, and a backend with a
+ * hardware target-list/affinity-routing mechanism (e.g. a GICv2 CPU
+ * target list, or GICv3 affinity-routed `1-of-N`/list targeting) can
+ * issue a single broadcast write instead of one `send_ipi` call per
+ * target CPU. Both `send_ipi` and `assign_security_domain` are
+ * independently optional, exactly like `assign_cpu`: a backend with no
+ * TrustZone/security-domain concept at
+ * all simply does not implement them, and every caller through them
+ * fails with `error::unsupported_operation`.
  *
  * ## Rust-inspired API shape
  *
@@ -126,6 +164,10 @@
  *
  * @code
  * static reloco::result<void> assign_cpu(my_pic &, structo::hw::irq_source &, std::size_t cpu) noexcept;
+ * static reloco::result<void> assign_security_domain(my_pic &, structo::hw::irq_source &,
+ *                                                    structo::hw::irq_security_domain) noexcept;
+ * static reloco::result<void> send_ipi(my_pic &, reloco::span<const std::uint64_t> target_mask,
+ *                                      structo::hw::irq_security_domain, std::uint32_t ipi_id) noexcept;
  * static reloco::result<void> pre_ithread(my_pic &, structo::hw::irq_source &) noexcept;
  * static reloco::result<void> post_ithread(my_pic &, structo::hw::irq_source &) noexcept;
  * static reloco::result<void> post_filter(my_pic &, structo::hw::irq_source &) noexcept;
@@ -296,14 +338,68 @@ struct irq_map_data {
 };
 
 // ============================================================================
+// Security Domains
+// ============================================================================
+
+/**
+ * @brief A thin, type-safe wrapper around a single `std::uint8_t`
+ * security-domain identifier, inspired by ARM TrustZone's GIC Group
+ * 0/Group 1 (secure/non-secure) interrupt partitioning (and, more
+ * generally, Arm CCA/RME-style realm partitioning with more than two
+ * domains).
+ *
+ * Deliberately *not* a fixed secure/non-secure `enum class`: real
+ * controllers disagree on how many domains exist and what each one
+ * means (a plain GICv2/v3 has exactly two -- secure and non-secure --
+ * but a CCA-aware GIC or a vendor-specific partition scheme may have
+ * more), so the meaning of a given `std::uint8_t` value is entirely up
+ * to whichever `irqc_traits<Backend>` specialization interprets it; this
+ * type only provides the type-safety/equality boilerplate around it. A
+ * caller is free to define its own named constants for whatever domains
+ * its platform actually has, e.g.:
+ *
+ * @code
+ * namespace my_platform {
+ * inline constexpr auto secure_domain = structo::hw::irq_security_domain{0};
+ * inline constexpr auto non_secure_domain = structo::hw::irq_security_domain{1};
+ * }
+ * @endcode
+ *
+ * Default-constructed to domain `0`, matching `irq_source`'s own
+ * default (an unarmed source starts in whatever domain `0` means on the
+ * target platform, typically secure/trusted-by-default until a caller
+ * explicitly reassigns it).
+ */
+class irq_security_domain {
+public:
+  /** @brief Constructs the default domain, identifier `0`. */
+  constexpr irq_security_domain() noexcept = default;
+  /** @brief Constructs a domain with the given backend-defined identifier. */
+  constexpr explicit irq_security_domain(std::uint8_t id) noexcept : id_(id) {}
+
+  /** @brief The raw, backend-defined domain identifier. */
+  [[nodiscard]] constexpr std::uint8_t value() const noexcept { return id_; }
+
+  [[nodiscard]] friend constexpr bool operator==(const irq_security_domain &a, const irq_security_domain &b) noexcept {
+    return a.id_ == b.id_;
+  }
+  [[nodiscard]] friend constexpr bool operator!=(const irq_security_domain &a, const irq_security_domain &b) noexcept {
+    return !(a == b);
+  }
+
+private:
+  std::uint8_t id_ = 0;
+};
+
+// ============================================================================
 // Interrupt Source
 // ============================================================================
 
 /**
  * @brief Per-line bookkeeping for one registered interrupt source --
  * FreeBSD's `struct intr_irqsrc` -- tracking its controller-local IRQ
- * number, negotiated trigger/polarity, enabled state, CPU affinity, and
- * at most one registered handler.
+ * number, negotiated trigger/polarity, enabled state, CPU affinity,
+ * security domain, and at most one registered handler.
  *
  * Never copyable or movable: an `irq_source` is registered by address
  * (`irqc_ref::map_intr`/`setup_intr` hand out and operate on references
@@ -333,6 +429,10 @@ public:
   /** @brief The logical CPU this source is currently affine to (meaningful only once a
    * backend has actually implemented `irqc_traits::assign_cpu`; `0` otherwise). */
   [[nodiscard]] constexpr std::size_t target_cpu() const noexcept { return target_cpu_; }
+  /** @brief The security domain (e.g. TrustZone secure/non-secure group) this source
+   * currently belongs to (meaningful only once a backend has actually implemented
+   * `irqc_traits::assign_security_domain`; the default domain `0` otherwise). */
+  [[nodiscard]] constexpr irq_security_domain security_domain() const noexcept { return security_domain_; }
   /** @brief Whether a handler is currently registered (`set_handler`ed, not yet `clear_handler`ed). */
   [[nodiscard]] bool has_handler() const noexcept { return handler_.has_value(); }
 
@@ -344,6 +444,11 @@ public:
   void set_enabled(bool enabled) noexcept { enabled_ = enabled; }
   /** @brief Records which logical CPU this source is affine to. Bookkeeping only, see `set_config`. */
   void set_target_cpu(std::size_t cpu) noexcept { target_cpu_ = cpu; }
+  /** @brief Records which security domain this source belongs to. Bookkeeping only --
+   * does not itself touch hardware; a controller backend calls this from its own
+   * `irqc_traits::assign_security_domain` alongside whatever register writes that
+   * requires (e.g. a GIC's `GICD_IGROUPR`/`GICD_IGRPMODR`). */
+  void set_security_domain(irq_security_domain domain) noexcept { security_domain_ = domain; }
 
   /**
    * @brief Registers @p handler, replacing whatever was previously
@@ -379,6 +484,7 @@ private:
   irq_config config_{};
   bool enabled_ = false;
   std::size_t target_cpu_ = 0;
+  irq_security_domain security_domain_{};
   optional<function_ref<void(irq_source &)>> handler_{};
 };
 
@@ -405,6 +511,12 @@ struct irqc_capabilities {
   bool supports_gsi_mapping = false;
   /** @brief Whether the optional `irqc_traits::assign_cpu` (IRQ affinity, FreeBSD's `PIC_BIND`) is implemented. */
   bool supports_affinity = false;
+  /** @brief Whether the optional `irqc_traits::assign_security_domain` (TrustZone-style
+   * secure/non-secure or other security-domain partitioning) is implemented. */
+  bool supports_security_domains = false;
+  /** @brief Whether the optional `irqc_traits::send_ipi` (domain-targeted
+   * inter-processor interrupt) is implemented. */
+  bool supports_ipi = false;
   /** @brief Whether this controller has per-CPU-private sources (e.g. a GIC's PPIs/SGIs,
    * each core seeing its own private banked instance of the same IRQ number) in addition to
    * shared ones (e.g. a GIC's SPIs) -- mirrors `timer_capabilities::is_per_cpu`. */
@@ -413,7 +525,8 @@ struct irqc_capabilities {
   [[nodiscard]] friend constexpr bool operator==(const irqc_capabilities &a, const irqc_capabilities &b) noexcept {
     return a.max_sources == b.max_sources && a.supports_fdt_mapping == b.supports_fdt_mapping &&
            a.supports_msi_mapping == b.supports_msi_mapping && a.supports_gsi_mapping == b.supports_gsi_mapping &&
-           a.supports_affinity == b.supports_affinity && a.supports_percpu_sources == b.supports_percpu_sources;
+           a.supports_affinity == b.supports_affinity && a.supports_security_domains == b.supports_security_domains &&
+           a.supports_ipi == b.supports_ipi && a.supports_percpu_sources == b.supports_percpu_sources;
   }
   [[nodiscard]] friend constexpr bool operator!=(const irqc_capabilities &a, const irqc_capabilities &b) noexcept {
     return !(a == b);
@@ -450,6 +563,15 @@ struct has_irqc_traits<
 template <typename Traits, typename = void> struct irqc_has_assign_cpu : std::false_type {};
 template <typename Traits>
 struct irqc_has_assign_cpu<Traits, std::void_t<decltype(Traits::assign_cpu)>> : std::true_type {};
+
+template <typename Traits, typename = void> struct irqc_has_assign_security_domain : std::false_type {};
+template <typename Traits>
+struct irqc_has_assign_security_domain<Traits, std::void_t<decltype(Traits::assign_security_domain)>> : std::true_type {
+};
+
+template <typename Traits, typename = void> struct irqc_has_send_ipi : std::false_type {};
+template <typename Traits>
+struct irqc_has_send_ipi<Traits, std::void_t<decltype(Traits::send_ipi)>> : std::true_type {};
 
 template <typename Traits, typename = void> struct irqc_has_pre_ithread : std::false_type {};
 template <typename Traits>
@@ -494,6 +616,9 @@ public:
     result<void> (*teardown_intr)(void *ctx, irq_source &src) noexcept;
     result<std::reference_wrapper<irq_source>> (*map_intr)(void *ctx, const irq_map_data &data) noexcept;
     result<void> (*assign_cpu)(void *ctx, irq_source &src, std::size_t cpu) noexcept;
+    result<void> (*assign_security_domain)(void *ctx, irq_source &src, irq_security_domain domain) noexcept;
+    result<void> (*send_ipi)(void *ctx, span<const std::uint64_t> target_mask, irq_security_domain domain,
+                             std::uint32_t ipi_id) noexcept;
     result<void> (*pre_ithread)(void *ctx, irq_source &src) noexcept;
     result<void> (*post_ithread)(void *ctx, irq_source &src) noexcept;
     result<void> (*post_filter)(void *ctx, irq_source &src) noexcept;
@@ -587,6 +712,35 @@ public:
     if (!vtbl_)
       return unexpected(error::unsupported_operation);
     return vtbl_->assign_cpu(ctx_, src, cpu);
+  }
+
+  /** @brief Reassigns @p src's security domain (e.g. ARM TrustZone secure/non-secure
+   * group) to @p domain -- not a FreeBSD `INTRNG` concept, this is `structo`-specific.
+   * Fails with `error::unsupported_operation` if this ref is unbound, or if the bound
+   * backend does not implement the optional `irqc_traits::assign_security_domain`. */
+  [[nodiscard]] result<void> assign_security_domain(irq_source &src, irq_security_domain domain) const noexcept {
+    if (!vtbl_)
+      return unexpected(error::unsupported_operation);
+    return vtbl_->assign_security_domain(ctx_, src, domain);
+  }
+
+  /** @brief Sends an inter-processor interrupt (e.g. a GIC SGI) identified by @p ipi_id
+   * to every logical CPU set in @p target_mask (a `span` over raw bitmask words; word
+   * `i` holds CPUs `[i * 64, i * 64 + 64)` -- an `arch::cpu_mask<Tag, MaxCpus>` "decays"
+   * directly to this via its own `.words()`), within security domain @p domain --
+   * mirroring ARM TrustZone's GIC SGI `NSATT` bit, which determines whether a
+   * software-generated interrupt reaches each target core's secure or non-secure
+   * state. Passing a mask rather than one CPU at a time (the same raw-bitmask
+   * convention `asid_allocator.hpp`'s TLB shootdown guide uses) lets a backend with
+   * hardware target-list/affinity-routing support (e.g. a GICv2 CPU target list,
+   * GICv3 `1-of-N`/list targeting) issue a single broadcast write instead of one call
+   * per target CPU. Fails with `error::unsupported_operation` if this ref is unbound,
+   * or if the bound backend does not implement the optional `irqc_traits::send_ipi`. */
+  [[nodiscard]] result<void> send_ipi(span<const std::uint64_t> target_mask, irq_security_domain domain,
+                                      std::uint32_t ipi_id) const noexcept {
+    if (!vtbl_)
+      return unexpected(error::unsupported_operation);
+    return vtbl_->send_ipi(ctx_, target_mask, domain, ipi_id);
   }
 
   /** @brief Called before a level-triggered @p src's handler runs, typically to mask it
@@ -740,6 +894,34 @@ private:
     }
   }
 
+  template <typename Backend>
+  static result<void> assign_security_domain_entry(void *ctx, irq_source &src, irq_security_domain domain) noexcept {
+    using traits = irqc_traits<Backend>;
+    if constexpr (detail::irqc_has_assign_security_domain<traits>::value) {
+      return traits::assign_security_domain(*static_cast<Backend *>(ctx), src, domain);
+    } else {
+      (void)ctx;
+      (void)src;
+      (void)domain;
+      return unexpected(error::unsupported_operation);
+    }
+  }
+
+  template <typename Backend>
+  static result<void> send_ipi_entry(void *ctx, span<const std::uint64_t> target_mask, irq_security_domain domain,
+                                     std::uint32_t ipi_id) noexcept {
+    using traits = irqc_traits<Backend>;
+    if constexpr (detail::irqc_has_send_ipi<traits>::value) {
+      return traits::send_ipi(*static_cast<Backend *>(ctx), target_mask, domain, ipi_id);
+    } else {
+      (void)ctx;
+      (void)target_mask;
+      (void)domain;
+      (void)ipi_id;
+      return unexpected(error::unsupported_operation);
+    }
+  }
+
   template <typename Backend> static result<void> pre_ithread_entry(void *ctx, irq_source &src) noexcept {
     using traits = irqc_traits<Backend>;
     if constexpr (detail::irqc_has_pre_ithread<traits>::value) {
@@ -784,11 +966,18 @@ private:
   }
 
   template <typename Backend>
-  static constexpr vtable s_vtbl{&enable_intr_entry<Backend>, &disable_intr_entry<Backend>,
-                                 &setup_intr_entry<Backend>,  &teardown_intr_entry<Backend>,
-                                 &map_intr_entry<Backend>,    &assign_cpu_entry<Backend>,
-                                 &pre_ithread_entry<Backend>, &post_ithread_entry<Backend>,
-                                 &post_filter_entry<Backend>, &capabilities_entry<Backend>};
+  static constexpr vtable s_vtbl{&enable_intr_entry<Backend>,
+                                 &disable_intr_entry<Backend>,
+                                 &setup_intr_entry<Backend>,
+                                 &teardown_intr_entry<Backend>,
+                                 &map_intr_entry<Backend>,
+                                 &assign_cpu_entry<Backend>,
+                                 &assign_security_domain_entry<Backend>,
+                                 &send_ipi_entry<Backend>,
+                                 &pre_ithread_entry<Backend>,
+                                 &post_ithread_entry<Backend>,
+                                 &post_filter_entry<Backend>,
+                                 &capabilities_entry<Backend>};
 
   void *ctx_ = nullptr;
   const vtable *vtbl_ = nullptr;

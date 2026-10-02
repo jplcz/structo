@@ -23,6 +23,9 @@ struct fake_pic {
   bool pre_ithread_called = false;
   bool post_ithread_called = false;
   bool post_filter_called = false;
+  std::uint64_t last_ipi_mask_word0 = 0;
+  irq_security_domain last_ipi_domain{};
+  std::uint32_t last_ipi_id = 0;
 };
 
 struct partial_pic {
@@ -63,6 +66,17 @@ template <> struct structo::hw::irqc_traits<fake_pic> {
     src.set_target_cpu(cpu);
     return {};
   }
+  static result<void> assign_security_domain(fake_pic &, irq_source &src, irq_security_domain domain) noexcept {
+    src.set_security_domain(domain);
+    return {};
+  }
+  static result<void> send_ipi(fake_pic &b, span<const std::uint64_t> target_mask, irq_security_domain domain,
+                               std::uint32_t ipi_id) noexcept {
+    b.last_ipi_mask_word0 = target_mask.empty() ? 0 : target_mask[0];
+    b.last_ipi_domain = domain;
+    b.last_ipi_id = ipi_id;
+    return {};
+  }
   static result<void> pre_ithread(fake_pic &b, irq_source &) noexcept {
     b.pre_ithread_called = true;
     return {};
@@ -81,6 +95,8 @@ template <> struct structo::hw::irqc_traits<fake_pic> {
     caps.supports_fdt_mapping = true;
     caps.supports_gsi_mapping = true;
     caps.supports_affinity = true;
+    caps.supports_security_domains = true;
+    caps.supports_ipi = true;
     caps.supports_percpu_sources = true;
     return caps;
   }
@@ -129,6 +145,9 @@ TEST_F(IrqcRefTest, UnboundRefFailsEveryOperation) {
   EXPECT_FALSE(unbound.enable_intr(src));
   EXPECT_FALSE(unbound.disable_intr(src));
   EXPECT_FALSE(unbound.map_intr(irq_map_data::from_gsi(1)));
+  EXPECT_FALSE(unbound.assign_security_domain(src, irq_security_domain{1}));
+  const std::uint64_t words[] = {1};
+  EXPECT_FALSE(unbound.send_ipi(span<const std::uint64_t>(words, 1), irq_security_domain{}, 0));
   EXPECT_FALSE(unbound.capabilities());
   EXPECT_FALSE(static_cast<bool>(unbound));
   EXPECT_TRUE(static_cast<bool>(ref));
@@ -209,6 +228,23 @@ TEST_F(IrqcRefTest, AssignCpuRecordsAffinityOnTheSource) {
   EXPECT_EQ(backend.line.target_cpu(), 2u);
 }
 
+TEST_F(IrqcRefTest, AssignSecurityDomainRecordsDomainOnTheSource) {
+  EXPECT_EQ(backend.line.security_domain(), irq_security_domain{});
+  const auto non_secure = irq_security_domain{1};
+  ASSERT_TRUE(ref.assign_security_domain(backend.line, non_secure));
+  EXPECT_EQ(backend.line.security_domain(), non_secure);
+}
+
+TEST_F(IrqcRefTest, SendIpiForwardsMaskDomainAndIdToBackend) {
+  const auto secure = irq_security_domain{0};
+  const std::uint64_t words[] = {(std::uint64_t{1} << 0) | (std::uint64_t{1} << 3)};
+  auto r = ref.send_ipi(span<const std::uint64_t>(words, 1), secure, 9);
+  ASSERT_TRUE(r);
+  EXPECT_EQ(backend.last_ipi_mask_word0, words[0]);
+  EXPECT_EQ(backend.last_ipi_domain, secure);
+  EXPECT_EQ(backend.last_ipi_id, 9u);
+}
+
 TEST_F(IrqcRefTest, PreIthreadPostIthreadPostFilterForwardToBackend) {
   ASSERT_TRUE(ref.pre_ithread(backend.line));
   ASSERT_TRUE(ref.post_ithread(backend.line));
@@ -226,6 +262,8 @@ TEST_F(IrqcRefTest, CapabilitiesReportsBackendMetadata) {
   EXPECT_TRUE(caps->supports_gsi_mapping);
   EXPECT_FALSE(caps->supports_msi_mapping);
   EXPECT_TRUE(caps->supports_affinity);
+  EXPECT_TRUE(caps->supports_security_domains);
+  EXPECT_TRUE(caps->supports_ipi);
   EXPECT_TRUE(caps->supports_percpu_sources);
 }
 
@@ -262,6 +300,9 @@ TEST(IrqcRefPartialBackendTest, OptionalOperationsFailUnsupportedWhenNotImplemen
   irqc_ref ref(backend);
 
   EXPECT_FALSE(ref.assign_cpu(backend.line, 1));
+  EXPECT_FALSE(ref.assign_security_domain(backend.line, irq_security_domain{1}));
+  const std::uint64_t words[] = {1};
+  EXPECT_FALSE(ref.send_ipi(span<const std::uint64_t>(words, 1), irq_security_domain{}, 0));
   EXPECT_FALSE(ref.pre_ithread(backend.line));
   EXPECT_FALSE(ref.post_ithread(backend.line));
   EXPECT_FALSE(ref.post_filter(backend.line));
@@ -293,5 +334,17 @@ TEST(IrqSourceTest, DefaultsToDisabledWithNoHandlerAndZeroAffinity) {
   EXPECT_FALSE(src.is_enabled());
   EXPECT_FALSE(src.has_handler());
   EXPECT_EQ(src.target_cpu(), 0u);
+  EXPECT_EQ(src.security_domain(), irq_security_domain{});
   EXPECT_EQ(src.config(), irq_config{});
+}
+
+TEST(IrqSecurityDomainTest, ValueAndEqualityReflectConstructedIdentifier) {
+  constexpr irq_security_domain default_domain;
+  constexpr irq_security_domain secure{0};
+  constexpr irq_security_domain non_secure{1};
+
+  EXPECT_EQ(default_domain.value(), 0u);
+  EXPECT_EQ(default_domain, secure);
+  EXPECT_NE(secure, non_secure);
+  EXPECT_EQ(non_secure.value(), 1u);
 }

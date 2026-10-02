@@ -33,6 +33,7 @@ driver implements) rather than a new invention:
 | `PIC_MAP_INTR` | `irqc_ref::map_intr` |
 | `PIC_BIND` (`assign_cpu`) | `irqc_ref::assign_cpu` |
 | `PIC_PRE_ITHREAD`/`PIC_POST_ITHREAD`/`PIC_POST_FILTER` | `irqc_ref::pre_ithread`/`post_ithread`/`post_filter` |
+| *(not a FreeBSD `INTRNG` concept)* | `irqc_ref::assign_security_domain`/`send_ipi` |
 
 What is deliberately *not* ported: FreeBSD's ithread scheduling itself
 (there is no kernel thread here to schedule -- `pre_ithread`/
@@ -79,6 +80,58 @@ struct gic_irq_line {
 member -- every other `irqc_traits` operation then takes/returns plain
 `irq_source &`, so the backend's own extra fields never need to appear
 in `irqc_ref`'s type-erased surface at all.
+
+## Security domains and domain-targeted IPIs (ARM TrustZone-inspired)
+
+Real-world PICs on TrustZone-capable cores (every ARM GICv2/v3) are not
+a single flat namespace of interrupts: each source additionally belongs
+to a *security domain* (GIC "Group 0"/secure, "Group 1"/non-secure, and
+-- on an Arm CCA/RME-aware GIC -- further realm partitions), and
+software running in one domain cannot unmask or redirect a source that
+belongs to another. `irq_security_domain` is `structo`'s generalization
+of that: a thin, type-safe wrapper around a single backend-defined
+`std::uint8_t` domain identifier -- deliberately *not* a fixed
+secure/non-secure `enum class`, since real controllers disagree on how
+many domains exist and what each one means. A caller defines its own
+named constants for whatever domains its platform actually has:
+
+```cpp
+namespace my_platform {
+inline constexpr auto secure_domain = structo::hw::irq_security_domain{0};
+inline constexpr auto non_secure_domain = structo::hw::irq_security_domain{1};
+}
+```
+
+Every `irq_source` now carries one (`irq_source::security_domain()`,
+default domain `0`). An `irqc_traits<Backend>` may optionally implement:
+
+- `assign_security_domain(Backend &, irq_source &, irq_security_domain)`
+  -- moves a source between domains at the controller (e.g. flipping a
+  GIC's `GICD_IGROUPR`/`GICD_IGRPMODR` bit for that source's INTID).
+- `send_ipi(Backend &, reloco::span<const std::uint64_t> target_mask, irq_security_domain, std::uint32_t ipi_id)`
+  -- sends a domain-targeted inter-processor interrupt (a GIC Software
+  Generated Interrupt, SGI) to every logical CPU set in `target_mask`.
+  The mask is a `span` over raw bitmask words (word `i` holds CPUs
+  `[i * 64, i * 64 + 64)`) -- the same raw, allocation-free IPI-target
+  convention [`asid_allocator.hpp`](asid_allocator.md)'s own TLB
+  shootdown guide uses, generalized to any CPU count instead of a
+  per-CPU loop. `structo::arch::cpu_mask<Tag, MaxCpus>::words()` decays
+  directly into it:
+  ```cpp
+  structo::arch::cpu_mask<my_physical_cpu_tag, 128> targets;
+  targets.set(0);
+  targets.set(3);
+  ref.send_ipi(targets.words(), my_platform::secure_domain, ipi_id);
+  ```
+  A backend with hardware target-list/affinity-routing support (e.g. a
+  GICv2 CPU target list, GICv3 `1-of-N`/list targeting) can turn this
+  into a single broadcast write instead of one call per target CPU.
+
+Both are independently optional, exactly like `assign_cpu`: a backend
+with no TrustZone/security-domain concept at all simply does not
+implement them, and every caller through them fails with
+`error::unsupported_operation`. `irqc_capabilities::supports_security_domains`/`supports_ipi`
+report whether a bound backend implements each.
 
 ## Why `structo::hw`
 
@@ -135,12 +188,18 @@ template <> struct structo::hw::irqc_traits<my_pic> {
 ```
 
 Optionally, a backend may also supply any of `assign_cpu` (IRQ affinity,
-FreeBSD's `PIC_BIND`), `pre_ithread`/`post_ithread`/`post_filter` (the
-three mask/EOI-timing hooks around however the caller's own dispatch
-loop handles a level-triggered source), and `capabilities`:
+FreeBSD's `PIC_BIND`), `assign_security_domain`/`send_ipi` (TrustZone-style
+security-domain switching and domain-targeted IPIs, see above),
+`pre_ithread`/`post_ithread`/`post_filter` (the three mask/EOI-timing
+hooks around however the caller's own dispatch loop handles a
+level-triggered source), and `capabilities`:
 
 ```cpp
 static reloco::result<void> assign_cpu(my_pic &, structo::hw::irq_source &, std::size_t cpu) noexcept;
+static reloco::result<void> assign_security_domain(my_pic &, structo::hw::irq_source &,
+                                                   structo::hw::irq_security_domain) noexcept;
+static reloco::result<void> send_ipi(my_pic &, reloco::span<const std::uint64_t> target_mask,
+                                     structo::hw::irq_security_domain, std::uint32_t ipi_id) noexcept;
 static reloco::result<void> pre_ithread(my_pic &, structo::hw::irq_source &) noexcept;
 static reloco::result<void> post_ithread(my_pic &, structo::hw::irq_source &) noexcept;
 static reloco::result<void> post_filter(my_pic &, structo::hw::irq_source &) noexcept;
@@ -156,8 +215,9 @@ the matching `irqc_ref` method fails with `error::unsupported_operation`.
 Per-line bookkeeping for one registered interrupt source -- FreeBSD's
 `struct intr_irqsrc` -- tracking its controller-local IRQ number,
 negotiated `irq_config` (trigger/polarity), enabled state, CPU affinity,
-and at most one registered handler (`set_handler`/`clear_handler`,
-invoked via `dispatch()`).
+security domain (`irq_security_domain`, see above), and at most one
+registered handler (`set_handler`/`clear_handler`, invoked via
+`dispatch()`).
 
 Never copyable or movable: an `irq_source` is registered by address
 (`irqc_ref::map_intr`/`setup_intr` hand out and operate on references to
@@ -199,8 +259,10 @@ separate enums exactly as FreeBSD does.
 The typical static capabilities of an interrupt controller backend:
 `max_sources`, which `irq_map_data` kinds `map_intr` can resolve
 (`supports_fdt_mapping`/`supports_msi_mapping`/`supports_gsi_mapping`),
-whether `assign_cpu` is implemented (`supports_affinity`), and whether
-the controller has per-CPU-private sources in addition to shared ones
+whether `assign_cpu` is implemented (`supports_affinity`), whether
+`assign_security_domain`/`send_ipi` are implemented
+(`supports_security_domains`/`supports_ipi`), and whether the controller
+has per-CPU-private sources in addition to shared ones
 (`supports_percpu_sources`, e.g. a GIC's banked PPIs/SGIs vs. its shared
 SPIs) -- mirroring `timer_capabilities`'s own role for `timer_ref`.
 
