@@ -22,6 +22,7 @@ exists and where.
 | `hw/uart_ref.hpp` | `structo::hw::uart_ref`, `structo::hw::uart_traits<Backend>`, `structo::hw::uart_config` | Type-erased, non-owning handle over a basic (interrupt-free, polled) UART's operations and settings -- configure/tx_ready/rx_ready/put_byte/get_byte/write/read_available -- via a customizable backend |
 | `hw/rng.hpp` | `structo::hw::hw_rng_ref`, `structo::hw::hw_rng_traits<Backend>` | Type-erased, non-owning handle over a hardware random/entropy source -- `try_generate64`/`try_generate32`/`try_fill`, with bounded retry on a backend's transient "not ready yet" condition -- via a customizable backend |
 | `hw/rng_combinator.hpp` | `structo::hw::hw_rng_combinator` | Combines several `hw_rng_ref` sources (e.g. a real hardware RNG plus weak fallback jitter sources) by `XOR`-folding every successful draw and avalanche-mixing the result; itself bindable through another `hw_rng_ref` |
+| `hw/timer_ref.hpp` | `structo::hw::timer_ref`, `structo::hw::timer_traits<Backend>`, `structo::hw::timer_mode`, `structo::hw::timer_capabilities` | Type-erased, non-owning handle over a hardware countdown/interval timer -- arm one-shot/periodic, cancel, is_active, poll for expiry, query remaining time/capabilities -- via a customizable backend; `try_wait`/`wait` follow Rust `embedded-hal`'s `nb::Result` non-blocking-poll shape and periods/readback use `reloco::duration` |
 | `pfn_translator.hpp` | `phys_pfn<SpaceTag, PageTraits, PhysInt>` | Typed physical page-frame number and address conversion |
 | `phys_page.hpp` | `page_traits<Size, Shift>`, `os_traits_base<Derived, OsPage>`, `page_view<PageTraits, OsTraits>` | Page-size traits and an OS-page-backed physical page view |
 | `phys_translator.hpp` | `phys_translator<Policy>` | Policy-based virtual/physical address translator |
@@ -82,6 +83,7 @@ exists and where.
 - [`io_space_ref.md`](io_space_ref.md) -- type-erased device-register read/write access over an `io_address`
 - [`uart_ref.md`](uart_ref.md) -- type-erased basic (polled) UART operations and settings, in `include/structo/hw/`
 - [`hw_rng.md`](hw_rng.md) -- type-erased hardware RNG handle, per-architecture backends, and the entropy-source combinator
+- [`timer_ref.md`](timer_ref.md) -- type-erased hardware countdown/interval timer, in `include/structo/hw/`
 - [`prng.md`](prng.md) -- `splitmix64`/`xoshiro256ss`/`pcg32` pseudo-random generators, seedable from a hardware RNG
 
 ## OS-development building blocks (from `jplcz_reloco`)
