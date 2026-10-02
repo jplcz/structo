@@ -4,11 +4,11 @@ SPDX-FileCopyrightText: 2026 Jarosław Pelczar <jarek@jpelczar.com>
 SPDX-License-Identifier: BSD-2-Clause
 -->
 
-# `structo::noop_sched` / `fixed_priority_sched` / `sched_ule` / `sched_4bsd`
+# `structo::noop_sched` / `fixed_priority_sched` / `edf_sched` / `sched_ule` / `sched_4bsd`
 
 `include/structo/sched.hpp`
 
-Four stateless, tickless scheduling policies built directly on top of
+Five stateless, tickless scheduling policies built directly on top of
 [`runqueue.hpp`](runqueue.md)'s intrusive queues. Every policy here is a
 class template with **no data members** -- every method is `static` and
 resolves "this CPU's scheduler state" through a caller-supplied
@@ -100,12 +100,13 @@ my_sched::enqueue(some_task);
 my_task *next = my_sched::pick_next();
 ```
 
-## The four policies
+## The five policies
 
 | Policy | Built on | Priority model | Time needed? |
 |---|---|---|---|
 | `noop_sched<Entry, Hook, PerCpu>` | `fifo_runqueue` | none | no |
 | `fixed_priority_sched<Entry, Hook, Priority, NumPriorities, PerCpu>` | `priority_bucket_runqueue` | static, caller-set | no |
+| `edf_sched<Entry, Hook, Deadline, PerCpu>` | `priority_list_runqueue` | caller-set absolute deadline (`reloco::instant`) | no (compares only, never reads a clock) |
 | `sched_ule<Entry, Hook, Priority, State, NumPriorities, PerCpu>` | two `priority_bucket_runqueue`s | recomputed from run/sleep history | yes |
 | `sched_4bsd<Entry, Hook, Priority, State, NumPriorities, PerCpu>` | `priority_bucket_runqueue` | recomputed from decayed CPU usage + `nice` | yes |
 
@@ -128,6 +129,23 @@ the caller arms for `now + quantum` at dispatch time) expires while the
 task is still runnable, for `SCHED_RR`-like behavior -- this scheduler
 itself has no clock/duration logic at all, keeping it genuinely
 tickless by delegating all timing to the caller.
+
+### `edf_sched` (Earliest Deadline First)
+
+The classic, uniprocessor-optimal (Liu & Layland, 1973) dynamic-priority
+real-time policy: always dispatches whichever runnable task has the
+soonest absolute `reloco::instant` deadline. `Entry.*Deadline` is plain
+caller-owned storage -- the caller sets it (typically
+`now + relative_deadline`) before each `enqueue`; this scheduler never
+reads a clock or recomputes a deadline itself, it only ever *compares*
+two already-computed instants via `priority_list_runqueue`'s ordinary
+`operator<`-ordered insertion, so it stays genuinely tickless despite
+ordering by time. It is EDF's bare dispatch rule only: no admission
+control/schedulability check is performed, so avoiding an overloaded
+task set (one that would miss deadlines under *any* policy) is the
+caller's responsibility, same as real EDF implementations (e.g. Linux's
+`SCHED_DEADLINE`) layer admission control on top of, not inside, the
+dispatch rule itself.
 
 ### `sched_ule` (simplified FreeBSD `SCHED_ULE`)
 
@@ -171,7 +189,7 @@ integer power-of-two approximation of 4BSD's fixed-point decay
 constant, not a verbatim port; no SMP load balancing/migration, no
 priority-inversion/priority-propagation handling.
 
-## Operations shared by all four
+## Operations shared by all five
 
 - `enqueue(entry[, now])` -- makes `entry` runnable; `sched_ule`/
   `sched_4bsd` take an explicit `instant now`.

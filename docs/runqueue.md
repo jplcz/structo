@@ -102,5 +102,7 @@ sorted-list toy scheduler in
 [`examples/callout_scheduler_demo.cpp`](../examples/callout_scheduler_demo.cpp).
 See [`sched.md`](sched.md) for a concrete consumer already built this
 way: `fixed_priority_sched`/`sched_ule`/`sched_4bsd` all use
-`priority_bucket_runqueue` directly as their per-CPU state, and
-`noop_sched` uses `fifo_runqueue`.
+`priority_bucket_runqueue` directly as their per-CPU state,
+`noop_sched` uses `fifo_runqueue`, and `edf_sched` uses
+`priority_list_runqueue` (sorted by absolute deadline instead of a
+bounded integer priority).

@@ -5,10 +5,11 @@
 #pragma once
 
 /** @file sched.hpp
- * @brief Four stateless, per-CPU-trait-driven scheduling policies built
+ * @brief Five stateless, per-CPU-trait-driven scheduling policies built
  * on `runqueue.hpp`: `structo::noop_sched`, `structo::fixed_priority_sched`,
- * `structo::sched_ule` (FreeBSD `SCHED_ULE`-flavored), and
- * `structo::sched_4bsd` (FreeBSD `SCHED_4BSD`-flavored).
+ * `structo::edf_sched` (Earliest Deadline First), `structo::sched_ule`
+ * (FreeBSD `SCHED_ULE`-flavored), and `structo::sched_4bsd` (FreeBSD
+ * `SCHED_4BSD`-flavored).
  *
  * ## Tickless: no periodic tick counting, anywhere
  *
@@ -95,7 +96,7 @@
  * my_task *next = my_sched::pick_next();
  * @endcode
  *
- * ## The four policies
+ * ## The five policies
  *
  * - **`noop_sched<Entry, Hook, PerCpu>`**: plain FIFO, no priority
  *   concept -- the trivial, always-correct baseline a kernel boots with
@@ -112,6 +113,16 @@
  *   `structo::callout` the caller arms for `now + quantum` at dispatch
  *   time) expires upgrades that to `SCHED_RR`-like behavior, with zero
  *   ticking inside this header. Built on `priority_bucket_runqueue`.
+ * - **`edf_sched<Entry, Hook, Deadline, PerCpu>`**: Earliest Deadline
+ *   First -- the classic, uniprocessor-optimal (Liu & Layland, 1973)
+ *   real-time policy: always dispatches whichever runnable task has the
+ *   soonest absolute `reloco::instant` deadline. `Entry.*Deadline` is
+ *   plain caller-owned storage (typically set to `now + relative
+ *   deadline` right before `enqueue`) -- this scheduler never reads a
+ *   clock itself, it only ever compares two already-computed instants,
+ *   making it (like `fixed_priority_sched`) entirely clock-free
+ *   internally despite ordering by time. Built directly on
+ *   `priority_list_runqueue` (sorted insertion by `Entry.*Deadline`).
  * - **`sched_ule<Entry, Hook, Priority, State, NumPriorities, PerCpu>`**:
  *   a simplified `SCHED_ULE` -- two per-CPU `priority_bucket_runqueue`s
  *   (`curr`/`next`), always dispatching from `curr` and refilling it by
@@ -145,7 +156,12 @@
  * shared FIFO level rather than a further CPU-usage-ranked sub-range,
  * and `sched_4bsd`'s decay is an integer power-of-two approximation of
  * 4BSD's real fixed-point decay constant. Both are namesaked after,
- * not verbatim ports of, their FreeBSD counterparts.
+ * not verbatim ports of, their FreeBSD counterparts. `edf_sched` is
+ * EDF's bare scheduling rule only -- it performs no admission-control/
+ * schedulability check, so an overloaded task set (one that would miss
+ * deadlines under *any* policy) is entirely the caller's concern, same
+ * as real EDF implementations (e.g. Linux's `SCHED_DEADLINE`) layer
+ * admission control on top of, not inside, the dispatch rule itself.
  */
 
 #include <cstddef>
@@ -240,6 +256,53 @@ public:
    * @p entry is still runnable, for `SCHED_RR`-like behavior. O(1).
    */
   static void requeue(Entry &entry) noexcept { PerCpu::get()->enqueue(entry); }
+
+  /** @brief Removes @p entry. O(1). Precondition: `is_linked(entry)`. */
+  static void remove(Entry &entry) noexcept { PerCpu::get()->remove(entry); }
+
+  /** @brief Whether @p entry is currently enqueued (on any CPU). O(1). */
+  [[nodiscard]] static bool is_linked(const Entry &entry) noexcept { return state_type::is_linked(entry); }
+
+  [[nodiscard]] static bool empty() noexcept { return PerCpu::get()->empty(); }
+  [[nodiscard]] static std::size_t size() noexcept { return PerCpu::get()->size(); }
+};
+
+// --------------------------------------------------------------------
+// edf_sched
+// --------------------------------------------------------------------
+
+/** @brief `edf_sched<...>`'s per-CPU state-blob type. */
+template <typename Entry, auto Hook, auto Deadline>
+using edf_sched_state = priority_list_runqueue<Entry, Hook, Deadline>;
+
+/**
+ * @brief Earliest Deadline First: always dispatches whichever runnable
+ * task has the soonest absolute `reloco::instant` deadline --
+ * uniprocessor-optimal among dynamic-priority real-time policies (Liu &
+ * Layland, 1973). `Entry.*Deadline` is plain caller-owned storage: the
+ * caller sets it (typically `now + relative_deadline`) before each
+ * `enqueue`; this scheduler never reads a clock or recomputes a
+ * deadline itself, it only ever *compares* two already-computed
+ * instants via `priority_list_runqueue`'s ordinary `operator<`-ordered
+ * insertion -- genuinely tickless despite ordering by time.
+ * @tparam Entry Caller-owned task type; must embed an intrusive link
+ * field matching `reloco::c_tailq`'s hook layout (named by @p Hook) and
+ * a `reloco::instant` deadline field (named by @p Deadline, soonest
+ * deadline runs first); read-only to this policy.
+ * @tparam Hook Pointer-to-member of @p Entry's link field.
+ * @tparam Deadline Pointer-to-member of @p Entry's deadline field.
+ * @tparam PerCpu Resolves the current CPU's `edf_sched_state<Entry,
+ * Hook, Deadline>` blob.
+ */
+template <typename Entry, auto Hook, auto Deadline, typename PerCpu> class edf_sched {
+public:
+  using state_type = edf_sched_state<Entry, Hook, Deadline>;
+
+  /** @brief Makes @p entry runnable, inserted in `Entry.*Deadline` order. O(n). */
+  static void enqueue(Entry &entry) noexcept { PerCpu::get()->enqueue(entry); }
+
+  /** @brief Selects and removes the task with the soonest deadline, or `nullptr` if none is runnable. O(1). */
+  static Entry *pick_next() noexcept { return PerCpu::get()->dequeue(); }
 
   /** @brief Removes @p entry. O(1). Precondition: `is_linked(entry)`. */
   static void remove(Entry &entry) noexcept { PerCpu::get()->remove(entry); }

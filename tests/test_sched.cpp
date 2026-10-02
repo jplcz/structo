@@ -154,6 +154,69 @@ TEST_F(FixedPrioritySchedTest, IsLinkedAndRemove) {
 }
 
 // --------------------------------------------------------------------
+// edf_sched
+// --------------------------------------------------------------------
+
+struct edf_task {
+  struct {
+    edf_task *next = nullptr;
+    edf_task **prev = nullptr;
+  } link;
+  instant deadline{};
+  int id = 0;
+};
+
+using edf_state = edf_sched_state<edf_task, &edf_task::link, &edf_task::deadline>;
+using edf_percpu = test_percpu<edf_state>;
+using edf = edf_sched<edf_task, &edf_task::link, &edf_task::deadline, edf_percpu>;
+
+class EdfSchedTest : public ::testing::Test {
+protected:
+  void SetUp() override { edf_percpu::set(&state_); }
+  void TearDown() override { edf_percpu::set(nullptr); }
+  edf_state state_;
+};
+
+TEST_F(EdfSchedTest, StartsEmpty) {
+  EXPECT_TRUE(edf::empty());
+  EXPECT_EQ(edf::size(), 0u);
+  EXPECT_EQ(edf::pick_next(), nullptr);
+}
+
+TEST_F(EdfSchedTest, DispatchesSoonestDeadlineFirstRegardlessOfEnqueueOrder) {
+  edf_task far{{}, at(1000), 1};
+  edf_task near{{}, at(10), 2};
+  edf_task mid{{}, at(100), 3};
+  edf::enqueue(far);
+  edf::enqueue(near);
+  edf::enqueue(mid);
+  EXPECT_EQ(edf::size(), 3u);
+
+  EXPECT_EQ(edf::pick_next()->id, 2);
+  EXPECT_EQ(edf::pick_next()->id, 3);
+  EXPECT_EQ(edf::pick_next()->id, 1);
+  EXPECT_EQ(edf::pick_next(), nullptr);
+}
+
+TEST_F(EdfSchedTest, SameDeadlineIsFifo) {
+  edf_task a{{}, at(50), 1};
+  edf_task b{{}, at(50), 2};
+  edf::enqueue(a);
+  edf::enqueue(b);
+  EXPECT_EQ(edf::pick_next()->id, 1);
+  EXPECT_EQ(edf::pick_next()->id, 2);
+}
+
+TEST_F(EdfSchedTest, IsLinkedAndRemove) {
+  edf_task a{{}, at(10), 1};
+  EXPECT_FALSE(edf::is_linked(a));
+  edf::enqueue(a);
+  EXPECT_TRUE(edf::is_linked(a));
+  edf::remove(a);
+  EXPECT_FALSE(edf::is_linked(a));
+}
+
+// --------------------------------------------------------------------
 // sched_ule
 // --------------------------------------------------------------------
 
