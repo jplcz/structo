@@ -66,7 +66,8 @@
 
 #include <structo/hw/rng.hpp>
 
-#include <array>
+#include <reloco/array.hpp>
+
 #include <cstdint>
 
 namespace structo::prng {
@@ -158,7 +159,7 @@ public:
    */
   [[nodiscard]] static result<xoshiro256ss>
   from_hw_rng(const hw::hw_rng_ref &hw, std::uint32_t max_retries = hw::hw_rng_ref::default_max_retries) noexcept {
-    std::array<std::uint64_t, 4> words{};
+    reloco::array<std::uint64_t, 4> words{};
     for (auto &word : words) {
       auto draw = hw.try_generate64(max_retries);
       if (!draw)
@@ -185,18 +186,18 @@ public:
 
 private:
   /** @brief Constructs directly from 4 already-random state words (used by `from_hw_rng`). */
-  constexpr explicit xoshiro256ss(const std::array<std::uint64_t, 4> &state) noexcept : state_(state) {}
+  constexpr explicit xoshiro256ss(const reloco::array<std::uint64_t, 4> &state) noexcept : state_(state) {}
 
   /** @brief Expands a single 64-bit seed into 4 state words via successive `splitmix64` draws. */
-  [[nodiscard]] static constexpr std::array<std::uint64_t, 4> expand_seed(std::uint64_t seed) noexcept {
+  [[nodiscard]] static constexpr reloco::array<std::uint64_t, 4> expand_seed(std::uint64_t seed) noexcept {
     splitmix64 sm(seed);
-    std::array<std::uint64_t, 4> state{};
+    reloco::array<std::uint64_t, 4> state{};
     for (auto &word : state)
       word = sm.next();
     return state;
   }
 
-  std::array<std::uint64_t, 4> state_;
+  reloco::array<std::uint64_t, 4> state_;
 };
 
 // ============================================================================

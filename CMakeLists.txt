@@ -18,13 +18,18 @@ option(JPLCZ_STRUCTO_ENABLE_STRICT_WARNINGS
 option(JPLCZ_STRUCTO_ENABLE_UNSAFE_BUFFER_USAGE
     "Enable Clang unsafe buffer usage diagnostics" OFF)
 option(JPLCZ_STRUCTO_ENABLE_WERROR
-    "Enable build with -Werror" OFF)
+    "Enable build with -Werror" ${JPLCZ_STRUCTO_DEVELOPMENT_DEFAULT})
 option(JPLCZ_STRUCTO_BUILD_TESTS
     "Build test suite" ${JPLCZ_STRUCTO_DEVELOPMENT_DEFAULT})
 option(JPLCZ_STRUCTO_BUILD_EXAMPLES
     "Build example apps" ${JPLCZ_STRUCTO_DEVELOPMENT_DEFAULT})
 option(JPLCZ_STRUCTO_BUILD_HEADER_CHECKS
     "Compile all public headers under each supported C++ standard"
+    ${JPLCZ_STRUCTO_DEVELOPMENT_DEFAULT})
+option(JPLCZ_STRUCTO_CHECK_NO_STD_TYPES
+    "Hard build-time check that public headers avoid allocating/throwing/\
+glibc-dependent std:: facilities outside explicitly marked interop points \
+(see scripts/check-no-std-types.py)"
     ${JPLCZ_STRUCTO_DEVELOPMENT_DEFAULT})
 option(JPLCZ_STRUCTO_INSTALL
     "Install jplcz_structo headers and CMake package metadata"
@@ -400,6 +405,35 @@ if(JPLCZ_STRUCTO_BUILD_HEADER_CHECKS)
 
     add_custom_target(jplcz_structo_check_public_headers
         DEPENDS ${JPLCZ_STRUCTO_HEADER_CHECK_TARGETS}
+    )
+endif()
+
+if(JPLCZ_STRUCTO_CHECK_NO_STD_TYPES)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+
+    file(GLOB_RECURSE JPLCZ_STRUCTO_PUBLIC_HEADERS CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/*.ipp"
+    )
+
+    # Hard build-time gate (part of the default `all` target, not an opt-in
+    # target like jplcz_structo_check_public_headers above): fails the build
+    # the moment a header introduces disallowed std:: usage, so regressions
+    # are caught on every ordinary `cmake --build` rather than only in CI.
+    add_custom_command(
+        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/jplcz_structo_check_no_std_types.stamp"
+        COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check-no-std-types.py"
+            --include-dir "${CMAKE_CURRENT_SOURCE_DIR}/include"
+        COMMAND "${CMAKE_COMMAND}" -E touch
+            "${CMAKE_CURRENT_BINARY_DIR}/jplcz_structo_check_no_std_types.stamp"
+        DEPENDS ${JPLCZ_STRUCTO_PUBLIC_HEADERS}
+            "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check-no-std-types.py"
+        COMMENT "Checking include/ for disallowed std:: usage (scripts/check-no-std-types.py)"
+        VERBATIM
+    )
+    add_custom_target(jplcz_structo_check_no_std_types ALL
+        DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/jplcz_structo_check_no_std_types.stamp"
     )
 endif()
 
