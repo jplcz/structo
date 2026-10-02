@@ -9,6 +9,7 @@
 #include <reloco/array.hpp>
 #include <reloco/detail/assert.hpp>
 #include <reloco/error.hpp>
+#include <reloco/intrusive_c_tailq.hpp>
 #include <reloco/lifetime.hpp>
 
 namespace structo {
@@ -43,6 +44,87 @@ template <typename OsPage> struct free_list_archetype {
   // Iteration
   [[nodiscard]] iterator begin() const & noexcept;
   [[nodiscard]] iterator end() const & noexcept;
+};
+
+/**
+ * @brief Ready-to-use `FreeList` adapter bridging `buddy_allocator`'s
+ * pointer-handle convention (`os_page_type = T *`, every
+ * `free_list_archetype` operation taking/returning a bare pointer) onto
+ * `reloco::c_tailq<T, Hook>` -- reloco's own `TAILQ`-style intrusive
+ * list, and representative of how "typical" hand-rolled intrusive
+ * lists are shaped: `push_front()`/`remove()` take the node *by
+ * reference* (`T &`), not by pointer, and its iterator dereferences to
+ * `T &` as well. Only `pop_front()` returns a nullable `T *`, there
+ * being no other way to represent "the list is empty".
+ *
+ * This adapter exists purely to translate at that boundary: it
+ * dereferences the incoming `T *` once before forwarding to
+ * `reloco::c_tailq`, and reports positions back out as `T *` by asking
+ * the underlying iterator for the node pointer it already holds.
+ *
+ * @tparam T The node type carrying the intrusive hook (e.g. a page
+ * descriptor struct with a `TAILQ_ENTRY`-equivalent member).
+ * @tparam Hook Pointer-to-member of `T`'s hook field, exactly as
+ * `reloco::c_tailq<T, Hook>` itself takes it.
+ *
+ * @code
+ * struct page_meta {
+ *   // ... other OS bookkeeping fields ...
+ *   struct {
+ *     page_meta *next = nullptr;
+ *     page_meta **prev = nullptr;
+ *   } link;
+ * };
+ *
+ * using free_list = structo::tailq_free_list<page_meta, &page_meta::link>;
+ * using allocator = structo::buddy_allocator<free_list, my_page_view, 11>;
+ * @endcode
+ */
+template <typename T, auto Hook> class tailq_free_list {
+public:
+  using os_page_type = T *;
+
+private:
+  using tailq_type = reloco::c_tailq<T, Hook>;
+
+public:
+  /** @brief Forward iterator yielding `T *` (never a `T &`), matching `free_list_archetype`. */
+  class iterator {
+  public:
+    iterator() noexcept = default;
+    explicit iterator(typename tailq_type::const_iterator it) noexcept : it_(it) {}
+
+    [[nodiscard]] bool operator!=(const iterator &other) const noexcept { return it_ != other.it_; }
+    [[nodiscard]] os_page_type operator*() const noexcept { return it_.node(); }
+    iterator &operator++() noexcept {
+      ++it_;
+      return *this;
+    }
+
+  private:
+    typename tailq_type::const_iterator it_{};
+  };
+
+  void clear() & noexcept { list_.clear(); }
+  [[nodiscard]] bool empty() const & noexcept { return list_.empty(); }
+
+  void push_front(os_page_type p) & noexcept {
+    RELOCO_ASSERT(p != nullptr, "tailq_free_list: push_front(nullptr)");
+    list_.push_front(*p);
+  }
+
+  void remove(os_page_type p) & noexcept {
+    RELOCO_ASSERT(p != nullptr, "tailq_free_list: remove(nullptr)");
+    list_.remove(*p);
+  }
+
+  [[nodiscard]] os_page_type pop_front() & noexcept { return list_.pop_front(); }
+
+  [[nodiscard]] iterator begin() const & noexcept { return iterator(list_.begin()); }
+  [[nodiscard]] iterator end() const & noexcept { return iterator(list_.end()); }
+
+private:
+  tailq_type list_;
 };
 
 /**
