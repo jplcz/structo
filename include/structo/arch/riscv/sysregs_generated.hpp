@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+#include <structo/arch/pte_field.hpp>
 
 namespace structo::arch::riscv::sysreg_raw {
 
@@ -930,9 +931,28 @@ struct sscountovf {
 #endif // defined(__riscv)
 };
 
-/** @brief Raw accessor for the RISC-V `sstatus` CSR (address 0x100; no named fields yet). */
+/** @brief Raw accessor for the RISC-V `sstatus` CSR (address 0x100; 5 named field(s)). */
 struct sstatus {
   unsigned long raw{0};
+
+  struct bits {
+    using sie = ::structo::arch::pte_bit_field<1, 1, unsigned long>;
+    using spie = ::structo::arch::pte_bit_field<5, 1, unsigned long>;
+    using spp = ::structo::arch::pte_bit_field<8, 1, unsigned long>;
+    using sum = ::structo::arch::pte_bit_field<18, 1, unsigned long>;
+    using mxr = ::structo::arch::pte_bit_field<19, 1, unsigned long>;
+  };
+
+  [[nodiscard]] constexpr bool sie() const noexcept { return bits::sie::test(raw); }
+  constexpr auto &set_sie(bool value) noexcept { raw = bits::sie::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool spie() const noexcept { return bits::spie::test(raw); }
+  constexpr auto &set_spie(bool value) noexcept { raw = bits::spie::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool spp() const noexcept { return bits::spp::test(raw); }
+  constexpr auto &set_spp(bool value) noexcept { raw = bits::spp::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool sum() const noexcept { return bits::sum::test(raw); }
+  constexpr auto &set_sum(bool value) noexcept { raw = bits::sum::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool mxr() const noexcept { return bits::mxr::test(raw); }
+  constexpr auto &set_mxr(bool value) noexcept { raw = bits::mxr::set_bit(raw, value); return *this; }
 
 #if defined(__riscv)
   [[nodiscard]] static sstatus read() noexcept {
@@ -944,9 +964,22 @@ struct sstatus {
 #endif // defined(__riscv)
 };
 
-/** @brief Raw accessor for the RISC-V `sie` CSR (address 0x104; no named fields yet). */
+/** @brief Raw accessor for the RISC-V `sie` CSR (address 0x104; 3 named field(s)). */
 struct sie {
   unsigned long raw{0};
+
+  struct bits {
+    using ssie = ::structo::arch::pte_bit_field<1, 1, unsigned long>;
+    using stie = ::structo::arch::pte_bit_field<5, 1, unsigned long>;
+    using seie = ::structo::arch::pte_bit_field<9, 1, unsigned long>;
+  };
+
+  [[nodiscard]] constexpr bool ssie() const noexcept { return bits::ssie::test(raw); }
+  constexpr auto &set_ssie(bool value) noexcept { raw = bits::ssie::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool stie() const noexcept { return bits::stie::test(raw); }
+  constexpr auto &set_stie(bool value) noexcept { raw = bits::stie::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool seie() const noexcept { return bits::seie::test(raw); }
+  constexpr auto &set_seie(bool value) noexcept { raw = bits::seie::set_bit(raw, value); return *this; }
 
 #if defined(__riscv)
   [[nodiscard]] static sie read() noexcept {
@@ -958,9 +991,19 @@ struct sie {
 #endif // defined(__riscv)
 };
 
-/** @brief Raw accessor for the RISC-V `stvec` CSR (address 0x105; no named fields yet). */
+/** @brief Raw accessor for the RISC-V `stvec` CSR (address 0x105; 2 named field(s)). */
 struct stvec {
   unsigned long raw{0};
+
+  struct bits {
+    using mode = ::structo::arch::pte_bit_field<0, 2, unsigned long>;
+    using base = ::structo::arch::pte_bit_field<2, 62, unsigned long>;
+  };
+
+  [[nodiscard]] constexpr unsigned long mode() const noexcept { return bits::mode::get(raw); }
+  constexpr auto &set_mode(unsigned long value) noexcept { raw = bits::mode::set(raw, value); return *this; }
+  [[nodiscard]] constexpr unsigned long base() const noexcept { return bits::base::get(raw); }
+  constexpr auto &set_base(unsigned long value) noexcept { raw = bits::base::set(raw, value); return *this; }
 
 #if defined(__riscv)
   [[nodiscard]] static stvec read() noexcept {
@@ -1042,9 +1085,19 @@ struct sepc {
 #endif // defined(__riscv)
 };
 
-/** @brief Raw accessor for the RISC-V `scause` CSR (address 0x142; no named fields yet). */
+/** @brief Raw accessor for the RISC-V `scause` CSR (address 0x142; 2 named field(s)). */
 struct scause {
   unsigned long raw{0};
+
+  struct bits {
+    using exception_code = ::structo::arch::pte_bit_field<0, 63, unsigned long>;
+    using interrupt = ::structo::arch::pte_bit_field<63, 1, unsigned long>;
+  };
+
+  [[nodiscard]] constexpr unsigned long exception_code() const noexcept { return bits::exception_code::get(raw); }
+  constexpr auto &set_exception_code(unsigned long value) noexcept { raw = bits::exception_code::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool interrupt() const noexcept { return bits::interrupt::test(raw); }
+  constexpr auto &set_interrupt(bool value) noexcept { raw = bits::interrupt::set_bit(raw, value); return *this; }
 
 #if defined(__riscv)
   [[nodiscard]] static scause read() noexcept {
@@ -1070,9 +1123,22 @@ struct stval {
 #endif // defined(__riscv)
 };
 
-/** @brief Raw accessor for the RISC-V `sip` CSR (address 0x144; no named fields yet). */
+/** @brief Raw accessor for the RISC-V `sip` CSR (address 0x144; 3 named field(s)). */
 struct sip {
   unsigned long raw{0};
+
+  struct bits {
+    using ssip = ::structo::arch::pte_bit_field<1, 1, unsigned long>;
+    using stip = ::structo::arch::pte_bit_field<5, 1, unsigned long>;
+    using seip = ::structo::arch::pte_bit_field<9, 1, unsigned long>;
+  };
+
+  [[nodiscard]] constexpr bool ssip() const noexcept { return bits::ssip::test(raw); }
+  constexpr auto &set_ssip(bool value) noexcept { raw = bits::ssip::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool stip() const noexcept { return bits::stip::test(raw); }
+  constexpr auto &set_stip(bool value) noexcept { raw = bits::stip::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool seip() const noexcept { return bits::seip::test(raw); }
+  constexpr auto &set_seip(bool value) noexcept { raw = bits::seip::set_bit(raw, value); return *this; }
 
 #if defined(__riscv)
   [[nodiscard]] static sip read() noexcept {
@@ -1084,9 +1150,22 @@ struct sip {
 #endif // defined(__riscv)
 };
 
-/** @brief Raw accessor for the RISC-V `satp` CSR (address 0x180; no named fields yet). */
+/** @brief Raw accessor for the RISC-V `satp` CSR (address 0x180; 3 named field(s)). */
 struct satp {
   unsigned long raw{0};
+
+  struct bits {
+    using ppn = ::structo::arch::pte_bit_field<0, 44, unsigned long>;
+    using asid = ::structo::arch::pte_bit_field<44, 16, unsigned long>;
+    using mode = ::structo::arch::pte_bit_field<60, 4, unsigned long>;
+  };
+
+  [[nodiscard]] constexpr unsigned long ppn() const noexcept { return bits::ppn::get(raw); }
+  constexpr auto &set_ppn(unsigned long value) noexcept { raw = bits::ppn::set(raw, value); return *this; }
+  [[nodiscard]] constexpr unsigned long asid() const noexcept { return bits::asid::get(raw); }
+  constexpr auto &set_asid(unsigned long value) noexcept { raw = bits::asid::set(raw, value); return *this; }
+  [[nodiscard]] constexpr unsigned long mode() const noexcept { return bits::mode::get(raw); }
+  constexpr auto &set_mode(unsigned long value) noexcept { raw = bits::mode::set(raw, value); return *this; }
 
 #if defined(__riscv)
   [[nodiscard]] static satp read() noexcept {
@@ -1826,9 +1905,49 @@ struct hstateen0_h {
 #endif // defined(__riscv)
 };
 
-/** @brief Raw accessor for the RISC-V `mstatus` CSR (address 0x300; no named fields yet). */
+/** @brief Raw accessor for the RISC-V `mstatus` CSR (address 0x300; 12 named field(s)). */
 struct mstatus {
   unsigned long raw{0};
+
+  struct bits {
+    using sie = ::structo::arch::pte_bit_field<1, 1, unsigned long>;
+    using mie = ::structo::arch::pte_bit_field<3, 1, unsigned long>;
+    using spie = ::structo::arch::pte_bit_field<5, 1, unsigned long>;
+    using mpie = ::structo::arch::pte_bit_field<7, 1, unsigned long>;
+    using spp = ::structo::arch::pte_bit_field<8, 1, unsigned long>;
+    using mpp = ::structo::arch::pte_bit_field<11, 2, unsigned long>;
+    using mprv = ::structo::arch::pte_bit_field<17, 1, unsigned long>;
+    using sum = ::structo::arch::pte_bit_field<18, 1, unsigned long>;
+    using mxr = ::structo::arch::pte_bit_field<19, 1, unsigned long>;
+    using tvm = ::structo::arch::pte_bit_field<20, 1, unsigned long>;
+    using tw = ::structo::arch::pte_bit_field<21, 1, unsigned long>;
+    using tsr = ::structo::arch::pte_bit_field<22, 1, unsigned long>;
+  };
+
+  [[nodiscard]] constexpr bool sie() const noexcept { return bits::sie::test(raw); }
+  constexpr auto &set_sie(bool value) noexcept { raw = bits::sie::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool mie() const noexcept { return bits::mie::test(raw); }
+  constexpr auto &set_mie(bool value) noexcept { raw = bits::mie::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool spie() const noexcept { return bits::spie::test(raw); }
+  constexpr auto &set_spie(bool value) noexcept { raw = bits::spie::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool mpie() const noexcept { return bits::mpie::test(raw); }
+  constexpr auto &set_mpie(bool value) noexcept { raw = bits::mpie::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool spp() const noexcept { return bits::spp::test(raw); }
+  constexpr auto &set_spp(bool value) noexcept { raw = bits::spp::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr unsigned long mpp() const noexcept { return bits::mpp::get(raw); }
+  constexpr auto &set_mpp(unsigned long value) noexcept { raw = bits::mpp::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool mprv() const noexcept { return bits::mprv::test(raw); }
+  constexpr auto &set_mprv(bool value) noexcept { raw = bits::mprv::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool sum() const noexcept { return bits::sum::test(raw); }
+  constexpr auto &set_sum(bool value) noexcept { raw = bits::sum::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool mxr() const noexcept { return bits::mxr::test(raw); }
+  constexpr auto &set_mxr(bool value) noexcept { raw = bits::mxr::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tvm() const noexcept { return bits::tvm::test(raw); }
+  constexpr auto &set_tvm(bool value) noexcept { raw = bits::tvm::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tw() const noexcept { return bits::tw::test(raw); }
+  constexpr auto &set_tw(bool value) noexcept { raw = bits::tw::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tsr() const noexcept { return bits::tsr::test(raw); }
+  constexpr auto &set_tsr(bool value) noexcept { raw = bits::tsr::set_bit(raw, value); return *this; }
 
 #if defined(__riscv)
   [[nodiscard]] static mstatus read() noexcept {
@@ -1868,9 +1987,31 @@ struct mideleg {
 #endif // defined(__riscv)
 };
 
-/** @brief Raw accessor for the RISC-V `mie` CSR (address 0x304; no named fields yet). */
+/** @brief Raw accessor for the RISC-V `mie` CSR (address 0x304; 6 named field(s)). */
 struct mie {
   unsigned long raw{0};
+
+  struct bits {
+    using ssie = ::structo::arch::pte_bit_field<1, 1, unsigned long>;
+    using msie = ::structo::arch::pte_bit_field<3, 1, unsigned long>;
+    using stie = ::structo::arch::pte_bit_field<5, 1, unsigned long>;
+    using mtie = ::structo::arch::pte_bit_field<7, 1, unsigned long>;
+    using seie = ::structo::arch::pte_bit_field<9, 1, unsigned long>;
+    using meie = ::structo::arch::pte_bit_field<11, 1, unsigned long>;
+  };
+
+  [[nodiscard]] constexpr bool ssie() const noexcept { return bits::ssie::test(raw); }
+  constexpr auto &set_ssie(bool value) noexcept { raw = bits::ssie::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool msie() const noexcept { return bits::msie::test(raw); }
+  constexpr auto &set_msie(bool value) noexcept { raw = bits::msie::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool stie() const noexcept { return bits::stie::test(raw); }
+  constexpr auto &set_stie(bool value) noexcept { raw = bits::stie::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool mtie() const noexcept { return bits::mtie::test(raw); }
+  constexpr auto &set_mtie(bool value) noexcept { raw = bits::mtie::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool seie() const noexcept { return bits::seie::test(raw); }
+  constexpr auto &set_seie(bool value) noexcept { raw = bits::seie::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool meie() const noexcept { return bits::meie::test(raw); }
+  constexpr auto &set_meie(bool value) noexcept { raw = bits::meie::set_bit(raw, value); return *this; }
 
 #if defined(__riscv)
   [[nodiscard]] static mie read() noexcept {
@@ -1882,9 +2023,19 @@ struct mie {
 #endif // defined(__riscv)
 };
 
-/** @brief Raw accessor for the RISC-V `mtvec` CSR (address 0x305; no named fields yet). */
+/** @brief Raw accessor for the RISC-V `mtvec` CSR (address 0x305; 2 named field(s)). */
 struct mtvec {
   unsigned long raw{0};
+
+  struct bits {
+    using mode = ::structo::arch::pte_bit_field<0, 2, unsigned long>;
+    using base = ::structo::arch::pte_bit_field<2, 62, unsigned long>;
+  };
+
+  [[nodiscard]] constexpr unsigned long mode() const noexcept { return bits::mode::get(raw); }
+  constexpr auto &set_mode(unsigned long value) noexcept { raw = bits::mode::set(raw, value); return *this; }
+  [[nodiscard]] constexpr unsigned long base() const noexcept { return bits::base::get(raw); }
+  constexpr auto &set_base(unsigned long value) noexcept { raw = bits::base::set(raw, value); return *this; }
 
 #if defined(__riscv)
   [[nodiscard]] static mtvec read() noexcept {
@@ -1952,9 +2103,19 @@ struct mepc {
 #endif // defined(__riscv)
 };
 
-/** @brief Raw accessor for the RISC-V `mcause` CSR (address 0x342; no named fields yet). */
+/** @brief Raw accessor for the RISC-V `mcause` CSR (address 0x342; 2 named field(s)). */
 struct mcause {
   unsigned long raw{0};
+
+  struct bits {
+    using exception_code = ::structo::arch::pte_bit_field<0, 63, unsigned long>;
+    using interrupt = ::structo::arch::pte_bit_field<63, 1, unsigned long>;
+  };
+
+  [[nodiscard]] constexpr unsigned long exception_code() const noexcept { return bits::exception_code::get(raw); }
+  constexpr auto &set_exception_code(unsigned long value) noexcept { raw = bits::exception_code::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool interrupt() const noexcept { return bits::interrupt::test(raw); }
+  constexpr auto &set_interrupt(bool value) noexcept { raw = bits::interrupt::set_bit(raw, value); return *this; }
 
 #if defined(__riscv)
   [[nodiscard]] static mcause read() noexcept {
@@ -1980,9 +2141,31 @@ struct mtval {
 #endif // defined(__riscv)
 };
 
-/** @brief Raw accessor for the RISC-V `mip` CSR (address 0x344; no named fields yet). */
+/** @brief Raw accessor for the RISC-V `mip` CSR (address 0x344; 6 named field(s)). */
 struct mip {
   unsigned long raw{0};
+
+  struct bits {
+    using ssip = ::structo::arch::pte_bit_field<1, 1, unsigned long>;
+    using msip = ::structo::arch::pte_bit_field<3, 1, unsigned long>;
+    using stip = ::structo::arch::pte_bit_field<5, 1, unsigned long>;
+    using mtip = ::structo::arch::pte_bit_field<7, 1, unsigned long>;
+    using seip = ::structo::arch::pte_bit_field<9, 1, unsigned long>;
+    using meip = ::structo::arch::pte_bit_field<11, 1, unsigned long>;
+  };
+
+  [[nodiscard]] constexpr bool ssip() const noexcept { return bits::ssip::test(raw); }
+  constexpr auto &set_ssip(bool value) noexcept { raw = bits::ssip::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool msip() const noexcept { return bits::msip::test(raw); }
+  constexpr auto &set_msip(bool value) noexcept { raw = bits::msip::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool stip() const noexcept { return bits::stip::test(raw); }
+  constexpr auto &set_stip(bool value) noexcept { raw = bits::stip::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool mtip() const noexcept { return bits::mtip::test(raw); }
+  constexpr auto &set_mtip(bool value) noexcept { raw = bits::mtip::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool seip() const noexcept { return bits::seip::test(raw); }
+  constexpr auto &set_seip(bool value) noexcept { raw = bits::seip::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool meip() const noexcept { return bits::meip::test(raw); }
+  constexpr auto &set_meip(bool value) noexcept { raw = bits::meip::set_bit(raw, value); return *this; }
 
 #if defined(__riscv)
   [[nodiscard]] static mip read() noexcept {

@@ -16,7 +16,17 @@ registers:
   encoding:
     kind: mov_cr
     reg: cr0
-  fields: []
+  fields:
+  - pe:0:1
+  - mp:1:1
+  - em:2:1
+  - ts:3:1
+  - ne:5:1
+  - wp:16:1
+  - am:18:1
+  - nw:29:1
+  - cd:30:1
+  - pg:31:1
 - name: cr2
   width: 32
   access:
@@ -34,7 +44,11 @@ registers:
   encoding:
     kind: mov_cr
     reg: cr3
-  fields: []
+  fields:
+  - pwt:3:1
+  - pcd:4:1
+  - pcid:0:12
+  - base_addr:12:40
 - name: cr4
   width: 32
   access:
@@ -43,7 +57,13 @@ registers:
   encoding:
     kind: mov_cr
     reg: cr4
-  fields: []
+  fields:
+  - pae:5:1
+  - pge:7:1
+  - pcide:17:1
+  - smep:20:1
+  - smap:21:1
+  - la57:12:1
 - name: eflags
   width: 32
   access:
@@ -51,7 +71,24 @@ registers:
   - write
   encoding:
     kind: pushf_popf
-  fields: []
+  fields:
+  - cf:0:1
+  - pf:2:1
+  - af:4:1
+  - zf:6:1
+  - sf:7:1
+  - tf:8:1
+  - intf:9:1
+  - df:10:1
+  - of:11:1
+  - iopl:12:2
+  - nt:14:1
+  - rf:16:1
+  - vm:17:1
+  - ac:18:1
+  - vif:19:1
+  - vip:20:1
+  - id:21:1
 - name: ia32_efer
   width: 64
   access:
@@ -59,5 +96,9 @@ registers:
   - write
   encoding:
     kind: rdmsr_wrmsr
-    msr: 0xc0000080
-  fields: []
+    msr: 3221225600
+  fields:
+  - sce:0:1
+  - lme:8:1
+  - lma:10:1
+  - nxe:11:1

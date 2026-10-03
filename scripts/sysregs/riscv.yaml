@@ -15,7 +15,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc00
+    address: 3072
   fields: []
 - name: time
   width: 64
@@ -24,7 +24,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc01
+    address: 3073
   fields: []
 - name: instret
   width: 64
@@ -33,7 +33,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc02
+    address: 3074
   fields: []
 - name: hpmcounter3
   width: 64
@@ -42,7 +42,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc03
+    address: 3075
   fields: []
 - name: hpmcounter4
   width: 64
@@ -51,7 +51,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc04
+    address: 3076
   fields: []
 - name: hpmcounter5
   width: 64
@@ -60,7 +60,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc05
+    address: 3077
   fields: []
 - name: hpmcounter6
   width: 64
@@ -69,7 +69,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc06
+    address: 3078
   fields: []
 - name: hpmcounter7
   width: 64
@@ -78,7 +78,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc07
+    address: 3079
   fields: []
 - name: hpmcounter8
   width: 64
@@ -87,7 +87,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc08
+    address: 3080
   fields: []
 - name: hpmcounter9
   width: 64
@@ -96,7 +96,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc09
+    address: 3081
   fields: []
 - name: hpmcounter10
   width: 64
@@ -105,7 +105,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc0a
+    address: 3082
   fields: []
 - name: hpmcounter11
   width: 64
@@ -114,7 +114,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc0b
+    address: 3083
   fields: []
 - name: hpmcounter12
   width: 64
@@ -123,7 +123,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc0c
+    address: 3084
   fields: []
 - name: hpmcounter13
   width: 64
@@ -132,7 +132,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc0d
+    address: 3085
   fields: []
 - name: hpmcounter14
   width: 64
@@ -141,7 +141,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc0e
+    address: 3086
   fields: []
 - name: hpmcounter15
   width: 64
@@ -150,7 +150,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc0f
+    address: 3087
   fields: []
 - name: hpmcounter16
   width: 64
@@ -159,7 +159,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc10
+    address: 3088
   fields: []
 - name: hpmcounter17
   width: 64
@@ -168,7 +168,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc11
+    address: 3089
   fields: []
 - name: hpmcounter18
   width: 64
@@ -177,7 +177,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc12
+    address: 3090
   fields: []
 - name: hpmcounter19
   width: 64
@@ -186,7 +186,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc13
+    address: 3091
   fields: []
 - name: hpmcounter20
   width: 64
@@ -195,7 +195,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc14
+    address: 3092
   fields: []
 - name: hpmcounter21
   width: 64
@@ -204,7 +204,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc15
+    address: 3093
   fields: []
 - name: hpmcounter22
   width: 64
@@ -213,7 +213,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc16
+    address: 3094
   fields: []
 - name: hpmcounter23
   width: 64
@@ -222,7 +222,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc17
+    address: 3095
   fields: []
 - name: hpmcounter24
   width: 64
@@ -231,7 +231,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc18
+    address: 3096
   fields: []
 - name: hpmcounter25
   width: 64
@@ -240,7 +240,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc19
+    address: 3097
   fields: []
 - name: hpmcounter26
   width: 64
@@ -249,7 +249,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc1a
+    address: 3098
   fields: []
 - name: hpmcounter27
   width: 64
@@ -258,7 +258,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc1b
+    address: 3099
   fields: []
 - name: hpmcounter28
   width: 64
@@ -267,7 +267,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc1c
+    address: 3100
   fields: []
 - name: hpmcounter29
   width: 64
@@ -276,7 +276,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc1d
+    address: 3101
   fields: []
 - name: hpmcounter30
   width: 64
@@ -285,7 +285,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc1e
+    address: 3102
   fields: []
 - name: hpmcounter31
   width: 64
@@ -294,7 +294,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc1f
+    address: 3103
   fields: []
 - name: cycleh
   width: 64
@@ -303,7 +303,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc80
+    address: 3200
   fields: []
 - name: timeh
   width: 64
@@ -312,7 +312,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc81
+    address: 3201
   fields: []
 - name: instreth
   width: 64
@@ -321,7 +321,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc82
+    address: 3202
   fields: []
 - name: hpmcounter3_h
   width: 64
@@ -330,7 +330,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc83
+    address: 3203
   fields: []
 - name: hpmcounter4_h
   width: 64
@@ -339,7 +339,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc84
+    address: 3204
   fields: []
 - name: hpmcounter5_h
   width: 64
@@ -348,7 +348,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc85
+    address: 3205
   fields: []
 - name: hpmcounter6_h
   width: 64
@@ -357,7 +357,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc86
+    address: 3206
   fields: []
 - name: hpmcounter7_h
   width: 64
@@ -366,7 +366,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc87
+    address: 3207
   fields: []
 - name: hpmcounter8_h
   width: 64
@@ -375,7 +375,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc88
+    address: 3208
   fields: []
 - name: hpmcounter9_h
   width: 64
@@ -384,7 +384,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc89
+    address: 3209
   fields: []
 - name: hpmcounter10_h
   width: 64
@@ -393,7 +393,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc8a
+    address: 3210
   fields: []
 - name: hpmcounter11_h
   width: 64
@@ -402,7 +402,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc8b
+    address: 3211
   fields: []
 - name: hpmcounter12_h
   width: 64
@@ -411,7 +411,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc8c
+    address: 3212
   fields: []
 - name: hpmcounter13_h
   width: 64
@@ -420,7 +420,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc8d
+    address: 3213
   fields: []
 - name: hpmcounter14_h
   width: 64
@@ -429,7 +429,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc8e
+    address: 3214
   fields: []
 - name: hpmcounter15_h
   width: 64
@@ -438,7 +438,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc8f
+    address: 3215
   fields: []
 - name: hpmcounter16_h
   width: 64
@@ -447,7 +447,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc90
+    address: 3216
   fields: []
 - name: hpmcounter17_h
   width: 64
@@ -456,7 +456,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc91
+    address: 3217
   fields: []
 - name: hpmcounter18_h
   width: 64
@@ -465,7 +465,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc92
+    address: 3218
   fields: []
 - name: hpmcounter19_h
   width: 64
@@ -474,7 +474,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc93
+    address: 3219
   fields: []
 - name: hpmcounter20_h
   width: 64
@@ -483,7 +483,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc94
+    address: 3220
   fields: []
 - name: hpmcounter21_h
   width: 64
@@ -492,7 +492,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc95
+    address: 3221
   fields: []
 - name: hpmcounter22_h
   width: 64
@@ -501,7 +501,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc96
+    address: 3222
   fields: []
 - name: hpmcounter23_h
   width: 64
@@ -510,7 +510,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc97
+    address: 3223
   fields: []
 - name: hpmcounter24_h
   width: 64
@@ -519,7 +519,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc98
+    address: 3224
   fields: []
 - name: hpmcounter25_h
   width: 64
@@ -528,7 +528,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc99
+    address: 3225
   fields: []
 - name: hpmcounter26_h
   width: 64
@@ -537,7 +537,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc9a
+    address: 3226
   fields: []
 - name: hpmcounter27_h
   width: 64
@@ -546,7 +546,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc9b
+    address: 3227
   fields: []
 - name: hpmcounter28_h
   width: 64
@@ -555,7 +555,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc9c
+    address: 3228
   fields: []
 - name: hpmcounter29_h
   width: 64
@@ -564,7 +564,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc9d
+    address: 3229
   fields: []
 - name: hpmcounter30_h
   width: 64
@@ -573,7 +573,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc9e
+    address: 3230
   fields: []
 - name: hpmcounter31_h
   width: 64
@@ -582,7 +582,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc9f
+    address: 3231
   fields: []
 - name: sscountovf
   width: 64
@@ -591,7 +591,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xda0
+    address: 3488
   fields: []
 - name: sstatus
   width: 64
@@ -600,8 +600,13 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x100
-  fields: []
+    address: 256
+  fields:
+  - sie:1:1
+  - spie:5:1
+  - spp:8:1
+  - sum:18:1
+  - mxr:19:1
 - name: sie
   width: 64
   access:
@@ -609,8 +614,11 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x104
-  fields: []
+    address: 260
+  fields:
+  - ssie:1:1
+  - stie:5:1
+  - seie:9:1
 - name: stvec
   width: 64
   access:
@@ -618,8 +626,10 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x105
-  fields: []
+    address: 261
+  fields:
+  - mode:0:2
+  - base:2:62
 - name: scounteren
   width: 64
   access:
@@ -627,7 +637,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x106
+    address: 262
   fields: []
 - name: senvcfg
   width: 64
@@ -636,7 +646,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x10a
+    address: 266
   fields: []
 - name: sstateen0
   width: 64
@@ -645,7 +655,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x10c
+    address: 268
   fields: []
 - name: sscratch
   width: 64
@@ -654,7 +664,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x140
+    address: 320
   fields: []
 - name: sepc
   width: 64
@@ -663,7 +673,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x141
+    address: 321
   fields: []
 - name: scause
   width: 64
@@ -672,8 +682,10 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x142
-  fields: []
+    address: 322
+  fields:
+  - exception_code:0:63
+  - interrupt:63:1
 - name: stval
   width: 64
   access:
@@ -681,7 +693,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x143
+    address: 323
   fields: []
 - name: sip
   width: 64
@@ -690,8 +702,11 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x144
-  fields: []
+    address: 324
+  fields:
+  - ssip:1:1
+  - stip:5:1
+  - seip:9:1
 - name: satp
   width: 64
   access:
@@ -699,8 +714,11 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x180
-  fields: []
+    address: 384
+  fields:
+  - ppn:0:44
+  - asid:44:16
+  - mode:60:4
 - name: stimecmp
   width: 64
   access:
@@ -708,7 +726,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x14d
+    address: 333
   fields: []
 - name: stimecmph
   width: 64
@@ -717,7 +735,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x15d
+    address: 349
   fields: []
 - name: siselect
   width: 64
@@ -726,7 +744,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x150
+    address: 336
   fields: []
 - name: sireg
   width: 64
@@ -735,7 +753,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x151
+    address: 337
   fields: []
 - name: stopei
   width: 64
@@ -744,7 +762,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x15c
+    address: 348
   fields: []
 - name: stopi
   width: 64
@@ -753,7 +771,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xdb0
+    address: 3504
   fields: []
 - name: sieh
   width: 64
@@ -762,7 +780,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x114
+    address: 276
   fields: []
 - name: siph
   width: 64
@@ -771,7 +789,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x154
+    address: 340
   fields: []
 - name: vsstatus
   width: 64
@@ -780,7 +798,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x200
+    address: 512
   fields: []
 - name: vsie
   width: 64
@@ -789,7 +807,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x204
+    address: 516
   fields: []
 - name: vstvec
   width: 64
@@ -798,7 +816,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x205
+    address: 517
   fields: []
 - name: vsscratch
   width: 64
@@ -807,7 +825,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x240
+    address: 576
   fields: []
 - name: vsepc
   width: 64
@@ -816,7 +834,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x241
+    address: 577
   fields: []
 - name: vscause
   width: 64
@@ -825,7 +843,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x242
+    address: 578
   fields: []
 - name: vstval
   width: 64
@@ -834,7 +852,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x243
+    address: 579
   fields: []
 - name: vsip
   width: 64
@@ -843,7 +861,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x244
+    address: 580
   fields: []
 - name: vsatp
   width: 64
@@ -852,7 +870,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x280
+    address: 640
   fields: []
 - name: vstimecmp
   width: 64
@@ -861,7 +879,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x24d
+    address: 589
   fields: []
 - name: vstimecmph
   width: 64
@@ -870,7 +888,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x25d
+    address: 605
   fields: []
 - name: hstatus
   width: 64
@@ -879,7 +897,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x600
+    address: 1536
   fields: []
 - name: hedeleg
   width: 64
@@ -888,7 +906,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x602
+    address: 1538
   fields: []
 - name: hideleg
   width: 64
@@ -897,7 +915,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x603
+    address: 1539
   fields: []
 - name: hie
   width: 64
@@ -906,7 +924,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x604
+    address: 1540
   fields: []
 - name: htimedelta
   width: 64
@@ -915,7 +933,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x605
+    address: 1541
   fields: []
 - name: hcounteren
   width: 64
@@ -924,7 +942,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x606
+    address: 1542
   fields: []
 - name: hgeie
   width: 64
@@ -933,7 +951,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x607
+    address: 1543
   fields: []
 - name: henvcfg
   width: 64
@@ -942,7 +960,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x60a
+    address: 1546
   fields: []
 - name: htimedeltah
   width: 64
@@ -951,7 +969,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x615
+    address: 1557
   fields: []
 - name: henvcfgh
   width: 64
@@ -960,7 +978,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x61a
+    address: 1562
   fields: []
 - name: htval
   width: 64
@@ -969,7 +987,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x643
+    address: 1603
   fields: []
 - name: hip
   width: 64
@@ -978,7 +996,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x644
+    address: 1604
   fields: []
 - name: hvip
   width: 64
@@ -987,7 +1005,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x645
+    address: 1605
   fields: []
 - name: htinst
   width: 64
@@ -996,7 +1014,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x64a
+    address: 1610
   fields: []
 - name: hgatp
   width: 64
@@ -1005,7 +1023,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x680
+    address: 1664
   fields: []
 - name: hgeip
   width: 64
@@ -1014,7 +1032,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xe12
+    address: 3602
   fields: []
 - name: hvien
   width: 64
@@ -1023,7 +1041,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x608
+    address: 1544
   fields: []
 - name: hvictl
   width: 64
@@ -1032,7 +1050,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x609
+    address: 1545
   fields: []
 - name: hviprio1
   width: 64
@@ -1041,7 +1059,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x646
+    address: 1606
   fields: []
 - name: hviprio2
   width: 64
@@ -1050,7 +1068,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x647
+    address: 1607
   fields: []
 - name: vsiselect
   width: 64
@@ -1059,7 +1077,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x250
+    address: 592
   fields: []
 - name: vsireg
   width: 64
@@ -1068,7 +1086,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x251
+    address: 593
   fields: []
 - name: vstopei
   width: 64
@@ -1077,7 +1095,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x25c
+    address: 604
   fields: []
 - name: vstopi
   width: 64
@@ -1086,7 +1104,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xeb0
+    address: 3760
   fields: []
 - name: hidelegh
   width: 64
@@ -1095,7 +1113,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x613
+    address: 1555
   fields: []
 - name: hvienh
   width: 64
@@ -1104,7 +1122,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x618
+    address: 1560
   fields: []
 - name: hviph
   width: 64
@@ -1113,7 +1131,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x655
+    address: 1621
   fields: []
 - name: hviprio1_h
   width: 64
@@ -1122,7 +1140,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x656
+    address: 1622
   fields: []
 - name: hviprio2_h
   width: 64
@@ -1131,7 +1149,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x657
+    address: 1623
   fields: []
 - name: vsieh
   width: 64
@@ -1140,7 +1158,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x214
+    address: 532
   fields: []
 - name: vsiph
   width: 64
@@ -1149,7 +1167,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x254
+    address: 596
   fields: []
 - name: hstateen0
   width: 64
@@ -1158,7 +1176,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x60c
+    address: 1548
   fields: []
 - name: hstateen0_h
   width: 64
@@ -1167,7 +1185,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x61c
+    address: 1564
   fields: []
 - name: mstatus
   width: 64
@@ -1176,8 +1194,20 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x300
-  fields: []
+    address: 768
+  fields:
+  - sie:1:1
+  - mie:3:1
+  - spie:5:1
+  - mpie:7:1
+  - spp:8:1
+  - mpp:11:2
+  - mprv:17:1
+  - sum:18:1
+  - mxr:19:1
+  - tvm:20:1
+  - tw:21:1
+  - tsr:22:1
 - name: misa
   width: 64
   access:
@@ -1185,7 +1215,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x301
+    address: 769
   fields: []
 - name: mideleg
   width: 64
@@ -1194,7 +1224,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x303
+    address: 771
   fields: []
 - name: mie
   width: 64
@@ -1203,8 +1233,14 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x304
-  fields: []
+    address: 772
+  fields:
+  - ssie:1:1
+  - msie:3:1
+  - stie:5:1
+  - mtie:7:1
+  - seie:9:1
+  - meie:11:1
 - name: mtvec
   width: 64
   access:
@@ -1212,8 +1248,10 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x305
-  fields: []
+    address: 773
+  fields:
+  - mode:0:2
+  - base:2:62
 - name: menvcfg
   width: 64
   access:
@@ -1221,7 +1259,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x30a
+    address: 778
   fields: []
 - name: menvcfgh
   width: 64
@@ -1230,7 +1268,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x31a
+    address: 794
   fields: []
 - name: mscratch
   width: 64
@@ -1239,7 +1277,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x340
+    address: 832
   fields: []
 - name: mepc
   width: 64
@@ -1248,7 +1286,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x341
+    address: 833
   fields: []
 - name: mcause
   width: 64
@@ -1257,8 +1295,10 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x342
-  fields: []
+    address: 834
+  fields:
+  - exception_code:0:63
+  - interrupt:63:1
 - name: mtval
   width: 64
   access:
@@ -1266,7 +1306,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x343
+    address: 835
   fields: []
 - name: mip
   width: 64
@@ -1275,8 +1315,14 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x344
-  fields: []
+    address: 836
+  fields:
+  - ssip:1:1
+  - msip:3:1
+  - stip:5:1
+  - mtip:7:1
+  - seip:9:1
+  - meip:11:1
 - name: pmpcfg0
   width: 64
   access:
@@ -1284,7 +1330,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x3a0
+    address: 928
   fields: []
 - name: pmpaddr0
   width: 64
@@ -1293,7 +1339,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x3b0
+    address: 944
   fields: []
 - name: mvendorid
   width: 64
@@ -1302,7 +1348,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xf11
+    address: 3857
   fields: []
 - name: marchid
   width: 64
@@ -1311,7 +1357,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xf12
+    address: 3858
   fields: []
 - name: mimpid
   width: 64
@@ -1320,7 +1366,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xf13
+    address: 3859
   fields: []
 - name: mhartid
   width: 64
@@ -1329,7 +1375,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xf14
+    address: 3860
   fields: []
 - name: miselect
   width: 64
@@ -1338,7 +1384,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x350
+    address: 848
   fields: []
 - name: mireg
   width: 64
@@ -1347,7 +1393,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x351
+    address: 849
   fields: []
 - name: mtopei
   width: 64
@@ -1356,7 +1402,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x35c
+    address: 860
   fields: []
 - name: mtopi
   width: 64
@@ -1365,7 +1411,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xfb0
+    address: 4016
   fields: []
 - name: mvien
   width: 64
@@ -1374,7 +1420,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x308
+    address: 776
   fields: []
 - name: mvip
   width: 64
@@ -1383,7 +1429,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x309
+    address: 777
   fields: []
 - name: midelegh
   width: 64
@@ -1392,7 +1438,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x313
+    address: 787
   fields: []
 - name: mieh
   width: 64
@@ -1401,7 +1447,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x314
+    address: 788
   fields: []
 - name: mvienh
   width: 64
@@ -1410,7 +1456,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x318
+    address: 792
   fields: []
 - name: mviph
   width: 64
@@ -1419,7 +1465,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x319
+    address: 793
   fields: []
 - name: miph
   width: 64
@@ -1428,7 +1474,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x354
+    address: 852
   fields: []
 - name: vstart
   width: 64
@@ -1437,7 +1483,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x8
+    address: 8
   fields: []
 - name: vcsr
   width: 64
@@ -1446,7 +1492,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xf
+    address: 15
   fields: []
 - name: vl
   width: 64
@@ -1455,7 +1501,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc20
+    address: 3104
   fields: []
 - name: vtype
   width: 64
@@ -1464,7 +1510,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc21
+    address: 3105
   fields: []
 - name: vlenb
   width: 64
@@ -1473,7 +1519,7 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0xc22
+    address: 3106
   fields: []
 - name: seed
   width: 64
@@ -1482,5 +1528,5 @@ registers:
   - write
   encoding:
     kind: csr
-    address: 0x15
+    address: 21
   fields: []
