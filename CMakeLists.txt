@@ -310,6 +310,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_core_pin_guard.cpp
         tests/test_core_rendezvous_barrier.cpp
         tests/test_early_rendezvous_barrier.cpp
+        tests/test_cpu_online_dispatcher.cpp
         tests/test_per_cpu_ptr.cpp
         tests/test_per_thread_ptr.cpp
         tests/test_per_domain_ptr.cpp
