@@ -72,4 +72,4 @@ another core) -- a waiter here can never jump ahead of an earlier one
 that is itself stalled, so an unexpectedly long critical section delays
 strictly more waiters than the unfair `kernel_spin_lock` would.
 
-See also: [`kernel_spin_lock.md`](kernel_spin_lock.md), [`queue_spin_lock.md`](queue_spin_lock.md), [`backoff.md`](backoff.md), [`softlock_detector.md`](softlock_detector.md).
+See also: [`kernel_spin_lock.md`](kernel_spin_lock.md), [`queue_spin_lock.md`](queue_spin_lock.md), [`rw_spin_lock.md`](rw_spin_lock.md), [`backoff.md`](backoff.md), [`softlock_detector.md`](softlock_detector.md).

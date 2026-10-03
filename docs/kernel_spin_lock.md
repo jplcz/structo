@@ -75,4 +75,4 @@ or [`queue_spin_lock<Traits>`](queue_spin_lock.md) for an MCS-style
 queue lock that additionally avoids every waiter polling one shared
 cache line.
 
-See also: [`backoff.md`](backoff.md), [`softlock_detector.md`](softlock_detector.md), [`ticket_spin_lock.md`](ticket_spin_lock.md), [`queue_spin_lock.md`](queue_spin_lock.md), [`irq_guard.md`](irq_guard.md), [`spinlock_entry_guard.md`](spinlock_entry_guard.md).
+See also: [`backoff.md`](backoff.md), [`softlock_detector.md`](softlock_detector.md), [`ticket_spin_lock.md`](ticket_spin_lock.md), [`queue_spin_lock.md`](queue_spin_lock.md), [`rw_spin_lock.md`](rw_spin_lock.md), [`irq_guard.md`](irq_guard.md), [`spinlock_entry_guard.md`](spinlock_entry_guard.md).

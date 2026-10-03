@@ -89,4 +89,4 @@ spinning is known to be short (IRQ/exception handlers,
 pre-scheduler-init code, data shared with an interrupt handler on
 another core).
 
-See also: [`kernel_spin_lock.md`](kernel_spin_lock.md), [`ticket_spin_lock.md`](ticket_spin_lock.md), [`backoff.md`](backoff.md), [`softlock_detector.md`](softlock_detector.md).
+See also: [`kernel_spin_lock.md`](kernel_spin_lock.md), [`ticket_spin_lock.md`](ticket_spin_lock.md), [`rw_spin_lock.md`](rw_spin_lock.md), [`backoff.md`](backoff.md), [`softlock_detector.md`](softlock_detector.md).
