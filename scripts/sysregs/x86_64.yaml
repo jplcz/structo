@@ -1,0 +1,91 @@
+arch: x86_64
+registers:
+- name: cr0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mov_cr
+    reg: cr0
+  fields: []
+- name: cr2
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mov_cr
+    reg: cr2
+  fields: []
+- name: cr3
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mov_cr
+    reg: cr3
+  fields: []
+- name: cr4
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mov_cr
+    reg: cr4
+  fields: []
+- name: cr8
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mov_cr
+    reg: cr8
+  fields: []
+- name: rflags
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: pushf_popf
+  fields: []
+- name: ia32_efer
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: rdmsr_wrmsr
+    msr: 0xc0000080
+  fields: []
+- name: ia32_fs_base
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: rdmsr_wrmsr
+    msr: 0xc0000100
+  fields: []
+- name: ia32_gs_base
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: rdmsr_wrmsr
+    msr: 0xc0000101
+  fields: []
+- name: ia32_kernel_gs_base
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: rdmsr_wrmsr
+    msr: 0xc0000102
+  fields: []

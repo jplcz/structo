@@ -1,0 +1,55 @@
+arch: x86
+registers:
+- name: cr0
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: mov_cr
+    reg: cr0
+  fields: []
+- name: cr2
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: mov_cr
+    reg: cr2
+  fields: []
+- name: cr3
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: mov_cr
+    reg: cr3
+  fields: []
+- name: cr4
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: mov_cr
+    reg: cr4
+  fields: []
+- name: eflags
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: pushf_popf
+  fields: []
+- name: ia32_efer
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: rdmsr_wrmsr
+    msr: 0xc0000080
+  fields: []

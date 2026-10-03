@@ -1,0 +1,1925 @@
+arch: arm64
+registers:
+- name: afsr0_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 5
+    crm: 1
+    op2: 0
+  fields: []
+- name: afsr0_el12
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 5
+    crn: 5
+    crm: 1
+    op2: 0
+  fields: []
+- name: afsr1_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 5
+    crm: 1
+    op2: 1
+  fields: []
+- name: afsr1_el12
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 5
+    crn: 5
+    crm: 1
+    op2: 1
+  fields: []
+- name: amair_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 10
+    crm: 3
+    op2: 0
+  fields: []
+- name: amair_el12
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 5
+    crn: 10
+    crm: 3
+    op2: 0
+  fields: []
+- name: apdakey_hi_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 2
+    crm: 2
+    op2: 1
+  fields: []
+- name: apdakey_lo_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 2
+    crm: 2
+    op2: 0
+  fields: []
+- name: apdbkey_hi_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 2
+    crm: 2
+    op2: 3
+  fields: []
+- name: apdbkey_lo_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 2
+    crm: 2
+    op2: 2
+  fields: []
+- name: apgakey_hi_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 2
+    crm: 3
+    op2: 1
+  fields: []
+- name: apgakey_lo_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 2
+    crm: 3
+    op2: 0
+  fields: []
+- name: apiakey_hi_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 2
+    crm: 1
+    op2: 1
+  fields: []
+- name: apiakey_lo_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 2
+    crm: 1
+    op2: 0
+  fields: []
+- name: apibkey_hi_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 2
+    crm: 1
+    op2: 3
+  fields: []
+- name: apibkey_lo_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 2
+    crm: 1
+    op2: 2
+  fields: []
+- name: ccsidr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 1
+    crn: 0
+    crm: 0
+    op2: 0
+  fields: []
+- name: clidr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 1
+    crn: 0
+    crm: 0
+    op2: 1
+  fields: []
+- name: cntkctl_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 14
+    crm: 1
+    op2: 0
+  fields: []
+- name: cntkctl_el12
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 5
+    crn: 14
+    crm: 1
+    op2: 0
+  fields: []
+- name: cntp_ctl_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 14
+    crm: 2
+    op2: 1
+  fields: []
+- name: cntp_ctl_el02
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 5
+    crn: 14
+    crm: 2
+    op2: 1
+  fields: []
+- name: cntp_cval_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 14
+    crm: 2
+    op2: 2
+  fields: []
+- name: cntp_cval_el02
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 5
+    crn: 14
+    crm: 2
+    op2: 2
+  fields: []
+- name: cntp_tval_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 14
+    crm: 2
+    op2: 0
+  fields: []
+- name: cntpct_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 14
+    crm: 0
+    op2: 1
+  fields: []
+- name: cntpctss_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 14
+    crm: 0
+    op2: 5
+  fields: []
+- name: cntv_ctl_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 14
+    crm: 3
+    op2: 1
+  fields: []
+- name: cntv_ctl_el02
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 5
+    crn: 14
+    crm: 3
+    op2: 1
+  fields: []
+- name: cntv_cval_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 14
+    crm: 3
+    op2: 2
+  fields: []
+- name: cntv_cval_el02
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 5
+    crn: 14
+    crm: 3
+    op2: 2
+  fields: []
+- name: cntvctss_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 14
+    crm: 0
+    op2: 6
+  fields: []
+- name: contextidr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 13
+    crm: 0
+    op2: 1
+  fields: []
+- name: contextidr_el12
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 5
+    crn: 13
+    crm: 0
+    op2: 1
+  fields: []
+- name: cpacr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 1
+    crm: 0
+    op2: 2
+  fields: []
+- name: cpacr_el12
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 5
+    crn: 1
+    crm: 0
+    op2: 2
+  fields: []
+- name: csselr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 2
+    crn: 0
+    crm: 0
+    op2: 0
+  fields: []
+- name: ctr_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 0
+    crm: 0
+    op2: 1
+  fields: []
+- name: dbgauthstatus_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 2
+    op1: 0
+    crn: 7
+    crm: 14
+    op2: 6
+  fields: []
+- name: dbgclaimclr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 2
+    op1: 0
+    crn: 7
+    crm: 9
+    op2: 6
+  fields: []
+- name: dbgclaimset_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 2
+    op1: 0
+    crn: 7
+    crm: 8
+    op2: 6
+  fields: []
+- name: dbgprcr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 2
+    op1: 0
+    crn: 1
+    crm: 4
+    op2: 4
+  fields: []
+- name: elr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 4
+    crm: 0
+    op2: 1
+  fields: []
+- name: elr_el12
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 5
+    crn: 4
+    crm: 0
+    op2: 1
+  fields: []
+- name: esr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 5
+    crm: 2
+    op2: 0
+  fields: []
+- name: esr_el12
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 5
+    crn: 5
+    crm: 2
+    op2: 0
+  fields: []
+- name: far_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 6
+    crm: 0
+    op2: 0
+  fields: []
+- name: far_el12
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 5
+    crn: 6
+    crm: 0
+    op2: 0
+  fields: []
+- name: gcr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 1
+    crm: 0
+    op2: 6
+  fields: []
+- name: gmid_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 1
+    crn: 0
+    crm: 0
+    op2: 4
+  fields: []
+- name: icc_sgi1_r_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 12
+    crm: 11
+    op2: 5
+  fields: []
+- name: id_aa64_afr0_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 5
+    op2: 4
+  fields: []
+- name: id_aa64_afr1_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 5
+    op2: 5
+  fields: []
+- name: id_aa64_dfr0_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 5
+    op2: 0
+  fields: []
+- name: id_aa64_dfr1_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 5
+    op2: 1
+  fields: []
+- name: id_aa64_isar0_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 6
+    op2: 0
+  fields: []
+- name: id_aa64_isar1_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 6
+    op2: 1
+  fields: []
+- name: id_aa64_isar2_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 6
+    op2: 2
+  fields: []
+- name: id_aa64_mmfr0_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 7
+    op2: 0
+  fields: []
+- name: id_aa64_mmfr1_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 7
+    op2: 1
+  fields: []
+- name: id_aa64_mmfr2_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 7
+    op2: 2
+  fields: []
+- name: id_aa64_mmfr3_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 7
+    op2: 3
+  fields: []
+- name: id_aa64_mmfr4_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 7
+    op2: 4
+  fields: []
+- name: id_aa64_pfr0_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 4
+    op2: 0
+  fields: []
+- name: id_aa64_pfr1_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 4
+    op2: 1
+  fields: []
+- name: id_aa64_pfr2_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 4
+    op2: 2
+  fields: []
+- name: id_aa64_zfr0_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 4
+    op2: 4
+  fields: []
+- name: id_isar5_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 2
+    op2: 5
+  fields: []
+- name: mair_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 10
+    crm: 2
+    op2: 0
+  fields: []
+- name: mair_el12
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 5
+    crn: 10
+    crm: 2
+    op2: 0
+  fields: []
+- name: mdccint_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 2
+    op1: 0
+    crn: 0
+    crm: 2
+    op2: 0
+  fields: []
+- name: mdccsr_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 2
+    op1: 3
+    crn: 0
+    crm: 1
+    op2: 0
+  fields: []
+- name: mdscr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 2
+    op1: 0
+    crn: 0
+    crm: 2
+    op2: 2
+  fields: []
+- name: midr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 0
+    op2: 0
+  fields: []
+- name: mpidr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 0
+    op2: 5
+  fields: []
+- name: mvfr0_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 3
+    op2: 0
+  fields: []
+- name: mvfr1_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 3
+    op2: 1
+  fields: []
+- name: osdlr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 2
+    op1: 0
+    crn: 1
+    crm: 3
+    op2: 4
+  fields: []
+- name: oslar_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 2
+    op1: 0
+    crn: 1
+    crm: 0
+    op2: 4
+  fields: []
+- name: oslsr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 2
+    op1: 0
+    crn: 1
+    crm: 1
+    op2: 4
+  fields: []
+- name: pmbidr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 9
+    crm: 10
+    op2: 7
+  fields: []
+- name: pmblimitr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 9
+    crm: 10
+    op2: 0
+  fields: []
+- name: pmbptr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 9
+    crm: 10
+    op2: 1
+  fields: []
+- name: pmbsr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 9
+    crm: 10
+    op2: 3
+  fields: []
+- name: pmccfiltr_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 14
+    crm: 15
+    op2: 7
+  fields: []
+- name: pmccntr_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 9
+    crm: 13
+    op2: 0
+  fields: []
+- name: pmceid0_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 9
+    crm: 12
+    op2: 6
+  fields: []
+- name: pmceid1_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 9
+    crm: 12
+    op2: 7
+  fields: []
+- name: pmcntenclr_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 9
+    crm: 12
+    op2: 2
+  fields: []
+- name: pmcntenset_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 9
+    crm: 12
+    op2: 1
+  fields: []
+- name: pmcr_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 9
+    crm: 12
+    op2: 0
+  fields: []
+- name: pmintenclr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 9
+    crm: 14
+    op2: 2
+  fields: []
+- name: pmintenset_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 9
+    crm: 14
+    op2: 1
+  fields: []
+- name: pmmir_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 9
+    crm: 14
+    op2: 6
+  fields: []
+- name: pmovsclr_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 9
+    crm: 12
+    op2: 3
+  fields: []
+- name: pmovsset_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 9
+    crm: 14
+    op2: 3
+  fields: []
+- name: pmscr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 9
+    crm: 9
+    op2: 0
+  fields: []
+- name: pmselr_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 9
+    crm: 12
+    op2: 5
+  fields: []
+- name: pmsevfr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 9
+    crm: 9
+    op2: 5
+  fields: []
+- name: pmsfcr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 9
+    crm: 9
+    op2: 4
+  fields: []
+- name: pmsicr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 9
+    crm: 9
+    op2: 2
+  fields: []
+- name: pmsidr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 9
+    crm: 9
+    op2: 7
+  fields: []
+- name: pmsirr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 9
+    crm: 9
+    op2: 3
+  fields: []
+- name: pmslatfr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 9
+    crm: 9
+    op2: 6
+  fields: []
+- name: pmsnevfr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 9
+    crm: 9
+    op2: 1
+  fields: []
+- name: pmswinc_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 9
+    crm: 12
+    op2: 4
+  fields: []
+- name: pmuserenr_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 9
+    crm: 14
+    op2: 0
+  fields: []
+- name: pmxevcntr_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 9
+    crm: 13
+    op2: 2
+  fields: []
+- name: pmxevtyper_el0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 9
+    crm: 13
+    op2: 1
+  fields: []
+- name: rgsr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 1
+    crm: 0
+    op2: 5
+  fields: []
+- name: rndrrs
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 2
+    crm: 4
+    op2: 1
+  fields: []
+- name: sctlr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 1
+    crm: 0
+    op2: 0
+  fields: []
+- name: sctlr_el12
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 5
+    crn: 1
+    crm: 0
+    op2: 0
+  fields: []
+- name: spsr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 4
+    crm: 0
+    op2: 0
+  fields: []
+- name: spsr_el12
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 5
+    crn: 4
+    crm: 0
+    op2: 0
+  fields: []
+- name: revidr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 0
+    crm: 0
+    op2: 6
+  fields: []
+- name: tco
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 4
+    crm: 2
+    op2: 7
+  fields: []
+- name: tcr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 2
+    crm: 0
+    op2: 2
+  fields: []
+- name: tcr_el12
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 5
+    crn: 2
+    crm: 0
+    op2: 2
+  fields: []
+- name: tfsre0_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 5
+    crm: 6
+    op2: 1
+  fields: []
+- name: tfsr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 5
+    crm: 6
+    op2: 0
+  fields: []
+- name: ttbr0_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 2
+    crm: 0
+    op2: 0
+  fields: []
+- name: ttbr0_el12
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 5
+    crn: 2
+    crm: 0
+    op2: 0
+  fields: []
+- name: ttbr1_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 2
+    crm: 0
+    op2: 1
+  fields: []
+- name: ttbr1_el12
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 5
+    crn: 2
+    crm: 0
+    op2: 1
+  fields: []
+- name: vbar_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 12
+    crm: 0
+    op2: 0
+  fields: []
+- name: vbar_el12
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 5
+    crn: 12
+    crm: 0
+    op2: 0
+  fields: []
+- name: zcr_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 0
+    crn: 1
+    crm: 2
+    op2: 0
+  fields: []
+- name: sctlr_el3
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 6
+    crn: 1
+    crm: 0
+    op2: 0
+  fields: []
+- name: actlr_el3
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 6
+    crn: 1
+    crm: 0
+    op2: 1
+  fields: []
+- name: scr_el3
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 6
+    crn: 1
+    crm: 1
+    op2: 0
+  fields: []
+- name: sder32_el3
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 6
+    crn: 1
+    crm: 1
+    op2: 1
+  fields: []
+- name: cptr_el3
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 6
+    crn: 1
+    crm: 1
+    op2: 2
+  fields: []
+- name: mdcr_el3
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 6
+    crn: 1
+    crm: 3
+    op2: 1
+  fields: []
+- name: ttbr0_el3
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 6
+    crn: 2
+    crm: 0
+    op2: 0
+  fields: []
+- name: tcr_el3
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 6
+    crn: 2
+    crm: 0
+    op2: 2
+  fields: []
+- name: spsr_el3
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 6
+    crn: 4
+    crm: 0
+    op2: 0
+  fields: []
+- name: elr_el3
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 6
+    crn: 4
+    crm: 0
+    op2: 1
+  fields: []
+- name: sp_el2
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 6
+    crn: 4
+    crm: 1
+    op2: 0
+  fields: []
+- name: afsr0_el3
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 6
+    crn: 5
+    crm: 1
+    op2: 0
+  fields: []
+- name: afsr1_el3
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 6
+    crn: 5
+    crm: 1
+    op2: 1
+  fields: []
+- name: esr_el3
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 6
+    crn: 5
+    crm: 2
+    op2: 0
+  fields: []
+- name: far_el3
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 6
+    crn: 6
+    crm: 0
+    op2: 0
+  fields: []
+- name: mair_el3
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 6
+    crn: 10
+    crm: 2
+    op2: 0
+  fields: []
+- name: amair_el3
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 6
+    crn: 10
+    crm: 3
+    op2: 0
+  fields: []
+- name: vbar_el3
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 6
+    crn: 12
+    crm: 0
+    op2: 0
+  fields: []
+- name: rvbar_el3
+  width: 64
+  access:
+  - read
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 6
+    crn: 12
+    crm: 0
+    op2: 1
+  fields: []
+- name: rmr_el3
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 6
+    crn: 12
+    crm: 0
+    op2: 2
+  fields: []

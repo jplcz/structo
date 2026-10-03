@@ -1,0 +1,1478 @@
+arch: riscv
+registers:
+- name: cycle
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc00
+  fields: []
+- name: time
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc01
+  fields: []
+- name: instret
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc02
+  fields: []
+- name: hpmcounter3
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc03
+  fields: []
+- name: hpmcounter4
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc04
+  fields: []
+- name: hpmcounter5
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc05
+  fields: []
+- name: hpmcounter6
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc06
+  fields: []
+- name: hpmcounter7
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc07
+  fields: []
+- name: hpmcounter8
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc08
+  fields: []
+- name: hpmcounter9
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc09
+  fields: []
+- name: hpmcounter10
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc0a
+  fields: []
+- name: hpmcounter11
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc0b
+  fields: []
+- name: hpmcounter12
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc0c
+  fields: []
+- name: hpmcounter13
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc0d
+  fields: []
+- name: hpmcounter14
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc0e
+  fields: []
+- name: hpmcounter15
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc0f
+  fields: []
+- name: hpmcounter16
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc10
+  fields: []
+- name: hpmcounter17
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc11
+  fields: []
+- name: hpmcounter18
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc12
+  fields: []
+- name: hpmcounter19
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc13
+  fields: []
+- name: hpmcounter20
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc14
+  fields: []
+- name: hpmcounter21
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc15
+  fields: []
+- name: hpmcounter22
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc16
+  fields: []
+- name: hpmcounter23
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc17
+  fields: []
+- name: hpmcounter24
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc18
+  fields: []
+- name: hpmcounter25
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc19
+  fields: []
+- name: hpmcounter26
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc1a
+  fields: []
+- name: hpmcounter27
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc1b
+  fields: []
+- name: hpmcounter28
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc1c
+  fields: []
+- name: hpmcounter29
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc1d
+  fields: []
+- name: hpmcounter30
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc1e
+  fields: []
+- name: hpmcounter31
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc1f
+  fields: []
+- name: cycleh
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc80
+  fields: []
+- name: timeh
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc81
+  fields: []
+- name: instreth
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc82
+  fields: []
+- name: hpmcounter3_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc83
+  fields: []
+- name: hpmcounter4_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc84
+  fields: []
+- name: hpmcounter5_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc85
+  fields: []
+- name: hpmcounter6_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc86
+  fields: []
+- name: hpmcounter7_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc87
+  fields: []
+- name: hpmcounter8_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc88
+  fields: []
+- name: hpmcounter9_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc89
+  fields: []
+- name: hpmcounter10_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc8a
+  fields: []
+- name: hpmcounter11_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc8b
+  fields: []
+- name: hpmcounter12_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc8c
+  fields: []
+- name: hpmcounter13_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc8d
+  fields: []
+- name: hpmcounter14_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc8e
+  fields: []
+- name: hpmcounter15_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc8f
+  fields: []
+- name: hpmcounter16_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc90
+  fields: []
+- name: hpmcounter17_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc91
+  fields: []
+- name: hpmcounter18_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc92
+  fields: []
+- name: hpmcounter19_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc93
+  fields: []
+- name: hpmcounter20_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc94
+  fields: []
+- name: hpmcounter21_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc95
+  fields: []
+- name: hpmcounter22_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc96
+  fields: []
+- name: hpmcounter23_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc97
+  fields: []
+- name: hpmcounter24_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc98
+  fields: []
+- name: hpmcounter25_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc99
+  fields: []
+- name: hpmcounter26_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc9a
+  fields: []
+- name: hpmcounter27_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc9b
+  fields: []
+- name: hpmcounter28_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc9c
+  fields: []
+- name: hpmcounter29_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc9d
+  fields: []
+- name: hpmcounter30_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc9e
+  fields: []
+- name: hpmcounter31_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc9f
+  fields: []
+- name: sscountovf
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xda0
+  fields: []
+- name: sstatus
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x100
+  fields: []
+- name: sie
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x104
+  fields: []
+- name: stvec
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x105
+  fields: []
+- name: scounteren
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x106
+  fields: []
+- name: senvcfg
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x10a
+  fields: []
+- name: sstateen0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x10c
+  fields: []
+- name: sscratch
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x140
+  fields: []
+- name: sepc
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x141
+  fields: []
+- name: scause
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x142
+  fields: []
+- name: stval
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x143
+  fields: []
+- name: sip
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x144
+  fields: []
+- name: satp
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x180
+  fields: []
+- name: stimecmp
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x14d
+  fields: []
+- name: stimecmph
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x15d
+  fields: []
+- name: siselect
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x150
+  fields: []
+- name: sireg
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x151
+  fields: []
+- name: stopei
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x15c
+  fields: []
+- name: stopi
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xdb0
+  fields: []
+- name: sieh
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x114
+  fields: []
+- name: siph
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x154
+  fields: []
+- name: vsstatus
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x200
+  fields: []
+- name: vsie
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x204
+  fields: []
+- name: vstvec
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x205
+  fields: []
+- name: vsscratch
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x240
+  fields: []
+- name: vsepc
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x241
+  fields: []
+- name: vscause
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x242
+  fields: []
+- name: vstval
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x243
+  fields: []
+- name: vsip
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x244
+  fields: []
+- name: vsatp
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x280
+  fields: []
+- name: vstimecmp
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x24d
+  fields: []
+- name: vstimecmph
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x25d
+  fields: []
+- name: hstatus
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x600
+  fields: []
+- name: hedeleg
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x602
+  fields: []
+- name: hideleg
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x603
+  fields: []
+- name: hie
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x604
+  fields: []
+- name: htimedelta
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x605
+  fields: []
+- name: hcounteren
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x606
+  fields: []
+- name: hgeie
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x607
+  fields: []
+- name: henvcfg
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x60a
+  fields: []
+- name: htimedeltah
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x615
+  fields: []
+- name: henvcfgh
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x61a
+  fields: []
+- name: htval
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x643
+  fields: []
+- name: hip
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x644
+  fields: []
+- name: hvip
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x645
+  fields: []
+- name: htinst
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x64a
+  fields: []
+- name: hgatp
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x680
+  fields: []
+- name: hgeip
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xe12
+  fields: []
+- name: hvien
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x608
+  fields: []
+- name: hvictl
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x609
+  fields: []
+- name: hviprio1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x646
+  fields: []
+- name: hviprio2
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x647
+  fields: []
+- name: vsiselect
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x250
+  fields: []
+- name: vsireg
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x251
+  fields: []
+- name: vstopei
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x25c
+  fields: []
+- name: vstopi
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xeb0
+  fields: []
+- name: hidelegh
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x613
+  fields: []
+- name: hvienh
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x618
+  fields: []
+- name: hviph
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x655
+  fields: []
+- name: hviprio1_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x656
+  fields: []
+- name: hviprio2_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x657
+  fields: []
+- name: vsieh
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x214
+  fields: []
+- name: vsiph
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x254
+  fields: []
+- name: hstateen0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x60c
+  fields: []
+- name: hstateen0_h
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x61c
+  fields: []
+- name: mstatus
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x300
+  fields: []
+- name: misa
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x301
+  fields: []
+- name: mideleg
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x303
+  fields: []
+- name: mie
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x304
+  fields: []
+- name: mtvec
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x305
+  fields: []
+- name: menvcfg
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x30a
+  fields: []
+- name: menvcfgh
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x31a
+  fields: []
+- name: mscratch
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x340
+  fields: []
+- name: mepc
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x341
+  fields: []
+- name: mcause
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x342
+  fields: []
+- name: mtval
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x343
+  fields: []
+- name: mip
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x344
+  fields: []
+- name: pmpcfg0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x3a0
+  fields: []
+- name: pmpaddr0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x3b0
+  fields: []
+- name: mvendorid
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xf11
+  fields: []
+- name: marchid
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xf12
+  fields: []
+- name: mimpid
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xf13
+  fields: []
+- name: mhartid
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xf14
+  fields: []
+- name: miselect
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x350
+  fields: []
+- name: mireg
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x351
+  fields: []
+- name: mtopei
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x35c
+  fields: []
+- name: mtopi
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xfb0
+  fields: []
+- name: mvien
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x308
+  fields: []
+- name: mvip
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x309
+  fields: []
+- name: midelegh
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x313
+  fields: []
+- name: mieh
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x314
+  fields: []
+- name: mvienh
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x318
+  fields: []
+- name: mviph
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x319
+  fields: []
+- name: miph
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x354
+  fields: []
+- name: vstart
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x8
+  fields: []
+- name: vcsr
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xf
+  fields: []
+- name: vl
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc20
+  fields: []
+- name: vtype
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc21
+  fields: []
+- name: vlenb
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0xc22
+  fields: []
+- name: seed
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 0x15
+  fields: []

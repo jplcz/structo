@@ -1,0 +1,1658 @@
+arch: arm
+registers:
+- name: dbgdidr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p14
+    opc1: 0
+    crn: 0
+    crm: 0
+    opc2: 0
+  fields: []
+- name: dbgdscrext_v6
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p14
+    opc1: 0
+    crn: 0
+    crm: 1
+    opc2: 0
+  fields: []
+- name: dbgdscrext_v7
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p14
+    opc1: 0
+    crn: 0
+    crm: 2
+    opc2: 2
+  fields: []
+- name: dbgvcr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p14
+    opc1: 0
+    crn: 0
+    crm: 7
+    opc2: 0
+  fields: []
+- name: dbgoslar
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p14
+    opc1: 0
+    crn: 1
+    crm: 0
+    opc2: 4
+  fields: []
+- name: dbgoslsr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p14
+    opc1: 0
+    crn: 1
+    crm: 1
+    opc2: 4
+  fields: []
+- name: dbgosdlr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p14
+    opc1: 0
+    crn: 1
+    crm: 3
+    opc2: 4
+  fields: []
+- name: dbgprsr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p14
+    opc1: 0
+    crn: 1
+    crm: 5
+    opc2: 4
+  fields: []
+- name: midr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 0
+    crm: 0
+    opc2: 0
+  fields: []
+- name: ctr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 0
+    crm: 0
+    opc2: 1
+  fields: []
+- name: tcmtr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 0
+    crm: 0
+    opc2: 2
+  fields: []
+- name: tlbtr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 0
+    crm: 0
+    opc2: 3
+  fields: []
+- name: mpidr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 0
+    crm: 0
+    opc2: 5
+  fields: []
+- name: revidr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 0
+    crm: 0
+    opc2: 6
+  fields: []
+- name: id_pfr0
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 0
+    crm: 1
+    opc2: 0
+  fields: []
+- name: id_pfr1
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 0
+    crm: 1
+    opc2: 1
+  fields: []
+- name: id_dfr0
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 0
+    crm: 1
+    opc2: 2
+  fields: []
+- name: id_afr0
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 0
+    crm: 1
+    opc2: 3
+  fields: []
+- name: id_mmfr0
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 0
+    crm: 1
+    opc2: 4
+  fields: []
+- name: id_mmfr1
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 0
+    crm: 1
+    opc2: 5
+  fields: []
+- name: id_mmfr2
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 0
+    crm: 1
+    opc2: 6
+  fields: []
+- name: id_mmfr3
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 0
+    crm: 1
+    opc2: 7
+  fields: []
+- name: id_isar0
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 0
+    crm: 2
+    opc2: 0
+  fields: []
+- name: id_isar1
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 0
+    crm: 2
+    opc2: 1
+  fields: []
+- name: id_isar2
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 0
+    crm: 2
+    opc2: 2
+  fields: []
+- name: id_isar3
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 0
+    crm: 2
+    opc2: 3
+  fields: []
+- name: id_isar4
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 0
+    crm: 2
+    opc2: 4
+  fields: []
+- name: id_isar5
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 0
+    crm: 2
+    opc2: 5
+  fields: []
+- name: ccsidr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 1
+    crn: 0
+    crm: 0
+    opc2: 0
+  fields: []
+- name: clidr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 1
+    crn: 0
+    crm: 0
+    opc2: 1
+  fields: []
+- name: aidr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 1
+    crn: 0
+    crm: 0
+    opc2: 7
+  fields: []
+- name: csselr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 2
+    crn: 0
+    crm: 0
+    opc2: 0
+  fields: []
+- name: vpidr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 0
+    crm: 0
+    opc2: 0
+  fields: []
+- name: vmpidr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 0
+    crm: 0
+    opc2: 5
+  fields: []
+- name: sctlr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 1
+    crm: 0
+    opc2: 0
+  fields: []
+- name: actlr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 1
+    crm: 0
+    opc2: 1
+  fields: []
+- name: cpacr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 1
+    crm: 0
+    opc2: 2
+  fields: []
+- name: scr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 1
+    crm: 1
+    opc2: 0
+  fields: []
+- name: sder
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 1
+    crm: 1
+    opc2: 1
+  fields: []
+- name: nsacr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 1
+    crm: 1
+    opc2: 2
+  fields: []
+- name: hsctlr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 1
+    crm: 0
+    opc2: 0
+  fields: []
+- name: hcr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 1
+    crm: 1
+    opc2: 0
+  fields: []
+- name: hdcr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 1
+    crm: 1
+    opc2: 1
+  fields: []
+- name: hcptr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 1
+    crm: 1
+    opc2: 2
+  fields: []
+- name: hstr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 1
+    crm: 1
+    opc2: 3
+  fields: []
+- name: ttbr0
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 2
+    crm: 0
+    opc2: 0
+  fields: []
+- name: ttbr1
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 2
+    crm: 0
+    opc2: 1
+  fields: []
+- name: ttbcr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 2
+    crm: 0
+    opc2: 2
+  fields: []
+- name: htcr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 2
+    crm: 0
+    opc2: 2
+  fields: []
+- name: vtcr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 2
+    crm: 1
+    opc2: 2
+  fields: []
+- name: dacr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 3
+    crm: 0
+    opc2: 0
+  fields: []
+- name: dfsr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 5
+    crm: 0
+    opc2: 0
+  fields: []
+- name: hsr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 5
+    crm: 2
+    opc2: 0
+  fields: []
+- name: ifsr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 5
+    crm: 0
+    opc2: 1
+  fields: []
+- name: adfsr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 5
+    crm: 1
+    opc2: 0
+  fields: []
+- name: aifsr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 5
+    crm: 1
+    opc2: 1
+  fields: []
+- name: dfar
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 6
+    crm: 0
+    opc2: 0
+  fields: []
+- name: hdfar
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 6
+    crm: 0
+    opc2: 0
+  fields: []
+- name: hifar
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 6
+    crm: 0
+    opc2: 2
+  fields: []
+- name: hpfar
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 6
+    crm: 0
+    opc2: 4
+  fields: []
+- name: ifar
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 6
+    crm: 0
+    opc2: 2
+  fields: []
+- name: par
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 7
+    crm: 4
+    opc2: 0
+  fields: []
+- name: icimvau
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 7
+    crm: 5
+    opc2: 1
+  fields: []
+- name: dcimvac
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 7
+    crm: 6
+    opc2: 1
+  fields: []
+- name: dcisw
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 7
+    crm: 6
+    opc2: 2
+  fields: []
+- name: ats1_cpr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 7
+    crm: 8
+    opc2: 0
+  fields: []
+- name: ats1_cpw
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 7
+    crm: 8
+    opc2: 1
+  fields: []
+- name: ats1_cur
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 7
+    crm: 8
+    opc2: 2
+  fields: []
+- name: ats1_cuw
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 7
+    crm: 8
+    opc2: 3
+  fields: []
+- name: ats12_nsopr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 7
+    crm: 8
+    opc2: 4
+  fields: []
+- name: ats12_nsopw
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 7
+    crm: 8
+    opc2: 5
+  fields: []
+- name: ats12_nsour
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 7
+    crm: 8
+    opc2: 6
+  fields: []
+- name: ats12_nsouw
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 7
+    crm: 8
+    opc2: 7
+  fields: []
+- name: dccmvac
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 7
+    crm: 10
+    opc2: 1
+  fields: []
+- name: dccsw
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 7
+    crm: 10
+    opc2: 2
+  fields: []
+- name: dccmvau
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 7
+    crm: 11
+    opc2: 1
+  fields: []
+- name: dccimvac
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 7
+    crm: 14
+    opc2: 1
+  fields: []
+- name: dccisw
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 7
+    crm: 14
+    opc2: 2
+  fields: []
+- name: tlbimvais
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 8
+    crm: 3
+    opc2: 1
+  fields: []
+- name: tlbiasidis
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 8
+    crm: 3
+    opc2: 2
+  fields: []
+- name: tlbimvaais
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 8
+    crm: 3
+    opc2: 3
+  fields: []
+- name: tlbimva
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 8
+    crm: 7
+    opc2: 1
+  fields: []
+- name: tlbiasid
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 8
+    crm: 7
+    opc2: 2
+  fields: []
+- name: tlbiallh
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 8
+    crm: 7
+    opc2: 0
+  fields: []
+- name: tlbimvaa
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 8
+    crm: 7
+    opc2: 3
+  fields: []
+- name: l2_ctlr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 1
+    crn: 9
+    crm: 0
+    opc2: 2
+  fields: []
+- name: pmcr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 9
+    crm: 12
+    opc2: 0
+  fields: []
+- name: pmcntenset
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 9
+    crm: 12
+    opc2: 1
+  fields: []
+- name: pmcntenclr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 9
+    crm: 12
+    opc2: 2
+  fields: []
+- name: pmovsr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 9
+    crm: 12
+    opc2: 3
+  fields: []
+- name: pmswinc
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 9
+    crm: 12
+    opc2: 4
+  fields: []
+- name: pmselr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 9
+    crm: 12
+    opc2: 5
+  fields: []
+- name: pmccntr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 9
+    crm: 13
+    opc2: 0
+  fields: []
+- name: pmxevtyper
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 9
+    crm: 13
+    opc2: 1
+  fields: []
+- name: pmxevcntrr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 9
+    crm: 13
+    opc2: 2
+  fields: []
+- name: pmuserenr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 9
+    crm: 14
+    opc2: 0
+  fields: []
+- name: pmintenset
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 9
+    crm: 14
+    opc2: 1
+  fields: []
+- name: pmintenclr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 9
+    crm: 14
+    opc2: 2
+  fields: []
+- name: prrr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 10
+    crm: 2
+    opc2: 0
+  fields: []
+- name: mair0
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 10
+    crm: 2
+    opc2: 0
+  fields: []
+- name: nmrr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 10
+    crm: 2
+    opc2: 1
+  fields: []
+- name: mair1
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 10
+    crm: 2
+    opc2: 1
+  fields: []
+- name: amair0
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 10
+    crm: 3
+    opc2: 0
+  fields: []
+- name: amair1
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 10
+    crm: 3
+    opc2: 1
+  fields: []
+- name: hmair0
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 10
+    crm: 2
+    opc2: 0
+  fields: []
+- name: hmair1
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 10
+    crm: 2
+    opc2: 1
+  fields: []
+- name: vbar
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 12
+    crm: 0
+    opc2: 0
+  fields: []
+- name: mvbar
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 12
+    crm: 0
+    opc2: 1
+  fields: []
+- name: isr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 12
+    crm: 1
+    opc2: 0
+  fields: []
+- name: hvbar
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 12
+    crm: 0
+    opc2: 0
+  fields: []
+- name: fcseidr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 13
+    crm: 0
+    opc2: 0
+  fields: []
+- name: contextidr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 13
+    crm: 0
+    opc2: 1
+  fields: []
+- name: tpidrurw
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 13
+    crm: 0
+    opc2: 2
+  fields: []
+- name: tpidruro
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 13
+    crm: 0
+    opc2: 3
+  fields: []
+- name: tpidrprw
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 13
+    crm: 0
+    opc2: 4
+  fields: []
+- name: htpidr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 13
+    crm: 0
+    opc2: 2
+  fields: []
+- name: cntfrq
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 14
+    crm: 0
+    opc2: 0
+  fields: []
+- name: cntkctl
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 14
+    crm: 1
+    opc2: 0
+  fields: []
+- name: cntp_tval
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 14
+    crm: 2
+    opc2: 0
+  fields: []
+- name: cntp_ctl
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 14
+    crm: 2
+    opc2: 1
+  fields: []
+- name: cntv_tval
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 14
+    crm: 3
+    opc2: 0
+  fields: []
+- name: cntv_ctl
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 0
+    crn: 14
+    crm: 3
+    opc2: 1
+  fields: []
+- name: cnthctl
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 14
+    crm: 1
+    opc2: 0
+  fields: []
+- name: cnthp_tval
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 14
+    crm: 2
+    opc2: 0
+  fields: []
+- name: cnthp_ctl
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 14
+    crm: 2
+    opc2: 1
+  fields: []
+- name: cbar
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p15
+    opc1: 4
+    crn: 15
+    crm: 0
+    opc2: 0
+  fields: []
+- name: cpsr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: status
+    reg: cpsr
+  fields: []
+- name: spsr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: status
+    reg: spsr
+  fields: []
