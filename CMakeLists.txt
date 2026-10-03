@@ -325,6 +325,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_hw_rng.cpp
         tests/test_hw_rng_combinator.cpp
         tests/test_prng.cpp
+        tests/test_debug_symtab.cpp
     )
     target_link_libraries(jplcz_structo_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)

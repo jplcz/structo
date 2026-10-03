@@ -80,6 +80,7 @@ exists and where.
 | `arch/arm/hw_rng.hpp` | `structo::arch::arm::{cntpct_rng, cntvct_rng}` | Weak `CNTPCT`/`CNTVCT` jitter-combiner fallback backends (ARMv7-A has no baseline hardware-RNG instruction); `ID_PFR1.GenTimer`-based `is_available()`; only compile their real asm for `__arm__` |
 | `arch/riscv/hw_rng.hpp` | `structo::arch::riscv::seed_rng` | `hw_rng_traits` backend for the RISC-V Zkr `seed` CSR, accumulating four 16-bit `ES16` samples per 64-bit draw per the architecture's `csrrw`-swap-with-zero protocol; only compiles its real asm for `__riscv` |
 | `prng.hpp` | `structo::prng::{splitmix64, xoshiro256ss, pcg32}` | Small, fast, deterministic pseudo-random generators, each directly seedable and each with a `from_hw_rng(hw_rng_ref, ...)` factory drawing its initial state from a hardware entropy source |
+| `debug_symtab.hpp`, `debug_symtab_resolver.hpp` | `debug_symtab_view`, `debug_symtab_resolver_tag` | Allocation-free decoder for the compressed `DSYM` debug symbol table blob format; `try_resolve()` recovers symbol names a release `strip` removed from the shipped binary, from a blob built offline by `scripts/elf_symtab_to_blob.py` and loaded via a caller-owned external memory block; `debug_symtab_resolver.hpp` adapts it to microfmt's `symbol_resolver_traits<Tag>` |
 | `sync/preemption_guard.hpp` | `preemption_guard<Traits>`, `preempt_locked<T, Traits>`, `preemption_disabled_token`, `with_preemption_disabled` | RAII preemption-disable guard, proof-token-gated data wrapper, and functional helper, mirroring `irq_guard` for scheduler preemption instead of interrupts |
 | `sync/core_pin_guard.hpp` | `core_pin_guard<Traits>`, `with_cpu_pinned` | RAII guard pinning the calling thread to its current CPU core for its lifetime (migration prevention, not interrupt/preemption exclusion), exposing which CPU it pinned to |
 | `sync/core_rendezvous_barrier.hpp` | `core_rendezvous_barrier<Traits>` | Reusable, spin-only SMP rendezvous point for exactly `num_cores` participants, invoking a caller-supplied callback once per spin iteration on every non-leader core while it waits |
@@ -107,6 +108,7 @@ exists and where.
 - [`runqueue.md`](runqueue.md) -- `fifo_runqueue`/`priority_list_runqueue`/`priority_bucket_runqueue`: pluggable, allocation-free intrusive runqueue policies
 - [`sched.md`](sched.md) -- `noop_sched`/`fixed_priority_sched`/`sched_ule`/`sched_4bsd`: tickless, per-CPU-trait-driven scheduling policies built on `runqueue.hpp`
 - [`prng.md`](prng.md) -- `splitmix64`/`xoshiro256ss`/`pcg32` pseudo-random generators, seedable from a hardware RNG
+- [`debug_symtab.md`](debug_symtab.md) -- compressed debug symbol table decoder for stack unwinding, with a microfmt `symbol_resolver_traits` adapter
 
 ## OS-development building blocks (from `jplcz_reloco`)
 
