@@ -277,7 +277,8 @@ TEST(TimerRefTest, SetCallbackInvokedOnFire) {
   ASSERT_TRUE(ref.start(duration::from_millis(5)).has_value());
 
   int calls = 0;
-  ASSERT_TRUE(ref.set_callback([&calls]() noexcept { ++calls; }).has_value());
+  auto cb = [&calls]() noexcept { ++calls; };
+  ASSERT_TRUE(ref.set_callback(cb).has_value());
   EXPECT_EQ(calls, 0);
 
   dev.fire();
@@ -293,8 +294,10 @@ TEST(TimerRefTest, SetCallbackReplacesPreviousCallback) {
 
   int first_calls = 0;
   int second_calls = 0;
-  ASSERT_TRUE(ref.set_callback([&first_calls]() noexcept { ++first_calls; }).has_value());
-  ASSERT_TRUE(ref.set_callback([&second_calls]() noexcept { ++second_calls; }).has_value());
+  auto first_cb = [&first_calls]() noexcept { ++first_calls; };
+  auto second_cb = [&second_calls]() noexcept { ++second_calls; };
+  ASSERT_TRUE(ref.set_callback(first_cb).has_value());
+  ASSERT_TRUE(ref.set_callback(second_cb).has_value());
 
   dev.fire();
   EXPECT_EQ(first_calls, 0);
@@ -306,7 +309,8 @@ TEST(TimerRefTest, ClearCallbackStopsFurtherInvocations) {
   timer_ref ref(dev);
 
   int calls = 0;
-  ASSERT_TRUE(ref.set_callback([&calls]() noexcept { ++calls; }).has_value());
+  auto cb = [&calls]() noexcept { ++calls; };
+  ASSERT_TRUE(ref.set_callback(cb).has_value());
   dev.fire();
   EXPECT_EQ(calls, 1);
 
