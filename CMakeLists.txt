@@ -307,6 +307,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_fdt_cpu_map.cpp
         tests/test_irq_guard.cpp
         tests/test_preemption_guard.cpp
+        tests/test_spinlock_entry_guard.cpp
         tests/test_core_pin_guard.cpp
         tests/test_core_rendezvous_barrier.cpp
         tests/test_early_rendezvous_barrier.cpp
@@ -316,6 +317,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_softlock_detector.cpp
         tests/test_kernel_spin_lock.cpp
         tests/test_ticket_spin_lock.cpp
+        tests/test_queue_spin_lock.cpp
         tests/test_per_cpu_ptr.cpp
         tests/test_per_thread_ptr.cpp
         tests/test_per_domain_ptr.cpp

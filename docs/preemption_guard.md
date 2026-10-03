@@ -46,4 +46,4 @@ See the header's `@file` block for a complete `kernel_preempt_traits`
 example (a per-CPU nesting counter plus a reschedule check on the
 outermost re-enable).
 
-See also: [`irq_guard.md`](irq_guard.md), [`core_pin_guard.md`](core_pin_guard.md).
+See also: [`irq_guard.md`](irq_guard.md), [`core_pin_guard.md`](core_pin_guard.md), [`spinlock_entry_guard.md`](spinlock_entry_guard.md).

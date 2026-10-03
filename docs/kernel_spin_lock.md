@@ -70,6 +70,9 @@ IRQ/exception handlers, pre-scheduler-init code, data shared with an
 interrupt handler on another core. See
 [`ticket_spin_lock<Traits>`](ticket_spin_lock.md) for a FIFO-fair
 alternative sharing the same `Traits` shape, trading a little extra
-overhead for immunity to starvation under heavy, sustained contention.
+overhead for immunity to starvation under heavy, sustained contention,
+or [`queue_spin_lock<Traits>`](queue_spin_lock.md) for an MCS-style
+queue lock that additionally avoids every waiter polling one shared
+cache line.
 
-See also: [`backoff.md`](backoff.md), [`softlock_detector.md`](softlock_detector.md), [`ticket_spin_lock.md`](ticket_spin_lock.md), [`irq_guard.md`](irq_guard.md).
+See also: [`backoff.md`](backoff.md), [`softlock_detector.md`](softlock_detector.md), [`ticket_spin_lock.md`](ticket_spin_lock.md), [`queue_spin_lock.md`](queue_spin_lock.md), [`irq_guard.md`](irq_guard.md), [`spinlock_entry_guard.md`](spinlock_entry_guard.md).
