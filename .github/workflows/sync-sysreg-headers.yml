@@ -1,0 +1,63 @@
+# SPDX-FileCopyrightText: 2026 Jarosław Pelczar <jarek@jpelczar.com>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+
+# Regenerates the per-architecture `sysregs_generated.hpp` headers from the
+# hand-maintained YAML in `scripts/sysregs/` and opens a pull request if the
+# committed headers have drifted out of sync (e.g. someone edited a YAML file
+# or gen_sysreg_headers.py without re-running the generator locally).
+name: Sync generated sysreg headers
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "scripts/sysregs/**"
+      - ".github/workflows/sync-sysreg-headers.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
+      - name: Regenerate headers
+        run: python3 scripts/sysregs/gen_sysreg_headers.py
+
+      - name: Open pull request if headers changed
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "Regenerate sysreg headers from YAML"
+          title: "Regenerate sysreg headers from YAML"
+          body: |
+            The generated `include/structo/arch/*/sysregs_generated.hpp` headers were
+            out of sync with `scripts/sysregs/*.yaml` and `gen_sysreg_headers.py`.
+
+            This PR was opened automatically by running:
+
+            ```
+            python3 scripts/sysregs/gen_sysreg_headers.py
+            ```
+
+            Please review the diff before merging.
+          branch: auto/sync-sysreg-headers
+          delete-branch: true
+          add-paths: |
+            include/structo/arch/*/sysregs_generated.hpp
+          labels: |
+            automated
+            generated-code
