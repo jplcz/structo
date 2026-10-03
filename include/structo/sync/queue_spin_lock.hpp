@@ -55,6 +55,10 @@
  * lock.unlock(qnode);
  * @endcode
  *
+ * `Traits` may additionally supply an optional `name(self)` and/or
+ * `panic(reason, name)` hook for richer trap diagnostics -- see
+ * `lock_diagnostics.hpp` (shared by every lock type in this family).
+ *
  * Like the rest of this family, never appropriate outside contexts
  * where spinning is known to be short (IRQ/exception handlers,
  * pre-scheduler-init code, data shared with an interrupt handler on
@@ -62,6 +66,7 @@
  */
 
 #include <structo/sync/backoff.hpp>
+#include <structo/sync/lock_diagnostics.hpp>
 #include <structo/sync/softlock_detector.hpp>
 
 #include <reloco/detail/assert.hpp>
@@ -118,8 +123,8 @@ public:
    * waiter is still queued for it.
    */
   ~queue_spin_lock() noexcept {
-    RELOCO_ASSERT(tail_.load(std::memory_order_relaxed) == nullptr,
-                  "queue_spin_lock: destroyed while still held or while a waiter is queued");
+    STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, tail_.load(std::memory_order_relaxed) == nullptr,
+                              "queue_spin_lock: destroyed while still held or while a waiter is queued");
   }
 
   queue_spin_lock(const queue_spin_lock &) = delete;
@@ -135,8 +140,8 @@ public:
    * own already-held lock would otherwise self-deadlock forever.
    */
   void lock(node &n) & noexcept {
-    RELOCO_ASSERT(!is_locked_by_current(),
-                  "queue_spin_lock: lock() called while already held by the calling context (self-deadlock)");
+    STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, !is_locked_by_current(),
+                              "queue_spin_lock: lock() called while already held by the calling context (self-deadlock)");
 
     n.next_.store(nullptr, std::memory_order_relaxed);
     n.waiting_.store(true, std::memory_order_relaxed);
@@ -185,8 +190,8 @@ public:
    * current owner (double-unlock, or unlock from the wrong context).
    */
   void unlock(node &n) & noexcept {
-    RELOCO_ASSERT(owner_.load(std::memory_order_relaxed) == owner_value(),
-                  "queue_spin_lock: unlock() by non-owner (or already unlocked)");
+    STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, owner_.load(std::memory_order_relaxed) == owner_value(),
+                              "queue_spin_lock: unlock() by non-owner (or already unlocked)");
     owner_.store(0, std::memory_order_relaxed);
 
     node *expected = &n;

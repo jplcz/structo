@@ -59,6 +59,10 @@
  * lock.write_unlock();
  * @endcode
  *
+ * `Traits` may additionally supply an optional `name(self)` and/or
+ * `panic(reason, name)` hook for richer trap diagnostics -- see
+ * `lock_diagnostics.hpp` (shared by every lock type in this family).
+ *
  * As with the rest of this family, never appropriate outside contexts
  * where spinning is known to be short (IRQ/exception handlers,
  * pre-scheduler-init code, data shared with an interrupt handler on
@@ -72,6 +76,7 @@
  */
 
 #include <structo/sync/backoff.hpp>
+#include <structo/sync/lock_diagnostics.hpp>
 #include <structo/sync/softlock_detector.hpp>
 
 #include <reloco/detail/assert.hpp>
@@ -103,8 +108,8 @@ public:
    * reader or the writer, or a writer is still waiting for it.
    */
   ~rw_spin_lock() noexcept {
-    RELOCO_ASSERT(state_.load(std::memory_order_relaxed) == 0,
-                  "rw_spin_lock: destroyed while still held (reader or writer) or while a writer is waiting");
+    STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, state_.load(std::memory_order_relaxed) == 0,
+                              "rw_spin_lock: destroyed while still held (reader or writer) or while a writer is waiting");
   }
 
   rw_spin_lock(const rw_spin_lock &) = delete;
@@ -156,9 +161,10 @@ public:
   void read_unlock() & noexcept {
     state_type expected = state_.load(std::memory_order_relaxed);
     for (;;) {
-      RELOCO_ASSERT((expected & reader_mask) != 0,
-                    "rw_spin_lock: read_unlock() called with no active readers (double-unlock, or never locked)");
-      RELOCO_ASSERT((expected & writer_bit) == 0, "rw_spin_lock: read_unlock() called while write-locked (corrupted state)");
+      STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, (expected & reader_mask) != 0,
+                                "rw_spin_lock: read_unlock() called with no active readers (double-unlock, or never locked)");
+      STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, (expected & writer_bit) == 0,
+                                "rw_spin_lock: read_unlock() called while write-locked (corrupted state)");
       if (state_.compare_exchange_weak(expected, expected - 1, std::memory_order_release, std::memory_order_relaxed)) {
         return;
       }
@@ -177,8 +183,8 @@ public:
    */
   void write_lock() & noexcept {
     const std::uintptr_t self = owner_value();
-    RELOCO_ASSERT(owner_.load(std::memory_order_relaxed) != self,
-                  "rw_spin_lock: write_lock() called while already held by the calling context (self-deadlock)");
+    STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, owner_.load(std::memory_order_relaxed) != self,
+                              "rw_spin_lock: write_lock() called while already held by the calling context (self-deadlock)");
 
     backoff bo;
     softlock_detector lockup(detail::softlock_limit_for<Traits>::value());
@@ -225,8 +231,8 @@ public:
    * current writer (double-unlock, or unlock from the wrong context).
    */
   void write_unlock() & noexcept {
-    RELOCO_ASSERT(owner_.load(std::memory_order_relaxed) == owner_value(),
-                  "rw_spin_lock: write_unlock() by non-owner (or already unlocked)");
+    STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, owner_.load(std::memory_order_relaxed) == owner_value(),
+                              "rw_spin_lock: write_unlock() by non-owner (or already unlocked)");
     owner_.store(0, std::memory_order_relaxed);
     state_.store(0, std::memory_order_release);
   }

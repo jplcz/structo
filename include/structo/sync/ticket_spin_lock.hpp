@@ -48,6 +48,10 @@
  * lock.unlock();
  * @endcode
  *
+ * `Traits` may additionally supply an optional `name(self)` and/or
+ * `panic(reason, name)` hook for richer trap diagnostics -- see
+ * `lock_diagnostics.hpp` (shared by every lock type in this family).
+ *
  * Like `kernel_spin_lock`, never appropriate outside contexts where
  * spinning is known to be short (IRQ/exception handlers,
  * pre-scheduler-init code, data shared with an interrupt handler on
@@ -58,6 +62,7 @@
  */
 
 #include <structo/sync/backoff.hpp>
+#include <structo/sync/lock_diagnostics.hpp>
 #include <structo/sync/softlock_detector.hpp>
 
 #include <reloco/detail/assert.hpp>
@@ -89,8 +94,9 @@ public:
    * about to disappear -- both worth trapping on immediately.
    */
   ~ticket_spin_lock() noexcept {
-    RELOCO_ASSERT(now_serving_.load(std::memory_order_relaxed) == next_ticket_.load(std::memory_order_relaxed),
-                  "ticket_spin_lock: destroyed while still held or while a waiter is queued");
+    STRUCTO_SYNC_LOCK_ASSERT(Traits, *this,
+                              now_serving_.load(std::memory_order_relaxed) == next_ticket_.load(std::memory_order_relaxed),
+                              "ticket_spin_lock: destroyed while still held or while a waiter is queued");
   }
 
   ticket_spin_lock(const ticket_spin_lock &) = delete;
@@ -105,8 +111,8 @@ public:
    * ticket behind one's own would otherwise self-deadlock forever.
    */
   void lock() & noexcept {
-    RELOCO_ASSERT(!is_locked_by_current(),
-                  "ticket_spin_lock: lock() called while already held by the calling context (self-deadlock)");
+    STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, !is_locked_by_current(),
+                              "ticket_spin_lock: lock() called while already held by the calling context (self-deadlock)");
 
     const ticket_type my_ticket = next_ticket_.fetch_add(1, std::memory_order_relaxed);
 
@@ -143,8 +149,8 @@ public:
    * current owner (double-unlock, or unlock from the wrong context).
    */
   void unlock() & noexcept {
-    RELOCO_ASSERT(owner_.load(std::memory_order_relaxed) == owner_value(),
-                  "ticket_spin_lock: unlock() by non-owner (or already unlocked)");
+    STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, owner_.load(std::memory_order_relaxed) == owner_value(),
+                              "ticket_spin_lock: unlock() by non-owner (or already unlocked)");
     owner_.store(0, std::memory_order_relaxed);
     now_serving_.fetch_add(1, std::memory_order_release);
   }

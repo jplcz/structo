@@ -47,6 +47,12 @@
  * lock.unlock();
  * @endcode
  *
+ * `Traits` may additionally supply an optional `name(self)` and/or
+ * `panic(reason, name)` hook for richer trap diagnostics -- see
+ * `lock_diagnostics.hpp` (shared by every lock type in this family);
+ * absent either one, every trap below falls back to a plain
+ * `RELOCO_ASSERT` exactly as documented.
+ *
  * Like `reloco::spin_lock`, never fair and never adaptive: a contended
  * `lock()` spins forever (with `structo::sync::backoff` thinning the
  * polling rate as contention persists) rather than parking or falling
@@ -67,6 +73,7 @@
  */
 
 #include <structo/sync/backoff.hpp>
+#include <structo/sync/lock_diagnostics.hpp>
 #include <structo/sync/softlock_detector.hpp>
 
 #include <reloco/detail/assert.hpp>
@@ -101,7 +108,8 @@ public:
    * contended) lock.
    */
   ~kernel_spin_lock() noexcept {
-    RELOCO_ASSERT(owner_.load(std::memory_order_relaxed) == 0, "kernel_spin_lock: destroyed while still held");
+    STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, owner_.load(std::memory_order_relaxed) == 0,
+                              "kernel_spin_lock: destroyed while still held");
   }
 
   kernel_spin_lock(const kernel_spin_lock &) = delete;
@@ -117,8 +125,8 @@ public:
    */
   void lock() & noexcept {
     const std::uintptr_t self = owner_value();
-    RELOCO_ASSERT(owner_.load(std::memory_order_relaxed) != self,
-                  "kernel_spin_lock: lock() called while already held by the calling context (self-deadlock)");
+    STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, owner_.load(std::memory_order_relaxed) != self,
+                              "kernel_spin_lock: lock() called while already held by the calling context (self-deadlock)");
 
     backoff bo;
     softlock_detector lockup(detail::softlock_limit_for<Traits>::value());
@@ -151,8 +159,8 @@ public:
    * current owner (double-unlock, or unlock from the wrong context).
    */
   void unlock() & noexcept {
-    RELOCO_ASSERT(owner_.load(std::memory_order_relaxed) == owner_value(),
-                  "kernel_spin_lock: unlock() by non-owner (or already unlocked)");
+    STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, owner_.load(std::memory_order_relaxed) == owner_value(),
+                              "kernel_spin_lock: unlock() by non-owner (or already unlocked)");
     owner_.store(0, std::memory_order_release);
   }
 

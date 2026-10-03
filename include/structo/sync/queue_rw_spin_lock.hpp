@@ -49,9 +49,14 @@
  * // ... exclusive access here ...
  * lock.write_unlock(qnode);
  * @endcode
+ *
+ * `Traits` may additionally supply an optional `name(self)` and/or
+ * `panic(reason, name)` hook for richer trap diagnostics -- see
+ * `lock_diagnostics.hpp` (shared by every lock type in this family).
  */
 
 #include <structo/sync/backoff.hpp>
+#include <structo/sync/lock_diagnostics.hpp>
 #include <structo/sync/queue_spin_lock.hpp>
 #include <structo/sync/softlock_detector.hpp>
 
@@ -90,8 +95,8 @@ public:
    * afterwards) additionally traps if a writer is still queued for it.
    */
   ~queue_rw_spin_lock() noexcept {
-    RELOCO_ASSERT(state_.load(std::memory_order_relaxed) == 0,
-                  "queue_rw_spin_lock: destroyed while still held (reader or writer) or while a writer is waiting");
+    STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, state_.load(std::memory_order_relaxed) == 0,
+                              "queue_rw_spin_lock: destroyed while still held (reader or writer) or while a writer is waiting");
   }
 
   queue_rw_spin_lock(const queue_rw_spin_lock &) = delete;
@@ -142,10 +147,10 @@ public:
   void read_unlock() & noexcept {
     state_type expected = state_.load(std::memory_order_relaxed);
     for (;;) {
-      RELOCO_ASSERT((expected & reader_mask) != 0,
-                    "queue_rw_spin_lock: read_unlock() called with no active readers (double-unlock, or never locked)");
-      RELOCO_ASSERT((expected & writer_bit) == 0,
-                    "queue_rw_spin_lock: read_unlock() called while write-locked (corrupted state)");
+      STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, (expected & reader_mask) != 0,
+                                "queue_rw_spin_lock: read_unlock() called with no active readers (double-unlock, or never locked)");
+      STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, (expected & writer_bit) == 0,
+                                "queue_rw_spin_lock: read_unlock() called while write-locked (corrupted state)");
       if (state_.compare_exchange_weak(expected, expected - 1, std::memory_order_release, std::memory_order_relaxed)) {
         return;
       }
@@ -217,8 +222,8 @@ public:
    * current writer (double-unlock, or unlock from the wrong context).
    */
   void write_unlock(node &n) & noexcept {
-    RELOCO_ASSERT(owner_.load(std::memory_order_relaxed) == owner_value(),
-                  "queue_rw_spin_lock: write_unlock() by non-owner (or already unlocked)");
+    STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, owner_.load(std::memory_order_relaxed) == owner_value(),
+                              "queue_rw_spin_lock: write_unlock() by non-owner (or already unlocked)");
     owner_.store(0, std::memory_order_relaxed);
     state_.store(0, std::memory_order_release);
     writer_queue_.unlock(n);
