@@ -171,12 +171,13 @@
 #include <reloco/error.hpp>
 #include <reloco/expected.hpp>
 #include <reloco/function_ref.hpp>
-#include <reloco/hint.hpp>
 #include <reloco/intrusive_c_list.hpp>
 #include <reloco/optional.hpp>
 #include <reloco/span.hpp>
 #include <reloco/spin_lock.hpp>
 #include <reloco/unique_lock.hpp>
+
+#include <structo/sync/backoff.hpp>
 
 #include <atomic>
 #include <cstddef>
@@ -223,23 +224,18 @@ public:
    * because it went offline mid-flight) this message. */
   [[nodiscard]] bool is_done_relaxed() const noexcept { return ref_count_.load(std::memory_order_relaxed) == 0; }
 
-  /** @brief Spins until `is_done()`, backing off between checks (a
-   * capped, doubling burst of `hint::spin_loop()` between each relaxed
-   * poll) so a long wait doesn't keep re-issuing loads against the same
-   * cache line on every single iteration -- that line is also what
-   * every target CPU's completing `ref_count_.fetch_sub()` needs
-   * exclusive ownership of to make progress. */
+  /** @brief Spins until `is_done()`, backing off between checks (via
+   * `structo::sync::backoff`) so a long wait doesn't keep re-issuing
+   * loads against the same cache line on every single iteration -- that
+   * line is also what every target CPU's completing
+   * `ref_count_.fetch_sub()` needs exclusive ownership of to make
+   * progress. */
   void wait() const noexcept {
     while (!is_done()) {
       // Perform relaxed load not to kill cache with atomic loads
-      std::uint32_t pause_burst = 1;
+      structo::sync::backoff bo;
       while (!is_done_relaxed()) {
-        for (std::uint32_t i = 0; i < pause_burst; ++i) {
-          reloco::hint::spin_loop();
-        }
-        if (pause_burst < 1024) {
-          pause_burst *= 2;
-        }
+        bo.spin();
       }
     }
   }
