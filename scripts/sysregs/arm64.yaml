@@ -1,3 +1,16 @@
+# SPDX-FileCopyrightText: 2026 Jarosław Pelczar <jarek@jpelczar.com>
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# Hand-maintained raw system-register definitions for AArch64. Consumed by
+# gen_sysreg_headers.py to generate
+# include/structo/arch/arm64/sysregs_generated.hpp.
+#
+# encoding: op0/op1/crn/crm/op2 identify the register for `mrs`/`msr Sop0_op1_Cn_Cm_op2`.
+# EL3 registers (*_el3) were derived by matching each EL1 register's CRn/CRm/op2
+# tuple with op1=6 (op1 is 0/4/5/6 for EL1/EL2/EL12/EL3 respectively), cross-checked
+# against arm-trusted-firmware's symbolic mrs/msr usage and S3_6_C*_C*_* encodings.
+#
+# fields: list of "name:bit:len" strings (bit = LSB offset, len = width in bits).
 arch: arm64
 registers:
 - name: afsr0_el1
@@ -896,7 +909,15 @@ registers:
     crn: 10
     crm: 2
     op2: 0
-  fields: []
+  fields:
+  - attr0:0:8
+  - attr1:8:8
+  - attr2:16:8
+  - attr3:24:8
+  - attr4:32:8
+  - attr5:40:8
+  - attr6:48:8
+  - attr7:56:8
 - name: mair_el12
   width: 64
   access:
@@ -1455,7 +1476,13 @@ registers:
     crn: 1
     crm: 0
     op2: 0
-  fields: []
+  fields:
+  - m:0:1
+  - a:1:1
+  - c:2:1
+  - sa:3:1
+  - i:12:1
+  - wxn:19:1
 - name: sctlr_el12
   width: 64
   access:
@@ -1533,7 +1560,26 @@ registers:
     crn: 2
     crm: 0
     op2: 2
-  fields: []
+  fields:
+  - t0sz:0:6
+  - epd0:7:1
+  - irgn0:8:2
+  - orgn0:10:2
+  - sh0:12:2
+  - tg0:14:2
+  - t1sz:16:6
+  - a1:22:1
+  - epd1:23:1
+  - irgn1:24:2
+  - orgn1:26:2
+  - sh1:28:2
+  - tg1:30:2
+  - ips:32:3
+  - as:36:1
+  - tbi0:37:1
+  - tbi1:38:1
+  - ha:39:1
+  - hd:40:1
 - name: tcr_el12
   width: 64
   access:
@@ -1585,7 +1631,10 @@ registers:
     crn: 2
     crm: 0
     op2: 0
-  fields: []
+  fields:
+  - cnp:0:1
+  - baddr:1:47
+  - asid:48:16
 - name: ttbr0_el12
   width: 64
   access:
@@ -1611,7 +1660,10 @@ registers:
     crn: 2
     crm: 0
     op2: 1
-  fields: []
+  fields:
+  - cnp:0:1
+  - baddr:1:47
+  - asid:48:16
 - name: ttbr1_el12
   width: 64
   access:
@@ -1702,7 +1754,18 @@ registers:
     crn: 1
     crm: 1
     op2: 0
-  fields: []
+  fields:
+  - ns:0:1
+  - irq:1:1
+  - fiq:2:1
+  - ea:3:1
+  - smd:7:1
+  - hce:8:1
+  - sif:9:1
+  - rw:10:1
+  - st:11:1
+  - twi:12:1
+  - twe:13:1
 - name: sder32_el3
   width: 64
   access:

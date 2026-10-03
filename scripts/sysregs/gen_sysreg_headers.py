@@ -106,6 +106,31 @@ struct {name} {{
 """
 
 
+def cpp_struct_coproc64(name: str, enc: dict) -> str:
+    """AArch32 LPAE-style 64-bit coprocessor register, transferred as a
+    register pair via `mrrc`/`mcrr` (e.g. `TTBR0`/`TTBR1`/`PAR` in their
+    LPAE long-descriptor form, `VTTBR`, `HTTBR`, and the 64-bit generic
+    timer registers). `%Q0`/`%R0` let GCC/Clang pick the low/high half of
+    the 64-bit operand's register pair."""
+    coproc = enc["coproc"]
+    opc1, crm = enc["opc1"], enc["crm"]
+    return f"""\
+/** @brief Raw accessor for the AArch32 64-bit `{name.upper()}` coprocessor register pair (no named fields yet). */
+struct {name} {{
+  std::uint64_t raw{{0}};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static {name} read() noexcept {{
+    std::uint64_t value;
+    asm volatile("mrrc {coproc}, {opc1}, %Q0, %R0, c{crm}" : "=r"(value));
+    return {name}{{value}};
+  }}
+  void write() const noexcept {{ asm volatile("mcrr {coproc}, {opc1}, %Q0, %R0, c{crm}" ::"r"(raw)); }}
+#endif // defined(__arm__) && !defined(__aarch64__)
+}};
+"""
+
+
 def cpp_struct_status(name: str, enc: dict) -> str:
     """AArch32 CPSR/SPSR: plain `mrs`/`msr` (no coprocessor tuple)."""
     reg = enc["reg"]
@@ -239,6 +264,7 @@ def cpp_struct_x86(name: str, entries_by_width: dict[int, dict]) -> str:
 
 ARM_STRUCT_FNS = {
     "coproc": cpp_struct_coproc,
+    "coproc64": cpp_struct_coproc64,
     "status": cpp_struct_status,
 }
 

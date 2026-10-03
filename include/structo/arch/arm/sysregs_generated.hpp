@@ -648,29 +648,29 @@ struct hstr {
 #endif // defined(__arm__) && !defined(__aarch64__)
 };
 
-/** @brief Raw accessor for the AArch32 `TTBR0` coprocessor register (no named fields yet). */
-struct ttbr0 {
+/** @brief Raw accessor for the AArch32 `SHORT_TTBR0` coprocessor register (no named fields yet). */
+struct short_ttbr0 {
   std::uint32_t raw{0};
 
 #if defined(__arm__) && !defined(__aarch64__)
-  [[nodiscard]] static ttbr0 read() noexcept {
+  [[nodiscard]] static short_ttbr0 read() noexcept {
     std::uint32_t value;
     asm volatile("mrc p15, 0, %0, c2, c0, 0" : "=r"(value));
-    return ttbr0{value};
+    return short_ttbr0{value};
   }
   void write() const noexcept { asm volatile("mcr p15, 0, %0, c2, c0, 0" ::"r"(raw)); }
 #endif // defined(__arm__) && !defined(__aarch64__)
 };
 
-/** @brief Raw accessor for the AArch32 `TTBR1` coprocessor register (no named fields yet). */
-struct ttbr1 {
+/** @brief Raw accessor for the AArch32 `SHORT_TTBR1` coprocessor register (no named fields yet). */
+struct short_ttbr1 {
   std::uint32_t raw{0};
 
 #if defined(__arm__) && !defined(__aarch64__)
-  [[nodiscard]] static ttbr1 read() noexcept {
+  [[nodiscard]] static short_ttbr1 read() noexcept {
     std::uint32_t value;
     asm volatile("mrc p15, 0, %0, c2, c0, 1" : "=r"(value));
-    return ttbr1{value};
+    return short_ttbr1{value};
   }
   void write() const noexcept { asm volatile("mcr p15, 0, %0, c2, c0, 1" ::"r"(raw)); }
 #endif // defined(__arm__) && !defined(__aarch64__)
@@ -872,15 +872,15 @@ struct ifar {
 #endif // defined(__arm__) && !defined(__aarch64__)
 };
 
-/** @brief Raw accessor for the AArch32 `PAR` coprocessor register (no named fields yet). */
-struct par {
+/** @brief Raw accessor for the AArch32 `SHORT_PAR` coprocessor register (no named fields yet). */
+struct short_par {
   std::uint32_t raw{0};
 
 #if defined(__arm__) && !defined(__aarch64__)
-  [[nodiscard]] static par read() noexcept {
+  [[nodiscard]] static short_par read() noexcept {
     std::uint32_t value;
     asm volatile("mrc p15, 0, %0, c7, c4, 0" : "=r"(value));
-    return par{value};
+    return short_par{value};
   }
   void write() const noexcept { asm volatile("mcr p15, 0, %0, c7, c4, 0" ::"r"(raw)); }
 #endif // defined(__arm__) && !defined(__aarch64__)
@@ -1807,6 +1807,160 @@ struct spsr {
     return spsr{value};
   }
   void write() const noexcept { asm volatile("msr spsr_fsxc, %0" ::"r"(raw)); }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 64-bit `LPAE_TTBR0` coprocessor register pair (no named fields yet). */
+struct lpae_ttbr0 {
+  std::uint64_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static lpae_ttbr0 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrrc p15, 0, %Q0, %R0, c2" : "=r"(value));
+    return lpae_ttbr0{value};
+  }
+  void write() const noexcept { asm volatile("mcrr p15, 0, %Q0, %R0, c2" ::"r"(raw)); }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 64-bit `LPAE_TTBR1` coprocessor register pair (no named fields yet). */
+struct lpae_ttbr1 {
+  std::uint64_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static lpae_ttbr1 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrrc p15, 1, %Q0, %R0, c2" : "=r"(value));
+    return lpae_ttbr1{value};
+  }
+  void write() const noexcept { asm volatile("mcrr p15, 1, %Q0, %R0, c2" ::"r"(raw)); }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 64-bit `LPAE_PAR` coprocessor register pair (no named fields yet). */
+struct lpae_par {
+  std::uint64_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static lpae_par read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrrc p15, 0, %Q0, %R0, c7" : "=r"(value));
+    return lpae_par{value};
+  }
+  void write() const noexcept { asm volatile("mcrr p15, 0, %Q0, %R0, c7" ::"r"(raw)); }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 64-bit `VTTBR` coprocessor register pair (no named fields yet). */
+struct vttbr {
+  std::uint64_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static vttbr read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrrc p15, 6, %Q0, %R0, c2" : "=r"(value));
+    return vttbr{value};
+  }
+  void write() const noexcept { asm volatile("mcrr p15, 6, %Q0, %R0, c2" ::"r"(raw)); }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 64-bit `HTTBR` coprocessor register pair (no named fields yet). */
+struct httbr {
+  std::uint64_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static httbr read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrrc p15, 4, %Q0, %R0, c2" : "=r"(value));
+    return httbr{value};
+  }
+  void write() const noexcept { asm volatile("mcrr p15, 4, %Q0, %R0, c2" ::"r"(raw)); }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 64-bit `CNTPCT` coprocessor register pair (no named fields yet). */
+struct cntpct {
+  std::uint64_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static cntpct read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r"(value));
+    return cntpct{value};
+  }
+  void write() const noexcept { asm volatile("mcrr p15, 0, %Q0, %R0, c14" ::"r"(raw)); }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 64-bit `CNTVCT` coprocessor register pair (no named fields yet). */
+struct cntvct {
+  std::uint64_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static cntvct read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrrc p15, 1, %Q0, %R0, c14" : "=r"(value));
+    return cntvct{value};
+  }
+  void write() const noexcept { asm volatile("mcrr p15, 1, %Q0, %R0, c14" ::"r"(raw)); }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 64-bit `CNTP_CVAL` coprocessor register pair (no named fields yet). */
+struct cntp_cval {
+  std::uint64_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static cntp_cval read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrrc p15, 2, %Q0, %R0, c14" : "=r"(value));
+    return cntp_cval{value};
+  }
+  void write() const noexcept { asm volatile("mcrr p15, 2, %Q0, %R0, c14" ::"r"(raw)); }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 64-bit `CNTV_CVAL` coprocessor register pair (no named fields yet). */
+struct cntv_cval {
+  std::uint64_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static cntv_cval read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrrc p15, 3, %Q0, %R0, c14" : "=r"(value));
+    return cntv_cval{value};
+  }
+  void write() const noexcept { asm volatile("mcrr p15, 3, %Q0, %R0, c14" ::"r"(raw)); }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 64-bit `CNTVOFF` coprocessor register pair (no named fields yet). */
+struct cntvoff {
+  std::uint64_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static cntvoff read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrrc p15, 4, %Q0, %R0, c14" : "=r"(value));
+    return cntvoff{value};
+  }
+  void write() const noexcept { asm volatile("mcrr p15, 4, %Q0, %R0, c14" ::"r"(raw)); }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 64-bit `CNTHP_CVAL` coprocessor register pair (no named fields yet). */
+struct cnthp_cval {
+  std::uint64_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static cnthp_cval read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrrc p15, 6, %Q0, %R0, c14" : "=r"(value));
+    return cnthp_cval{value};
+  }
+  void write() const noexcept { asm volatile("mcrr p15, 6, %Q0, %R0, c14" ::"r"(raw)); }
 #endif // defined(__arm__) && !defined(__aarch64__)
 };
 

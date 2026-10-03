@@ -1,3 +1,11 @@
+# SPDX-FileCopyrightText: 2026 Jarosław Pelczar <jarek@jpelczar.com>
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# Hand-maintained raw CSR definitions for RISC-V. Consumed by
+# gen_sysreg_headers.py to generate include/structo/arch/riscv/sysregs_generated.hpp.
+#
+# encoding.address: the CSR address used by `csrr`/`csrw`.
+# fields: list of "name:bit:len" strings (bit = LSB offset, len = width in bits).
 arch: riscv
 registers:
 - name: cycle

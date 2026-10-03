@@ -1,3 +1,25 @@
+# SPDX-FileCopyrightText: 2026 Jarosław Pelczar <jarek@jpelczar.com>
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# Hand-maintained raw system-register definitions for AArch32 (armv7-a and
+# later; older ARM architecture versions are out of scope). Consumed by
+# gen_sysreg_headers.py to generate include/structo/arch/arm/sysregs_generated.hpp.
+#
+# encoding.kind:
+#   coproc   - single-register MRC/MCR coprocessor access (32-bit).
+#   coproc64 - register-pair MRRC/MCRR coprocessor access (64-bit), used for
+#              LPAE long-descriptor registers (lpae_ttbr0/1, lpae_par),
+#              virtualization registers (vttbr, httbr) and the 64-bit
+#              generic timer registers (cntpct, cntvct, ...). Fields:
+#              coproc, opc1, crm (no crn/opc2 in this transfer form).
+#   status   - plain MRS/MSR status register access (cpsr, spsr).
+#
+# fields: list of "name:bit:len" strings (bit = LSB offset, len = width in bits).
+#
+# Short-descriptor vs. LPAE: ttbr0/ttbr1/par exist in two incompatible forms on
+# armv7-a: the classic 32-bit short-descriptor form (short_ttbr0/1, short_par)
+# and the 64-bit LPAE long-descriptor form (lpae_ttbr0/1, lpae_par), the latter
+# only valid once the MMU's TTBCR.EAE bit selects LPAE translation.
 arch: arm
 registers:
 - name: dbgdidr
@@ -454,7 +476,15 @@ registers:
     crn: 1
     crm: 0
     opc2: 0
-  fields: []
+  fields:
+  - m:0:1
+  - a:1:1
+  - c:2:1
+  - z:11:1
+  - i:12:1
+  - v:13:1
+  - afe:29:1
+  - te:30:1
 - name: actlr
   width: 32
   access:
@@ -585,7 +615,7 @@ registers:
     crm: 1
     opc2: 3
   fields: []
-- name: ttbr0
+- name: short_ttbr0
   width: 32
   access:
   - read
@@ -598,7 +628,7 @@ registers:
     crm: 0
     opc2: 0
   fields: []
-- name: ttbr1
+- name: short_ttbr1
   width: 32
   access:
   - read
@@ -793,7 +823,7 @@ registers:
     crm: 0
     opc2: 2
   fields: []
-- name: par
+- name: short_par
   width: 32
   access:
   - read
@@ -1646,7 +1676,20 @@ registers:
   encoding:
     kind: status
     reg: cpsr
-  fields: []
+  fields: &id001
+  - m:0:5
+  - t:5:1
+  - f:6:1
+  - i:7:1
+  - a:8:1
+  - e:9:1
+  - ge:16:4
+  - j:24:1
+  - q:27:1
+  - v:28:1
+  - c:29:1
+  - z:30:1
+  - n:31:1
 - name: spsr
   width: 32
   access:
@@ -1655,4 +1698,130 @@ registers:
   encoding:
     kind: status
     reg: spsr
+  fields: *id001
+- name: lpae_ttbr0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc64
+    coproc: p15
+    opc1: 0
+    crm: 2
+  fields:
+  - asid:48:8
+- name: lpae_ttbr1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc64
+    coproc: p15
+    opc1: 1
+    crm: 2
+  fields:
+  - asid:48:8
+- name: lpae_par
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc64
+    coproc: p15
+    opc1: 0
+    crm: 7
+  fields:
+  - f:0:1
+  - pa:12:28
+- name: vttbr
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc64
+    coproc: p15
+    opc1: 6
+    crm: 2
+  fields:
+  - vmid:48:8
+- name: httbr
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc64
+    coproc: p15
+    opc1: 4
+    crm: 2
+  fields: []
+- name: cntpct
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc64
+    coproc: p15
+    opc1: 0
+    crm: 14
+  fields: []
+- name: cntvct
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc64
+    coproc: p15
+    opc1: 1
+    crm: 14
+  fields: []
+- name: cntp_cval
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc64
+    coproc: p15
+    opc1: 2
+    crm: 14
+  fields: []
+- name: cntv_cval
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc64
+    coproc: p15
+    opc1: 3
+    crm: 14
+  fields: []
+- name: cntvoff
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc64
+    coproc: p15
+    opc1: 4
+    crm: 14
+  fields: []
+- name: cnthp_cval
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc64
+    coproc: p15
+    opc1: 6
+    crm: 14
   fields: []

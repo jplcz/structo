@@ -1,3 +1,11 @@
+# SPDX-FileCopyrightText: 2026 Jarosław Pelczar <jarek@jpelczar.com>
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# Hand-maintained raw register definitions for 32-bit x86. Consumed by
+# gen_sysreg_headers.py to generate include/structo/arch/x86/sysregs_generated.hpp
+# (merged with x86_64.yaml into a single mode-guarded header).
+#
+# fields: list of "name:bit:len" strings (bit = LSB offset, len = width in bits).
 arch: x86
 registers:
 - name: cr0
