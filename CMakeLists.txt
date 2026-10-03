@@ -337,6 +337,9 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_hw_rng.cpp
         tests/test_hw_rng_combinator.cpp
         tests/test_otp_storage.cpp
+        tests/test_block_device_ref.cpp
+        tests/test_ram_disk.cpp
+        tests/test_fdt_initrd.cpp
         tests/test_prng.cpp
         tests/test_debug_symtab.cpp
         tests/test_world_switch_guard.cpp
