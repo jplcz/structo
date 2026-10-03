@@ -2267,4 +2267,588 @@ struct rmr_el3 {
 #endif // defined(__aarch64__)
 };
 
+/** @brief Raw accessor for the `VPIDR_EL2` AArch64 system register (no named fields yet). */
+struct vpidr_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static vpidr_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C0_C0_0" : "=r"(value));
+    return vpidr_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C0_C0_0, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `VMPIDR_EL2` AArch64 system register (no named fields yet). */
+struct vmpidr_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static vmpidr_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C0_C0_5" : "=r"(value));
+    return vmpidr_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C0_C0_5, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `SCTLR_EL2` AArch64 system register (6 named field(s)). */
+struct sctlr_el2 {
+  std::uint64_t raw{0};
+
+  struct bits {
+    using m = ::structo::arch::pte_bit_field<0, 1, std::uint64_t>;
+    using a = ::structo::arch::pte_bit_field<1, 1, std::uint64_t>;
+    using c = ::structo::arch::pte_bit_field<2, 1, std::uint64_t>;
+    using sa = ::structo::arch::pte_bit_field<3, 1, std::uint64_t>;
+    using i = ::structo::arch::pte_bit_field<12, 1, std::uint64_t>;
+    using wxn = ::structo::arch::pte_bit_field<19, 1, std::uint64_t>;
+  };
+
+  [[nodiscard]] constexpr bool m() const noexcept { return bits::m::test(raw); }
+  constexpr auto &set_m(bool value) noexcept { raw = bits::m::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool a() const noexcept { return bits::a::test(raw); }
+  constexpr auto &set_a(bool value) noexcept { raw = bits::a::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool c() const noexcept { return bits::c::test(raw); }
+  constexpr auto &set_c(bool value) noexcept { raw = bits::c::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool sa() const noexcept { return bits::sa::test(raw); }
+  constexpr auto &set_sa(bool value) noexcept { raw = bits::sa::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool i() const noexcept { return bits::i::test(raw); }
+  constexpr auto &set_i(bool value) noexcept { raw = bits::i::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool wxn() const noexcept { return bits::wxn::test(raw); }
+  constexpr auto &set_wxn(bool value) noexcept { raw = bits::wxn::set_bit(raw, value); return *this; }
+
+#if defined(__aarch64__)
+  [[nodiscard]] static sctlr_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C1_C0_0" : "=r"(value));
+    return sctlr_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C1_C0_0, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `ACTLR_EL2` AArch64 system register (no named fields yet). */
+struct actlr_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static actlr_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C1_C0_1" : "=r"(value));
+    return actlr_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C1_C0_1, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `HCR_EL2` AArch64 system register (19 named field(s)). */
+struct hcr_el2 {
+  std::uint64_t raw{0};
+
+  struct bits {
+    using vm = ::structo::arch::pte_bit_field<0, 1, std::uint64_t>;
+    using swio = ::structo::arch::pte_bit_field<1, 1, std::uint64_t>;
+    using ptw = ::structo::arch::pte_bit_field<2, 1, std::uint64_t>;
+    using fmo = ::structo::arch::pte_bit_field<3, 1, std::uint64_t>;
+    using imo = ::structo::arch::pte_bit_field<4, 1, std::uint64_t>;
+    using amo = ::structo::arch::pte_bit_field<5, 1, std::uint64_t>;
+    using bsu = ::structo::arch::pte_bit_field<10, 2, std::uint64_t>;
+    using dc = ::structo::arch::pte_bit_field<12, 1, std::uint64_t>;
+    using twi = ::structo::arch::pte_bit_field<13, 1, std::uint64_t>;
+    using twe = ::structo::arch::pte_bit_field<14, 1, std::uint64_t>;
+    using tsc = ::structo::arch::pte_bit_field<19, 1, std::uint64_t>;
+    using ttlb = ::structo::arch::pte_bit_field<25, 1, std::uint64_t>;
+    using tvm = ::structo::arch::pte_bit_field<26, 1, std::uint64_t>;
+    using tge = ::structo::arch::pte_bit_field<27, 1, std::uint64_t>;
+    using tdz = ::structo::arch::pte_bit_field<28, 1, std::uint64_t>;
+    using trvm = ::structo::arch::pte_bit_field<30, 1, std::uint64_t>;
+    using rw = ::structo::arch::pte_bit_field<31, 1, std::uint64_t>;
+    using cd = ::structo::arch::pte_bit_field<32, 1, std::uint64_t>;
+    using id = ::structo::arch::pte_bit_field<33, 1, std::uint64_t>;
+  };
+
+  [[nodiscard]] constexpr bool vm() const noexcept { return bits::vm::test(raw); }
+  constexpr auto &set_vm(bool value) noexcept { raw = bits::vm::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool swio() const noexcept { return bits::swio::test(raw); }
+  constexpr auto &set_swio(bool value) noexcept { raw = bits::swio::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool ptw() const noexcept { return bits::ptw::test(raw); }
+  constexpr auto &set_ptw(bool value) noexcept { raw = bits::ptw::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool fmo() const noexcept { return bits::fmo::test(raw); }
+  constexpr auto &set_fmo(bool value) noexcept { raw = bits::fmo::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool imo() const noexcept { return bits::imo::test(raw); }
+  constexpr auto &set_imo(bool value) noexcept { raw = bits::imo::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool amo() const noexcept { return bits::amo::test(raw); }
+  constexpr auto &set_amo(bool value) noexcept { raw = bits::amo::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint64_t bsu() const noexcept { return bits::bsu::get(raw); }
+  constexpr auto &set_bsu(std::uint64_t value) noexcept { raw = bits::bsu::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool dc() const noexcept { return bits::dc::test(raw); }
+  constexpr auto &set_dc(bool value) noexcept { raw = bits::dc::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool twi() const noexcept { return bits::twi::test(raw); }
+  constexpr auto &set_twi(bool value) noexcept { raw = bits::twi::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool twe() const noexcept { return bits::twe::test(raw); }
+  constexpr auto &set_twe(bool value) noexcept { raw = bits::twe::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tsc() const noexcept { return bits::tsc::test(raw); }
+  constexpr auto &set_tsc(bool value) noexcept { raw = bits::tsc::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool ttlb() const noexcept { return bits::ttlb::test(raw); }
+  constexpr auto &set_ttlb(bool value) noexcept { raw = bits::ttlb::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tvm() const noexcept { return bits::tvm::test(raw); }
+  constexpr auto &set_tvm(bool value) noexcept { raw = bits::tvm::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tge() const noexcept { return bits::tge::test(raw); }
+  constexpr auto &set_tge(bool value) noexcept { raw = bits::tge::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tdz() const noexcept { return bits::tdz::test(raw); }
+  constexpr auto &set_tdz(bool value) noexcept { raw = bits::tdz::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool trvm() const noexcept { return bits::trvm::test(raw); }
+  constexpr auto &set_trvm(bool value) noexcept { raw = bits::trvm::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool rw() const noexcept { return bits::rw::test(raw); }
+  constexpr auto &set_rw(bool value) noexcept { raw = bits::rw::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool cd() const noexcept { return bits::cd::test(raw); }
+  constexpr auto &set_cd(bool value) noexcept { raw = bits::cd::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool id() const noexcept { return bits::id::test(raw); }
+  constexpr auto &set_id(bool value) noexcept { raw = bits::id::set_bit(raw, value); return *this; }
+
+#if defined(__aarch64__)
+  [[nodiscard]] static hcr_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C1_C1_0" : "=r"(value));
+    return hcr_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C1_C1_0, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `MDCR_EL2` AArch64 system register (no named fields yet). */
+struct mdcr_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static mdcr_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C1_C1_1" : "=r"(value));
+    return mdcr_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C1_C1_1, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `CPTR_EL2` AArch64 system register (3 named field(s)). */
+struct cptr_el2 {
+  std::uint64_t raw{0};
+
+  struct bits {
+    using tfp = ::structo::arch::pte_bit_field<10, 1, std::uint64_t>;
+    using tz = ::structo::arch::pte_bit_field<8, 1, std::uint64_t>;
+    using tta = ::structo::arch::pte_bit_field<20, 1, std::uint64_t>;
+  };
+
+  [[nodiscard]] constexpr bool tfp() const noexcept { return bits::tfp::test(raw); }
+  constexpr auto &set_tfp(bool value) noexcept { raw = bits::tfp::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tz() const noexcept { return bits::tz::test(raw); }
+  constexpr auto &set_tz(bool value) noexcept { raw = bits::tz::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tta() const noexcept { return bits::tta::test(raw); }
+  constexpr auto &set_tta(bool value) noexcept { raw = bits::tta::set_bit(raw, value); return *this; }
+
+#if defined(__aarch64__)
+  [[nodiscard]] static cptr_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C1_C1_2" : "=r"(value));
+    return cptr_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C1_C1_2, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `HSTR_EL2` AArch64 system register (no named fields yet). */
+struct hstr_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static hstr_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C1_C1_3" : "=r"(value));
+    return hstr_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C1_C1_3, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `TTBR0_EL2` AArch64 system register (no named fields yet). */
+struct ttbr0_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static ttbr0_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C2_C0_0" : "=r"(value));
+    return ttbr0_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C2_C0_0, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `TTBR1_EL2` AArch64 system register (no named fields yet). */
+struct ttbr1_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static ttbr1_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C2_C0_1" : "=r"(value));
+    return ttbr1_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C2_C0_1, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `TCR_EL2` AArch64 system register (6 named field(s)). */
+struct tcr_el2 {
+  std::uint64_t raw{0};
+
+  struct bits {
+    using t0sz = ::structo::arch::pte_bit_field<0, 6, std::uint64_t>;
+    using irgn0 = ::structo::arch::pte_bit_field<8, 2, std::uint64_t>;
+    using orgn0 = ::structo::arch::pte_bit_field<10, 2, std::uint64_t>;
+    using sh0 = ::structo::arch::pte_bit_field<12, 2, std::uint64_t>;
+    using tg0 = ::structo::arch::pte_bit_field<14, 2, std::uint64_t>;
+    using ps = ::structo::arch::pte_bit_field<16, 3, std::uint64_t>;
+  };
+
+  [[nodiscard]] constexpr std::uint64_t t0sz() const noexcept { return bits::t0sz::get(raw); }
+  constexpr auto &set_t0sz(std::uint64_t value) noexcept { raw = bits::t0sz::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint64_t irgn0() const noexcept { return bits::irgn0::get(raw); }
+  constexpr auto &set_irgn0(std::uint64_t value) noexcept { raw = bits::irgn0::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint64_t orgn0() const noexcept { return bits::orgn0::get(raw); }
+  constexpr auto &set_orgn0(std::uint64_t value) noexcept { raw = bits::orgn0::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint64_t sh0() const noexcept { return bits::sh0::get(raw); }
+  constexpr auto &set_sh0(std::uint64_t value) noexcept { raw = bits::sh0::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint64_t tg0() const noexcept { return bits::tg0::get(raw); }
+  constexpr auto &set_tg0(std::uint64_t value) noexcept { raw = bits::tg0::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint64_t ps() const noexcept { return bits::ps::get(raw); }
+  constexpr auto &set_ps(std::uint64_t value) noexcept { raw = bits::ps::set(raw, value); return *this; }
+
+#if defined(__aarch64__)
+  [[nodiscard]] static tcr_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C2_C0_2" : "=r"(value));
+    return tcr_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C2_C0_2, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `VTTBR_EL2` AArch64 system register (3 named field(s)). */
+struct vttbr_el2 {
+  std::uint64_t raw{0};
+
+  struct bits {
+    using cnp = ::structo::arch::pte_bit_field<0, 1, std::uint64_t>;
+    using baddr = ::structo::arch::pte_bit_field<1, 47, std::uint64_t>;
+    using vmid = ::structo::arch::pte_bit_field<48, 16, std::uint64_t>;
+  };
+
+  [[nodiscard]] constexpr bool cnp() const noexcept { return bits::cnp::test(raw); }
+  constexpr auto &set_cnp(bool value) noexcept { raw = bits::cnp::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint64_t baddr() const noexcept { return bits::baddr::get(raw); }
+  constexpr auto &set_baddr(std::uint64_t value) noexcept { raw = bits::baddr::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint64_t vmid() const noexcept { return bits::vmid::get(raw); }
+  constexpr auto &set_vmid(std::uint64_t value) noexcept { raw = bits::vmid::set(raw, value); return *this; }
+
+#if defined(__aarch64__)
+  [[nodiscard]] static vttbr_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C2_C1_0" : "=r"(value));
+    return vttbr_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C2_C1_0, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `VTCR_EL2` AArch64 system register (10 named field(s)). */
+struct vtcr_el2 {
+  std::uint64_t raw{0};
+
+  struct bits {
+    using t0sz = ::structo::arch::pte_bit_field<0, 6, std::uint64_t>;
+    using sl0 = ::structo::arch::pte_bit_field<6, 2, std::uint64_t>;
+    using irgn0 = ::structo::arch::pte_bit_field<8, 2, std::uint64_t>;
+    using orgn0 = ::structo::arch::pte_bit_field<10, 2, std::uint64_t>;
+    using sh0 = ::structo::arch::pte_bit_field<12, 2, std::uint64_t>;
+    using tg0 = ::structo::arch::pte_bit_field<14, 2, std::uint64_t>;
+    using ps = ::structo::arch::pte_bit_field<16, 3, std::uint64_t>;
+    using vs = ::structo::arch::pte_bit_field<19, 1, std::uint64_t>;
+    using ha = ::structo::arch::pte_bit_field<21, 1, std::uint64_t>;
+    using hd = ::structo::arch::pte_bit_field<22, 1, std::uint64_t>;
+  };
+
+  [[nodiscard]] constexpr std::uint64_t t0sz() const noexcept { return bits::t0sz::get(raw); }
+  constexpr auto &set_t0sz(std::uint64_t value) noexcept { raw = bits::t0sz::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint64_t sl0() const noexcept { return bits::sl0::get(raw); }
+  constexpr auto &set_sl0(std::uint64_t value) noexcept { raw = bits::sl0::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint64_t irgn0() const noexcept { return bits::irgn0::get(raw); }
+  constexpr auto &set_irgn0(std::uint64_t value) noexcept { raw = bits::irgn0::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint64_t orgn0() const noexcept { return bits::orgn0::get(raw); }
+  constexpr auto &set_orgn0(std::uint64_t value) noexcept { raw = bits::orgn0::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint64_t sh0() const noexcept { return bits::sh0::get(raw); }
+  constexpr auto &set_sh0(std::uint64_t value) noexcept { raw = bits::sh0::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint64_t tg0() const noexcept { return bits::tg0::get(raw); }
+  constexpr auto &set_tg0(std::uint64_t value) noexcept { raw = bits::tg0::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint64_t ps() const noexcept { return bits::ps::get(raw); }
+  constexpr auto &set_ps(std::uint64_t value) noexcept { raw = bits::ps::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool vs() const noexcept { return bits::vs::test(raw); }
+  constexpr auto &set_vs(bool value) noexcept { raw = bits::vs::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool ha() const noexcept { return bits::ha::test(raw); }
+  constexpr auto &set_ha(bool value) noexcept { raw = bits::ha::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool hd() const noexcept { return bits::hd::test(raw); }
+  constexpr auto &set_hd(bool value) noexcept { raw = bits::hd::set_bit(raw, value); return *this; }
+
+#if defined(__aarch64__)
+  [[nodiscard]] static vtcr_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C2_C1_2" : "=r"(value));
+    return vtcr_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C2_C1_2, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `SPSR_EL2` AArch64 system register (no named fields yet). */
+struct spsr_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static spsr_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C4_C0_0" : "=r"(value));
+    return spsr_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C4_C0_0, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `ELR_EL2` AArch64 system register (no named fields yet). */
+struct elr_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static elr_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C4_C0_1" : "=r"(value));
+    return elr_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C4_C0_1, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `IFSR32_EL2` AArch64 system register (no named fields yet). */
+struct ifsr32_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static ifsr32_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C5_C0_1" : "=r"(value));
+    return ifsr32_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C5_C0_1, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `AFSR0_EL2` AArch64 system register (no named fields yet). */
+struct afsr0_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static afsr0_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C5_C1_0" : "=r"(value));
+    return afsr0_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C5_C1_0, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `AFSR1_EL2` AArch64 system register (no named fields yet). */
+struct afsr1_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static afsr1_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C5_C1_1" : "=r"(value));
+    return afsr1_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C5_C1_1, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `ESR_EL2` AArch64 system register (3 named field(s)). */
+struct esr_el2 {
+  std::uint64_t raw{0};
+
+  struct bits {
+    using iss = ::structo::arch::pte_bit_field<0, 25, std::uint64_t>;
+    using il = ::structo::arch::pte_bit_field<25, 1, std::uint64_t>;
+    using ec = ::structo::arch::pte_bit_field<26, 6, std::uint64_t>;
+  };
+
+  [[nodiscard]] constexpr std::uint64_t iss() const noexcept { return bits::iss::get(raw); }
+  constexpr auto &set_iss(std::uint64_t value) noexcept { raw = bits::iss::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool il() const noexcept { return bits::il::test(raw); }
+  constexpr auto &set_il(bool value) noexcept { raw = bits::il::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint64_t ec() const noexcept { return bits::ec::get(raw); }
+  constexpr auto &set_ec(std::uint64_t value) noexcept { raw = bits::ec::set(raw, value); return *this; }
+
+#if defined(__aarch64__)
+  [[nodiscard]] static esr_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C5_C2_0" : "=r"(value));
+    return esr_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C5_C2_0, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `FAR_EL2` AArch64 system register (no named fields yet). */
+struct far_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static far_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C6_C0_0" : "=r"(value));
+    return far_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C6_C0_0, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `HPFAR_EL2` AArch64 system register (no named fields yet). */
+struct hpfar_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static hpfar_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C6_C0_4" : "=r"(value));
+    return hpfar_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C6_C0_4, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `MAIR_EL2` AArch64 system register (no named fields yet). */
+struct mair_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static mair_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C10_C2_0" : "=r"(value));
+    return mair_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C10_C2_0, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `AMAIR_EL2` AArch64 system register (no named fields yet). */
+struct amair_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static amair_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C10_C3_0" : "=r"(value));
+    return amair_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C10_C3_0, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `VBAR_EL2` AArch64 system register (no named fields yet). */
+struct vbar_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static vbar_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C12_C0_0" : "=r"(value));
+    return vbar_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C12_C0_0, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `RVBAR_EL2` AArch64 system register (no named fields yet). */
+struct rvbar_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static rvbar_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C12_C0_1" : "=r"(value));
+    return rvbar_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C12_C0_1, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `RMR_EL2` AArch64 system register (no named fields yet). */
+struct rmr_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static rmr_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C12_C0_2" : "=r"(value));
+    return rmr_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C12_C0_2, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `TPIDR_EL2` AArch64 system register (no named fields yet). */
+struct tpidr_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static tpidr_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C13_C0_2" : "=r"(value));
+    return tpidr_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C13_C0_2, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `CNTHCTL_EL2` AArch64 system register (no named fields yet). */
+struct cnthctl_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static cnthctl_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C14_C1_0" : "=r"(value));
+    return cnthctl_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C14_C1_0, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `CNTVOFF_EL2` AArch64 system register (no named fields yet). */
+struct cntvoff_el2 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static cntvoff_el2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C14_C0_3" : "=r"(value));
+    return cntvoff_el2{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C14_C0_3, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
 } // namespace structo::arch::arm64::sysreg_raw

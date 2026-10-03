@@ -609,9 +609,37 @@ struct nsacr {
 #endif // defined(__arm__) && !defined(__aarch64__)
 };
 
-/** @brief Raw accessor for the AArch32 `HSCTLR` coprocessor register (no named fields yet). */
+/** @brief Raw accessor for the AArch32 `HSCTLR` coprocessor register (8 named field(s)). */
 struct hsctlr {
   std::uint32_t raw{0};
+
+  struct bits {
+    using m = ::structo::arch::pte_bit_field<0, 1, std::uint32_t>;
+    using a = ::structo::arch::pte_bit_field<1, 1, std::uint32_t>;
+    using c = ::structo::arch::pte_bit_field<2, 1, std::uint32_t>;
+    using i = ::structo::arch::pte_bit_field<12, 1, std::uint32_t>;
+    using fi = ::structo::arch::pte_bit_field<21, 1, std::uint32_t>;
+    using wxn = ::structo::arch::pte_bit_field<19, 1, std::uint32_t>;
+    using ee = ::structo::arch::pte_bit_field<25, 1, std::uint32_t>;
+    using te = ::structo::arch::pte_bit_field<30, 1, std::uint32_t>;
+  };
+
+  [[nodiscard]] constexpr bool m() const noexcept { return bits::m::test(raw); }
+  constexpr auto &set_m(bool value) noexcept { raw = bits::m::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool a() const noexcept { return bits::a::test(raw); }
+  constexpr auto &set_a(bool value) noexcept { raw = bits::a::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool c() const noexcept { return bits::c::test(raw); }
+  constexpr auto &set_c(bool value) noexcept { raw = bits::c::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool i() const noexcept { return bits::i::test(raw); }
+  constexpr auto &set_i(bool value) noexcept { raw = bits::i::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool fi() const noexcept { return bits::fi::test(raw); }
+  constexpr auto &set_fi(bool value) noexcept { raw = bits::fi::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool wxn() const noexcept { return bits::wxn::test(raw); }
+  constexpr auto &set_wxn(bool value) noexcept { raw = bits::wxn::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool ee() const noexcept { return bits::ee::test(raw); }
+  constexpr auto &set_ee(bool value) noexcept { raw = bits::ee::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool te() const noexcept { return bits::te::test(raw); }
+  constexpr auto &set_te(bool value) noexcept { raw = bits::te::set_bit(raw, value); return *this; }
 
 #if defined(__arm__) && !defined(__aarch64__)
   [[nodiscard]] static hsctlr read() noexcept {
@@ -623,9 +651,67 @@ struct hsctlr {
 #endif // defined(__arm__) && !defined(__aarch64__)
 };
 
-/** @brief Raw accessor for the AArch32 `HCR` coprocessor register (no named fields yet). */
+/** @brief Raw accessor for the AArch32 `HCR` coprocessor register (18 named field(s)). */
 struct hcr {
   std::uint32_t raw{0};
+
+  struct bits {
+    using vm = ::structo::arch::pte_bit_field<0, 1, std::uint32_t>;
+    using swio = ::structo::arch::pte_bit_field<1, 1, std::uint32_t>;
+    using ptw = ::structo::arch::pte_bit_field<2, 1, std::uint32_t>;
+    using fmo = ::structo::arch::pte_bit_field<3, 1, std::uint32_t>;
+    using imo = ::structo::arch::pte_bit_field<4, 1, std::uint32_t>;
+    using amo = ::structo::arch::pte_bit_field<5, 1, std::uint32_t>;
+    using vf = ::structo::arch::pte_bit_field<6, 1, std::uint32_t>;
+    using vi = ::structo::arch::pte_bit_field<7, 1, std::uint32_t>;
+    using va = ::structo::arch::pte_bit_field<8, 1, std::uint32_t>;
+    using fb = ::structo::arch::pte_bit_field<9, 1, std::uint32_t>;
+    using bsu = ::structo::arch::pte_bit_field<10, 2, std::uint32_t>;
+    using dc = ::structo::arch::pte_bit_field<12, 1, std::uint32_t>;
+    using twi = ::structo::arch::pte_bit_field<13, 1, std::uint32_t>;
+    using twe = ::structo::arch::pte_bit_field<14, 1, std::uint32_t>;
+    using tsc = ::structo::arch::pte_bit_field<19, 1, std::uint32_t>;
+    using ttlb = ::structo::arch::pte_bit_field<25, 1, std::uint32_t>;
+    using tvm = ::structo::arch::pte_bit_field<26, 1, std::uint32_t>;
+    using tge = ::structo::arch::pte_bit_field<27, 1, std::uint32_t>;
+  };
+
+  [[nodiscard]] constexpr bool vm() const noexcept { return bits::vm::test(raw); }
+  constexpr auto &set_vm(bool value) noexcept { raw = bits::vm::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool swio() const noexcept { return bits::swio::test(raw); }
+  constexpr auto &set_swio(bool value) noexcept { raw = bits::swio::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool ptw() const noexcept { return bits::ptw::test(raw); }
+  constexpr auto &set_ptw(bool value) noexcept { raw = bits::ptw::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool fmo() const noexcept { return bits::fmo::test(raw); }
+  constexpr auto &set_fmo(bool value) noexcept { raw = bits::fmo::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool imo() const noexcept { return bits::imo::test(raw); }
+  constexpr auto &set_imo(bool value) noexcept { raw = bits::imo::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool amo() const noexcept { return bits::amo::test(raw); }
+  constexpr auto &set_amo(bool value) noexcept { raw = bits::amo::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool vf() const noexcept { return bits::vf::test(raw); }
+  constexpr auto &set_vf(bool value) noexcept { raw = bits::vf::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool vi() const noexcept { return bits::vi::test(raw); }
+  constexpr auto &set_vi(bool value) noexcept { raw = bits::vi::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool va() const noexcept { return bits::va::test(raw); }
+  constexpr auto &set_va(bool value) noexcept { raw = bits::va::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool fb() const noexcept { return bits::fb::test(raw); }
+  constexpr auto &set_fb(bool value) noexcept { raw = bits::fb::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t bsu() const noexcept { return bits::bsu::get(raw); }
+  constexpr auto &set_bsu(std::uint32_t value) noexcept { raw = bits::bsu::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool dc() const noexcept { return bits::dc::test(raw); }
+  constexpr auto &set_dc(bool value) noexcept { raw = bits::dc::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool twi() const noexcept { return bits::twi::test(raw); }
+  constexpr auto &set_twi(bool value) noexcept { raw = bits::twi::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool twe() const noexcept { return bits::twe::test(raw); }
+  constexpr auto &set_twe(bool value) noexcept { raw = bits::twe::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tsc() const noexcept { return bits::tsc::test(raw); }
+  constexpr auto &set_tsc(bool value) noexcept { raw = bits::tsc::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool ttlb() const noexcept { return bits::ttlb::test(raw); }
+  constexpr auto &set_ttlb(bool value) noexcept { raw = bits::ttlb::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tvm() const noexcept { return bits::tvm::test(raw); }
+  constexpr auto &set_tvm(bool value) noexcept { raw = bits::tvm::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tge() const noexcept { return bits::tge::test(raw); }
+  constexpr auto &set_tge(bool value) noexcept { raw = bits::tge::set_bit(raw, value); return *this; }
 
 #if defined(__arm__) && !defined(__aarch64__)
   [[nodiscard]] static hcr read() noexcept {
@@ -637,9 +723,37 @@ struct hcr {
 #endif // defined(__arm__) && !defined(__aarch64__)
 };
 
-/** @brief Raw accessor for the AArch32 `HDCR` coprocessor register (no named fields yet). */
+/** @brief Raw accessor for the AArch32 `HDCR` coprocessor register (8 named field(s)). */
 struct hdcr {
   std::uint32_t raw{0};
+
+  struct bits {
+    using hpmn = ::structo::arch::pte_bit_field<0, 5, std::uint32_t>;
+    using tpmcr = ::structo::arch::pte_bit_field<5, 1, std::uint32_t>;
+    using tpm = ::structo::arch::pte_bit_field<6, 1, std::uint32_t>;
+    using hpme = ::structo::arch::pte_bit_field<7, 1, std::uint32_t>;
+    using tde = ::structo::arch::pte_bit_field<8, 1, std::uint32_t>;
+    using tda = ::structo::arch::pte_bit_field<9, 1, std::uint32_t>;
+    using tdosa = ::structo::arch::pte_bit_field<10, 1, std::uint32_t>;
+    using tdra = ::structo::arch::pte_bit_field<11, 1, std::uint32_t>;
+  };
+
+  [[nodiscard]] constexpr std::uint32_t hpmn() const noexcept { return bits::hpmn::get(raw); }
+  constexpr auto &set_hpmn(std::uint32_t value) noexcept { raw = bits::hpmn::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tpmcr() const noexcept { return bits::tpmcr::test(raw); }
+  constexpr auto &set_tpmcr(bool value) noexcept { raw = bits::tpmcr::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tpm() const noexcept { return bits::tpm::test(raw); }
+  constexpr auto &set_tpm(bool value) noexcept { raw = bits::tpm::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool hpme() const noexcept { return bits::hpme::test(raw); }
+  constexpr auto &set_hpme(bool value) noexcept { raw = bits::hpme::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tde() const noexcept { return bits::tde::test(raw); }
+  constexpr auto &set_tde(bool value) noexcept { raw = bits::tde::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tda() const noexcept { return bits::tda::test(raw); }
+  constexpr auto &set_tda(bool value) noexcept { raw = bits::tda::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tdosa() const noexcept { return bits::tdosa::test(raw); }
+  constexpr auto &set_tdosa(bool value) noexcept { raw = bits::tdosa::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tdra() const noexcept { return bits::tdra::test(raw); }
+  constexpr auto &set_tdra(bool value) noexcept { raw = bits::tdra::set_bit(raw, value); return *this; }
 
 #if defined(__arm__) && !defined(__aarch64__)
   [[nodiscard]] static hdcr read() noexcept {
@@ -651,9 +765,25 @@ struct hdcr {
 #endif // defined(__arm__) && !defined(__aarch64__)
 };
 
-/** @brief Raw accessor for the AArch32 `HCPTR` coprocessor register (no named fields yet). */
+/** @brief Raw accessor for the AArch32 `HCPTR` coprocessor register (4 named field(s)). */
 struct hcptr {
   std::uint32_t raw{0};
+
+  struct bits {
+    using tcp_mask = ::structo::arch::pte_bit_field<0, 14, std::uint32_t>;
+    using tase = ::structo::arch::pte_bit_field<15, 1, std::uint32_t>;
+    using tta = ::structo::arch::pte_bit_field<20, 1, std::uint32_t>;
+    using tcpac = ::structo::arch::pte_bit_field<31, 1, std::uint32_t>;
+  };
+
+  [[nodiscard]] constexpr std::uint32_t tcp_mask() const noexcept { return bits::tcp_mask::get(raw); }
+  constexpr auto &set_tcp_mask(std::uint32_t value) noexcept { raw = bits::tcp_mask::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tase() const noexcept { return bits::tase::test(raw); }
+  constexpr auto &set_tase(bool value) noexcept { raw = bits::tase::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tta() const noexcept { return bits::tta::test(raw); }
+  constexpr auto &set_tta(bool value) noexcept { raw = bits::tta::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tcpac() const noexcept { return bits::tcpac::test(raw); }
+  constexpr auto &set_tcpac(bool value) noexcept { raw = bits::tcpac::set_bit(raw, value); return *this; }
 
 #if defined(__arm__) && !defined(__aarch64__)
   [[nodiscard]] static hcptr read() noexcept {
@@ -721,9 +851,25 @@ struct ttbcr {
 #endif // defined(__arm__) && !defined(__aarch64__)
 };
 
-/** @brief Raw accessor for the AArch32 `HTCR` coprocessor register (no named fields yet). */
+/** @brief Raw accessor for the AArch32 `HTCR` coprocessor register (4 named field(s)). */
 struct htcr {
   std::uint32_t raw{0};
+
+  struct bits {
+    using t0sz = ::structo::arch::pte_bit_field<0, 3, std::uint32_t>;
+    using irgn0 = ::structo::arch::pte_bit_field<8, 2, std::uint32_t>;
+    using orgn0 = ::structo::arch::pte_bit_field<10, 2, std::uint32_t>;
+    using sh0 = ::structo::arch::pte_bit_field<12, 2, std::uint32_t>;
+  };
+
+  [[nodiscard]] constexpr std::uint32_t t0sz() const noexcept { return bits::t0sz::get(raw); }
+  constexpr auto &set_t0sz(std::uint32_t value) noexcept { raw = bits::t0sz::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t irgn0() const noexcept { return bits::irgn0::get(raw); }
+  constexpr auto &set_irgn0(std::uint32_t value) noexcept { raw = bits::irgn0::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t orgn0() const noexcept { return bits::orgn0::get(raw); }
+  constexpr auto &set_orgn0(std::uint32_t value) noexcept { raw = bits::orgn0::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t sh0() const noexcept { return bits::sh0::get(raw); }
+  constexpr auto &set_sh0(std::uint32_t value) noexcept { raw = bits::sh0::set(raw, value); return *this; }
 
 #if defined(__arm__) && !defined(__aarch64__)
   [[nodiscard]] static htcr read() noexcept {
@@ -735,9 +881,31 @@ struct htcr {
 #endif // defined(__arm__) && !defined(__aarch64__)
 };
 
-/** @brief Raw accessor for the AArch32 `VTCR` coprocessor register (no named fields yet). */
+/** @brief Raw accessor for the AArch32 `VTCR` coprocessor register (6 named field(s)). */
 struct vtcr {
   std::uint32_t raw{0};
+
+  struct bits {
+    using t0sz = ::structo::arch::pte_bit_field<0, 4, std::uint32_t>;
+    using s = ::structo::arch::pte_bit_field<4, 1, std::uint32_t>;
+    using sl0 = ::structo::arch::pte_bit_field<6, 2, std::uint32_t>;
+    using irgn0 = ::structo::arch::pte_bit_field<8, 2, std::uint32_t>;
+    using orgn0 = ::structo::arch::pte_bit_field<10, 2, std::uint32_t>;
+    using sh0 = ::structo::arch::pte_bit_field<12, 2, std::uint32_t>;
+  };
+
+  [[nodiscard]] constexpr std::uint32_t t0sz() const noexcept { return bits::t0sz::get(raw); }
+  constexpr auto &set_t0sz(std::uint32_t value) noexcept { raw = bits::t0sz::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool s() const noexcept { return bits::s::test(raw); }
+  constexpr auto &set_s(bool value) noexcept { raw = bits::s::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t sl0() const noexcept { return bits::sl0::get(raw); }
+  constexpr auto &set_sl0(std::uint32_t value) noexcept { raw = bits::sl0::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t irgn0() const noexcept { return bits::irgn0::get(raw); }
+  constexpr auto &set_irgn0(std::uint32_t value) noexcept { raw = bits::irgn0::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t orgn0() const noexcept { return bits::orgn0::get(raw); }
+  constexpr auto &set_orgn0(std::uint32_t value) noexcept { raw = bits::orgn0::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t sh0() const noexcept { return bits::sh0::get(raw); }
+  constexpr auto &set_sh0(std::uint32_t value) noexcept { raw = bits::sh0::set(raw, value); return *this; }
 
 #if defined(__arm__) && !defined(__aarch64__)
   [[nodiscard]] static vtcr read() noexcept {
@@ -777,9 +945,22 @@ struct dfsr {
 #endif // defined(__arm__) && !defined(__aarch64__)
 };
 
-/** @brief Raw accessor for the AArch32 `HSR` coprocessor register (no named fields yet). */
+/** @brief Raw accessor for the AArch32 `HSR` coprocessor register (3 named field(s)). */
 struct hsr {
   std::uint32_t raw{0};
+
+  struct bits {
+    using iss = ::structo::arch::pte_bit_field<0, 25, std::uint32_t>;
+    using il = ::structo::arch::pte_bit_field<25, 1, std::uint32_t>;
+    using ec = ::structo::arch::pte_bit_field<26, 6, std::uint32_t>;
+  };
+
+  [[nodiscard]] constexpr std::uint32_t iss() const noexcept { return bits::iss::get(raw); }
+  constexpr auto &set_iss(std::uint32_t value) noexcept { raw = bits::iss::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool il() const noexcept { return bits::il::test(raw); }
+  constexpr auto &set_il(bool value) noexcept { raw = bits::il::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t ec() const noexcept { return bits::ec::get(raw); }
+  constexpr auto &set_ec(std::uint32_t value) noexcept { raw = bits::ec::set(raw, value); return *this; }
 
 #if defined(__arm__) && !defined(__aarch64__)
   [[nodiscard]] static hsr read() noexcept {
@@ -875,9 +1056,16 @@ struct hifar {
 #endif // defined(__arm__) && !defined(__aarch64__)
 };
 
-/** @brief Raw accessor for the AArch32 `HPFAR` coprocessor register (no named fields yet). */
+/** @brief Raw accessor for the AArch32 `HPFAR` coprocessor register (1 named field(s)). */
 struct hpfar {
   std::uint32_t raw{0};
+
+  struct bits {
+    using fipa = ::structo::arch::pte_bit_field<4, 28, std::uint32_t>;
+  };
+
+  [[nodiscard]] constexpr std::uint32_t fipa() const noexcept { return bits::fipa::get(raw); }
+  constexpr auto &set_fipa(std::uint32_t value) noexcept { raw = bits::fipa::set(raw, value); return *this; }
 
 #if defined(__arm__) && !defined(__aarch64__)
   [[nodiscard]] static hpfar read() noexcept {
@@ -1505,9 +1693,25 @@ struct amair1 {
 #endif // defined(__arm__) && !defined(__aarch64__)
 };
 
-/** @brief Raw accessor for the AArch32 `HMAIR0` coprocessor register (no named fields yet). */
+/** @brief Raw accessor for the AArch32 `HMAIR0` coprocessor register (4 named field(s)). */
 struct hmair0 {
   std::uint32_t raw{0};
+
+  struct bits {
+    using attr0 = ::structo::arch::pte_bit_field<0, 8, std::uint32_t>;
+    using attr1 = ::structo::arch::pte_bit_field<8, 8, std::uint32_t>;
+    using attr2 = ::structo::arch::pte_bit_field<16, 8, std::uint32_t>;
+    using attr3 = ::structo::arch::pte_bit_field<24, 8, std::uint32_t>;
+  };
+
+  [[nodiscard]] constexpr std::uint32_t attr0() const noexcept { return bits::attr0::get(raw); }
+  constexpr auto &set_attr0(std::uint32_t value) noexcept { raw = bits::attr0::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t attr1() const noexcept { return bits::attr1::get(raw); }
+  constexpr auto &set_attr1(std::uint32_t value) noexcept { raw = bits::attr1::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t attr2() const noexcept { return bits::attr2::get(raw); }
+  constexpr auto &set_attr2(std::uint32_t value) noexcept { raw = bits::attr2::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t attr3() const noexcept { return bits::attr3::get(raw); }
+  constexpr auto &set_attr3(std::uint32_t value) noexcept { raw = bits::attr3::set(raw, value); return *this; }
 
 #if defined(__arm__) && !defined(__aarch64__)
   [[nodiscard]] static hmair0 read() noexcept {
@@ -1519,9 +1723,25 @@ struct hmair0 {
 #endif // defined(__arm__) && !defined(__aarch64__)
 };
 
-/** @brief Raw accessor for the AArch32 `HMAIR1` coprocessor register (no named fields yet). */
+/** @brief Raw accessor for the AArch32 `HMAIR1` coprocessor register (4 named field(s)). */
 struct hmair1 {
   std::uint32_t raw{0};
+
+  struct bits {
+    using attr4 = ::structo::arch::pte_bit_field<0, 8, std::uint32_t>;
+    using attr5 = ::structo::arch::pte_bit_field<8, 8, std::uint32_t>;
+    using attr6 = ::structo::arch::pte_bit_field<16, 8, std::uint32_t>;
+    using attr7 = ::structo::arch::pte_bit_field<24, 8, std::uint32_t>;
+  };
+
+  [[nodiscard]] constexpr std::uint32_t attr4() const noexcept { return bits::attr4::get(raw); }
+  constexpr auto &set_attr4(std::uint32_t value) noexcept { raw = bits::attr4::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t attr5() const noexcept { return bits::attr5::get(raw); }
+  constexpr auto &set_attr5(std::uint32_t value) noexcept { raw = bits::attr5::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t attr6() const noexcept { return bits::attr6::get(raw); }
+  constexpr auto &set_attr6(std::uint32_t value) noexcept { raw = bits::attr6::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t attr7() const noexcept { return bits::attr7::get(raw); }
+  constexpr auto &set_attr7(std::uint32_t value) noexcept { raw = bits::attr7::set(raw, value); return *this; }
 
 #if defined(__arm__) && !defined(__aarch64__)
   [[nodiscard]] static hmair1 read() noexcept {
