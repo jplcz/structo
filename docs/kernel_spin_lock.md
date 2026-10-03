@@ -67,6 +67,9 @@ Like `reloco::spin_lock`, never fair and never adaptive: a contended
 `lock()` spins forever rather than parking or falling back to a
 blocking wait. Only appropriate where spinning is known to be short --
 IRQ/exception handlers, pre-scheduler-init code, data shared with an
-interrupt handler on another core.
+interrupt handler on another core. See
+[`ticket_spin_lock<Traits>`](ticket_spin_lock.md) for a FIFO-fair
+alternative sharing the same `Traits` shape, trading a little extra
+overhead for immunity to starvation under heavy, sustained contention.
 
-See also: [`backoff.md`](backoff.md), [`softlock_detector.md`](softlock_detector.md), [`irq_guard.md`](irq_guard.md).
+See also: [`backoff.md`](backoff.md), [`softlock_detector.md`](softlock_detector.md), [`ticket_spin_lock.md`](ticket_spin_lock.md), [`irq_guard.md`](irq_guard.md).

@@ -315,6 +315,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_backoff.cpp
         tests/test_softlock_detector.cpp
         tests/test_kernel_spin_lock.cpp
+        tests/test_ticket_spin_lock.cpp
         tests/test_per_cpu_ptr.cpp
         tests/test_per_thread_ptr.cpp
         tests/test_per_domain_ptr.cpp

@@ -74,25 +74,8 @@
 
 #include <atomic>
 #include <cstdint>
-#include <type_traits>
 
 namespace structo::sync {
-
-namespace detail {
-
-/** @brief Resolves `Traits`'s softlock tick limit: `Traits::softlock_limit` if provided, else `softlock_detector::default_limit()`. */
-template <typename Traits, typename = void> struct kernel_spin_lock_softlock_limit {
-  static softlock_detector::counter_type value() noexcept { return softlock_detector::default_limit(); }
-};
-
-template <typename Traits>
-struct kernel_spin_lock_softlock_limit<Traits, std::void_t<decltype(Traits::softlock_limit)>> {
-  static constexpr softlock_detector::counter_type value() noexcept {
-    return static_cast<softlock_detector::counter_type>(Traits::softlock_limit);
-  }
-};
-
-} // namespace detail
 
 
 /**
@@ -139,7 +122,7 @@ public:
                   "kernel_spin_lock: lock() called while already held by the calling context (self-deadlock)");
 
     backoff bo;
-    softlock_detector lockup(detail::kernel_spin_lock_softlock_limit<Traits>::value());
+    softlock_detector lockup(detail::softlock_limit_for<Traits>::value());
     for (;;) {
       std::uintptr_t expected = 0;
       if (owner_.compare_exchange_weak(expected, self, std::memory_order_acquire, std::memory_order_relaxed)) {

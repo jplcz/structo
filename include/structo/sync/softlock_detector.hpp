@@ -68,6 +68,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <type_traits>
 
 namespace structo::sync {
 
@@ -133,5 +134,25 @@ private:
   counter_type limit_;
   counter_type count_{0};
 };
+
+namespace detail {
+
+/**
+ * @brief Resolves a lock `Traits` policy's softlock tick limit:
+ * `Traits::softlock_limit` if provided, else `softlock_detector::default_limit()`.
+ * Shared by `kernel_spin_lock<Traits>` and `ticket_spin_lock<Traits>`.
+ */
+template <typename Traits, typename = void> struct softlock_limit_for {
+  static softlock_detector::counter_type value() noexcept { return softlock_detector::default_limit(); }
+};
+
+template <typename Traits>
+struct softlock_limit_for<Traits, std::void_t<decltype(Traits::softlock_limit)>> {
+  static constexpr softlock_detector::counter_type value() noexcept {
+    return static_cast<softlock_detector::counter_type>(Traits::softlock_limit);
+  }
+};
+
+} // namespace detail
 
 } // namespace structo::sync
