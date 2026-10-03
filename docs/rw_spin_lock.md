@@ -95,4 +95,4 @@ identity to check) -- as with real kernels' own reader-writer locks
 can self-deadlock, because the pending writer bit blocks the recursive
 `read_lock()` call exactly like it would any other new reader.
 
-See also: [`kernel_spin_lock.md`](kernel_spin_lock.md), [`ticket_spin_lock.md`](ticket_spin_lock.md), [`queue_spin_lock.md`](queue_spin_lock.md), [`backoff.md`](backoff.md), [`softlock_detector.md`](softlock_detector.md).
+See also: [`kernel_spin_lock.md`](kernel_spin_lock.md), [`ticket_spin_lock.md`](ticket_spin_lock.md), [`queue_spin_lock.md`](queue_spin_lock.md), [`backoff.md`](backoff.md), [`softlock_detector.md`](softlock_detector.md), [`queue_rw_spin_lock.md`](queue_rw_spin_lock.md).

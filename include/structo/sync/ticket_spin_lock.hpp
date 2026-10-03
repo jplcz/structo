@@ -61,7 +61,6 @@
 #include <structo/sync/softlock_detector.hpp>
 
 #include <reloco/detail/assert.hpp>
-#include <reloco/detail/compat.hpp>
 
 #include <atomic>
 #include <cstdint>
@@ -73,7 +72,7 @@ namespace structo::sync {
  * @tparam Traits Kernel policy providing `owner_type` and
  * `current_owner()`, matching `kernel_spin_lock::Traits`.
  */
-template <typename Traits> class RELOCO_CAPABILITY("mutex") ticket_spin_lock {
+template <typename Traits> class ticket_spin_lock {
 public:
   using traits_type = Traits;
   using owner_type = typename Traits::owner_type;
@@ -105,7 +104,7 @@ public:
    * this lock: this is a non-recursive lock, so queueing a second
    * ticket behind one's own would otherwise self-deadlock forever.
    */
-  void lock() & noexcept RELOCO_ACQUIRE() {
+  void lock() & noexcept {
     RELOCO_ASSERT(!is_locked_by_current(),
                   "ticket_spin_lock: lock() called while already held by the calling context (self-deadlock)");
 
@@ -128,7 +127,7 @@ public:
    * `lock()`'s FIFO guarantee rather than letting `try_lock()` itself
    * jump the queue.
    */
-  [[nodiscard]] bool try_lock() & noexcept RELOCO_TRY_ACQUIRE(true) {
+  [[nodiscard]] bool try_lock() & noexcept {
     ticket_type ticket = now_serving_.load(std::memory_order_relaxed);
     if (!next_ticket_.compare_exchange_strong(ticket, ticket + 1, std::memory_order_acquire, std::memory_order_relaxed)) {
       return false;
@@ -143,7 +142,7 @@ public:
    * Traps (via `RELOCO_ASSERT`) if the calling context is not the
    * current owner (double-unlock, or unlock from the wrong context).
    */
-  void unlock() & noexcept RELOCO_RELEASE() {
+  void unlock() & noexcept {
     RELOCO_ASSERT(owner_.load(std::memory_order_relaxed) == owner_value(),
                   "ticket_spin_lock: unlock() by non-owner (or already unlocked)");
     owner_.store(0, std::memory_order_relaxed);

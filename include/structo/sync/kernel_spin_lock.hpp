@@ -70,7 +70,6 @@
 #include <structo/sync/softlock_detector.hpp>
 
 #include <reloco/detail/assert.hpp>
-#include <reloco/detail/compat.hpp>
 
 #include <atomic>
 #include <cstdint>
@@ -84,7 +83,7 @@ namespace structo::sync {
  * @tparam Traits Kernel policy providing `owner_type` and
  * `current_owner()`; see this file's top-level docs.
  */
-template <typename Traits> class RELOCO_CAPABILITY("mutex") kernel_spin_lock {
+template <typename Traits> class kernel_spin_lock {
 public:
   using traits_type = Traits;
   using owner_type = typename Traits::owner_type;
@@ -116,7 +115,7 @@ public:
    * self-deadlock (spin forever against an owner slot only the caller
    * itself can clear).
    */
-  void lock() & noexcept RELOCO_ACQUIRE() {
+  void lock() & noexcept {
     const std::uintptr_t self = owner_value();
     RELOCO_ASSERT(owner_.load(std::memory_order_relaxed) != self,
                   "kernel_spin_lock: lock() called while already held by the calling context (self-deadlock)");
@@ -141,7 +140,7 @@ public:
   }
 
   /** @brief Attempts to acquire the lock without spinning; returns whether it succeeded. */
-  [[nodiscard]] bool try_lock() & noexcept RELOCO_TRY_ACQUIRE(true) {
+  [[nodiscard]] bool try_lock() & noexcept {
     std::uintptr_t expected = 0;
     return owner_.compare_exchange_strong(expected, owner_value(), std::memory_order_acquire, std::memory_order_relaxed);
   }
@@ -151,7 +150,7 @@ public:
    * Traps (via `RELOCO_ASSERT`) if the calling context is not the
    * current owner (double-unlock, or unlock from the wrong context).
    */
-  void unlock() & noexcept RELOCO_RELEASE() {
+  void unlock() & noexcept {
     RELOCO_ASSERT(owner_.load(std::memory_order_relaxed) == owner_value(),
                   "kernel_spin_lock: unlock() by non-owner (or already unlocked)");
     owner_.store(0, std::memory_order_release);
