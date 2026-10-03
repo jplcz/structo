@@ -368,4 +368,7 @@ See also: [`mm_asid_context.md`](mm_asid_context.md) (the ready-made
 (the analogous hardware-ID-to-logical-index lookup this header's
 `MaxActive` convention is modeled after), [`io_space_ref.md`](io_space_ref.md)
 (the same "bookkeeping here, hardware effects at the caller" division of
-responsibility).
+responsibility), [`fixed_asid_allocator.md`](fixed_asid_allocator.md)
+(the no-allocation, generation-free sibling for systems where the task
+count is a compile-time-known `Capacity` that never exceeds the hardware
+ASID space, so none of this header's rollover bookkeeping is needed).
