@@ -315,6 +315,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_per_domain_ptr.cpp
         tests/test_asid_allocator.cpp
         tests/test_fixed_asid_allocator.cpp
+        tests/test_tlb_flush.cpp
         tests/test_cpu_mask.cpp
         tests/test_mm_asid_context.cpp
         tests/test_page_table_traits.cpp
