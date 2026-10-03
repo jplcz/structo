@@ -287,6 +287,72 @@ struct cntkctl_el1 {
 #endif // defined(__aarch64__)
 };
 
+/** @brief Raw accessor for the `ACTLR_EL1` AArch64 system register (no named fields yet). */
+struct actlr_el1 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static actlr_el1 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_0_C1_C0_1" : "=r"(value));
+    return actlr_el1{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_0_C1_C0_1, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `PAR_EL1` AArch64 system register (2 named field(s)). */
+struct par_el1 {
+  std::uint64_t raw{0};
+
+  struct bits {
+    using f = ::structo::arch::pte_bit_field<0, 1, std::uint64_t>;
+    using fst = ::structo::arch::pte_bit_field<1, 6, std::uint64_t>;
+  };
+
+  [[nodiscard]] constexpr bool f() const noexcept { return bits::f::test(raw); }
+  constexpr auto &set_f(bool value) noexcept { raw = bits::f::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint64_t fst() const noexcept { return bits::fst::get(raw); }
+  constexpr auto &set_fst(std::uint64_t value) noexcept { raw = bits::fst::set(raw, value); return *this; }
+
+#if defined(__aarch64__)
+  [[nodiscard]] static par_el1 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_0_C7_C4_0" : "=r"(value));
+    return par_el1{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_0_C7_C4_0, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `TPIDR_EL0` AArch64 system register (no named fields yet). */
+struct tpidr_el0 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static tpidr_el0 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_3_C13_C0_2" : "=r"(value));
+    return tpidr_el0{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_3_C13_C0_2, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the `TPIDR_EL1` AArch64 system register (no named fields yet). */
+struct tpidr_el1 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static tpidr_el1 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_0_C13_C0_4" : "=r"(value));
+    return tpidr_el1{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_0_C13_C0_4, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
 /** @brief Raw accessor for the `CNTKCTL_EL12` AArch64 system register (no named fields yet). */
 struct cntkctl_el12 {
   std::uint64_t raw{0};

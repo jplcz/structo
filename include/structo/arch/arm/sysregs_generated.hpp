@@ -2147,6 +2147,311 @@ struct spsr {
 #endif // defined(__arm__) && !defined(__aarch64__)
 };
 
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `SPSR_svc` register (13 named field(s)). */
+struct spsr_svc {
+  std::uint32_t raw{0};
+
+  struct bits {
+    using m = ::structo::arch::pte_bit_field<0, 5, std::uint32_t>;
+    using t = ::structo::arch::pte_bit_field<5, 1, std::uint32_t>;
+    using f = ::structo::arch::pte_bit_field<6, 1, std::uint32_t>;
+    using i = ::structo::arch::pte_bit_field<7, 1, std::uint32_t>;
+    using a = ::structo::arch::pte_bit_field<8, 1, std::uint32_t>;
+    using e = ::structo::arch::pte_bit_field<9, 1, std::uint32_t>;
+    using ge = ::structo::arch::pte_bit_field<16, 4, std::uint32_t>;
+    using j = ::structo::arch::pte_bit_field<24, 1, std::uint32_t>;
+    using q = ::structo::arch::pte_bit_field<27, 1, std::uint32_t>;
+    using v = ::structo::arch::pte_bit_field<28, 1, std::uint32_t>;
+    using c = ::structo::arch::pte_bit_field<29, 1, std::uint32_t>;
+    using z = ::structo::arch::pte_bit_field<30, 1, std::uint32_t>;
+    using n = ::structo::arch::pte_bit_field<31, 1, std::uint32_t>;
+  };
+
+  [[nodiscard]] constexpr std::uint32_t m() const noexcept { return bits::m::get(raw); }
+  constexpr auto &set_m(std::uint32_t value) noexcept { raw = bits::m::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool t() const noexcept { return bits::t::test(raw); }
+  constexpr auto &set_t(bool value) noexcept { raw = bits::t::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool f() const noexcept { return bits::f::test(raw); }
+  constexpr auto &set_f(bool value) noexcept { raw = bits::f::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool i() const noexcept { return bits::i::test(raw); }
+  constexpr auto &set_i(bool value) noexcept { raw = bits::i::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool a() const noexcept { return bits::a::test(raw); }
+  constexpr auto &set_a(bool value) noexcept { raw = bits::a::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool e() const noexcept { return bits::e::test(raw); }
+  constexpr auto &set_e(bool value) noexcept { raw = bits::e::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t ge() const noexcept { return bits::ge::get(raw); }
+  constexpr auto &set_ge(std::uint32_t value) noexcept { raw = bits::ge::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool j() const noexcept { return bits::j::test(raw); }
+  constexpr auto &set_j(bool value) noexcept { raw = bits::j::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool q() const noexcept { return bits::q::test(raw); }
+  constexpr auto &set_q(bool value) noexcept { raw = bits::q::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool v() const noexcept { return bits::v::test(raw); }
+  constexpr auto &set_v(bool value) noexcept { raw = bits::v::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool c() const noexcept { return bits::c::test(raw); }
+  constexpr auto &set_c(bool value) noexcept { raw = bits::c::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool z() const noexcept { return bits::z::test(raw); }
+  constexpr auto &set_z(bool value) noexcept { raw = bits::z::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool n() const noexcept { return bits::n::test(raw); }
+  constexpr auto &set_n(bool value) noexcept { raw = bits::n::set_bit(raw, value); return *this; }
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static spsr_svc read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, SPSR_svc" : "=r"(value));
+    return spsr_svc{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr SPSR_svc, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `SPSR_abt` register (13 named field(s)). */
+struct spsr_abt {
+  std::uint32_t raw{0};
+
+  struct bits {
+    using m = ::structo::arch::pte_bit_field<0, 5, std::uint32_t>;
+    using t = ::structo::arch::pte_bit_field<5, 1, std::uint32_t>;
+    using f = ::structo::arch::pte_bit_field<6, 1, std::uint32_t>;
+    using i = ::structo::arch::pte_bit_field<7, 1, std::uint32_t>;
+    using a = ::structo::arch::pte_bit_field<8, 1, std::uint32_t>;
+    using e = ::structo::arch::pte_bit_field<9, 1, std::uint32_t>;
+    using ge = ::structo::arch::pte_bit_field<16, 4, std::uint32_t>;
+    using j = ::structo::arch::pte_bit_field<24, 1, std::uint32_t>;
+    using q = ::structo::arch::pte_bit_field<27, 1, std::uint32_t>;
+    using v = ::structo::arch::pte_bit_field<28, 1, std::uint32_t>;
+    using c = ::structo::arch::pte_bit_field<29, 1, std::uint32_t>;
+    using z = ::structo::arch::pte_bit_field<30, 1, std::uint32_t>;
+    using n = ::structo::arch::pte_bit_field<31, 1, std::uint32_t>;
+  };
+
+  [[nodiscard]] constexpr std::uint32_t m() const noexcept { return bits::m::get(raw); }
+  constexpr auto &set_m(std::uint32_t value) noexcept { raw = bits::m::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool t() const noexcept { return bits::t::test(raw); }
+  constexpr auto &set_t(bool value) noexcept { raw = bits::t::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool f() const noexcept { return bits::f::test(raw); }
+  constexpr auto &set_f(bool value) noexcept { raw = bits::f::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool i() const noexcept { return bits::i::test(raw); }
+  constexpr auto &set_i(bool value) noexcept { raw = bits::i::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool a() const noexcept { return bits::a::test(raw); }
+  constexpr auto &set_a(bool value) noexcept { raw = bits::a::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool e() const noexcept { return bits::e::test(raw); }
+  constexpr auto &set_e(bool value) noexcept { raw = bits::e::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t ge() const noexcept { return bits::ge::get(raw); }
+  constexpr auto &set_ge(std::uint32_t value) noexcept { raw = bits::ge::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool j() const noexcept { return bits::j::test(raw); }
+  constexpr auto &set_j(bool value) noexcept { raw = bits::j::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool q() const noexcept { return bits::q::test(raw); }
+  constexpr auto &set_q(bool value) noexcept { raw = bits::q::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool v() const noexcept { return bits::v::test(raw); }
+  constexpr auto &set_v(bool value) noexcept { raw = bits::v::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool c() const noexcept { return bits::c::test(raw); }
+  constexpr auto &set_c(bool value) noexcept { raw = bits::c::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool z() const noexcept { return bits::z::test(raw); }
+  constexpr auto &set_z(bool value) noexcept { raw = bits::z::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool n() const noexcept { return bits::n::test(raw); }
+  constexpr auto &set_n(bool value) noexcept { raw = bits::n::set_bit(raw, value); return *this; }
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static spsr_abt read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, SPSR_abt" : "=r"(value));
+    return spsr_abt{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr SPSR_abt, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `SPSR_und` register (13 named field(s)). */
+struct spsr_und {
+  std::uint32_t raw{0};
+
+  struct bits {
+    using m = ::structo::arch::pte_bit_field<0, 5, std::uint32_t>;
+    using t = ::structo::arch::pte_bit_field<5, 1, std::uint32_t>;
+    using f = ::structo::arch::pte_bit_field<6, 1, std::uint32_t>;
+    using i = ::structo::arch::pte_bit_field<7, 1, std::uint32_t>;
+    using a = ::structo::arch::pte_bit_field<8, 1, std::uint32_t>;
+    using e = ::structo::arch::pte_bit_field<9, 1, std::uint32_t>;
+    using ge = ::structo::arch::pte_bit_field<16, 4, std::uint32_t>;
+    using j = ::structo::arch::pte_bit_field<24, 1, std::uint32_t>;
+    using q = ::structo::arch::pte_bit_field<27, 1, std::uint32_t>;
+    using v = ::structo::arch::pte_bit_field<28, 1, std::uint32_t>;
+    using c = ::structo::arch::pte_bit_field<29, 1, std::uint32_t>;
+    using z = ::structo::arch::pte_bit_field<30, 1, std::uint32_t>;
+    using n = ::structo::arch::pte_bit_field<31, 1, std::uint32_t>;
+  };
+
+  [[nodiscard]] constexpr std::uint32_t m() const noexcept { return bits::m::get(raw); }
+  constexpr auto &set_m(std::uint32_t value) noexcept { raw = bits::m::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool t() const noexcept { return bits::t::test(raw); }
+  constexpr auto &set_t(bool value) noexcept { raw = bits::t::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool f() const noexcept { return bits::f::test(raw); }
+  constexpr auto &set_f(bool value) noexcept { raw = bits::f::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool i() const noexcept { return bits::i::test(raw); }
+  constexpr auto &set_i(bool value) noexcept { raw = bits::i::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool a() const noexcept { return bits::a::test(raw); }
+  constexpr auto &set_a(bool value) noexcept { raw = bits::a::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool e() const noexcept { return bits::e::test(raw); }
+  constexpr auto &set_e(bool value) noexcept { raw = bits::e::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t ge() const noexcept { return bits::ge::get(raw); }
+  constexpr auto &set_ge(std::uint32_t value) noexcept { raw = bits::ge::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool j() const noexcept { return bits::j::test(raw); }
+  constexpr auto &set_j(bool value) noexcept { raw = bits::j::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool q() const noexcept { return bits::q::test(raw); }
+  constexpr auto &set_q(bool value) noexcept { raw = bits::q::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool v() const noexcept { return bits::v::test(raw); }
+  constexpr auto &set_v(bool value) noexcept { raw = bits::v::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool c() const noexcept { return bits::c::test(raw); }
+  constexpr auto &set_c(bool value) noexcept { raw = bits::c::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool z() const noexcept { return bits::z::test(raw); }
+  constexpr auto &set_z(bool value) noexcept { raw = bits::z::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool n() const noexcept { return bits::n::test(raw); }
+  constexpr auto &set_n(bool value) noexcept { raw = bits::n::set_bit(raw, value); return *this; }
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static spsr_und read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, SPSR_und" : "=r"(value));
+    return spsr_und{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr SPSR_und, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `SPSR_irq` register (13 named field(s)). */
+struct spsr_irq {
+  std::uint32_t raw{0};
+
+  struct bits {
+    using m = ::structo::arch::pte_bit_field<0, 5, std::uint32_t>;
+    using t = ::structo::arch::pte_bit_field<5, 1, std::uint32_t>;
+    using f = ::structo::arch::pte_bit_field<6, 1, std::uint32_t>;
+    using i = ::structo::arch::pte_bit_field<7, 1, std::uint32_t>;
+    using a = ::structo::arch::pte_bit_field<8, 1, std::uint32_t>;
+    using e = ::structo::arch::pte_bit_field<9, 1, std::uint32_t>;
+    using ge = ::structo::arch::pte_bit_field<16, 4, std::uint32_t>;
+    using j = ::structo::arch::pte_bit_field<24, 1, std::uint32_t>;
+    using q = ::structo::arch::pte_bit_field<27, 1, std::uint32_t>;
+    using v = ::structo::arch::pte_bit_field<28, 1, std::uint32_t>;
+    using c = ::structo::arch::pte_bit_field<29, 1, std::uint32_t>;
+    using z = ::structo::arch::pte_bit_field<30, 1, std::uint32_t>;
+    using n = ::structo::arch::pte_bit_field<31, 1, std::uint32_t>;
+  };
+
+  [[nodiscard]] constexpr std::uint32_t m() const noexcept { return bits::m::get(raw); }
+  constexpr auto &set_m(std::uint32_t value) noexcept { raw = bits::m::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool t() const noexcept { return bits::t::test(raw); }
+  constexpr auto &set_t(bool value) noexcept { raw = bits::t::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool f() const noexcept { return bits::f::test(raw); }
+  constexpr auto &set_f(bool value) noexcept { raw = bits::f::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool i() const noexcept { return bits::i::test(raw); }
+  constexpr auto &set_i(bool value) noexcept { raw = bits::i::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool a() const noexcept { return bits::a::test(raw); }
+  constexpr auto &set_a(bool value) noexcept { raw = bits::a::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool e() const noexcept { return bits::e::test(raw); }
+  constexpr auto &set_e(bool value) noexcept { raw = bits::e::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t ge() const noexcept { return bits::ge::get(raw); }
+  constexpr auto &set_ge(std::uint32_t value) noexcept { raw = bits::ge::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool j() const noexcept { return bits::j::test(raw); }
+  constexpr auto &set_j(bool value) noexcept { raw = bits::j::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool q() const noexcept { return bits::q::test(raw); }
+  constexpr auto &set_q(bool value) noexcept { raw = bits::q::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool v() const noexcept { return bits::v::test(raw); }
+  constexpr auto &set_v(bool value) noexcept { raw = bits::v::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool c() const noexcept { return bits::c::test(raw); }
+  constexpr auto &set_c(bool value) noexcept { raw = bits::c::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool z() const noexcept { return bits::z::test(raw); }
+  constexpr auto &set_z(bool value) noexcept { raw = bits::z::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool n() const noexcept { return bits::n::test(raw); }
+  constexpr auto &set_n(bool value) noexcept { raw = bits::n::set_bit(raw, value); return *this; }
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static spsr_irq read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, SPSR_irq" : "=r"(value));
+    return spsr_irq{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr SPSR_irq, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `SPSR_fiq` register (13 named field(s)). */
+struct spsr_fiq {
+  std::uint32_t raw{0};
+
+  struct bits {
+    using m = ::structo::arch::pte_bit_field<0, 5, std::uint32_t>;
+    using t = ::structo::arch::pte_bit_field<5, 1, std::uint32_t>;
+    using f = ::structo::arch::pte_bit_field<6, 1, std::uint32_t>;
+    using i = ::structo::arch::pte_bit_field<7, 1, std::uint32_t>;
+    using a = ::structo::arch::pte_bit_field<8, 1, std::uint32_t>;
+    using e = ::structo::arch::pte_bit_field<9, 1, std::uint32_t>;
+    using ge = ::structo::arch::pte_bit_field<16, 4, std::uint32_t>;
+    using j = ::structo::arch::pte_bit_field<24, 1, std::uint32_t>;
+    using q = ::structo::arch::pte_bit_field<27, 1, std::uint32_t>;
+    using v = ::structo::arch::pte_bit_field<28, 1, std::uint32_t>;
+    using c = ::structo::arch::pte_bit_field<29, 1, std::uint32_t>;
+    using z = ::structo::arch::pte_bit_field<30, 1, std::uint32_t>;
+    using n = ::structo::arch::pte_bit_field<31, 1, std::uint32_t>;
+  };
+
+  [[nodiscard]] constexpr std::uint32_t m() const noexcept { return bits::m::get(raw); }
+  constexpr auto &set_m(std::uint32_t value) noexcept { raw = bits::m::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool t() const noexcept { return bits::t::test(raw); }
+  constexpr auto &set_t(bool value) noexcept { raw = bits::t::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool f() const noexcept { return bits::f::test(raw); }
+  constexpr auto &set_f(bool value) noexcept { raw = bits::f::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool i() const noexcept { return bits::i::test(raw); }
+  constexpr auto &set_i(bool value) noexcept { raw = bits::i::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool a() const noexcept { return bits::a::test(raw); }
+  constexpr auto &set_a(bool value) noexcept { raw = bits::a::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool e() const noexcept { return bits::e::test(raw); }
+  constexpr auto &set_e(bool value) noexcept { raw = bits::e::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t ge() const noexcept { return bits::ge::get(raw); }
+  constexpr auto &set_ge(std::uint32_t value) noexcept { raw = bits::ge::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool j() const noexcept { return bits::j::test(raw); }
+  constexpr auto &set_j(bool value) noexcept { raw = bits::j::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool q() const noexcept { return bits::q::test(raw); }
+  constexpr auto &set_q(bool value) noexcept { raw = bits::q::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool v() const noexcept { return bits::v::test(raw); }
+  constexpr auto &set_v(bool value) noexcept { raw = bits::v::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool c() const noexcept { return bits::c::test(raw); }
+  constexpr auto &set_c(bool value) noexcept { raw = bits::c::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool z() const noexcept { return bits::z::test(raw); }
+  constexpr auto &set_z(bool value) noexcept { raw = bits::z::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool n() const noexcept { return bits::n::test(raw); }
+  constexpr auto &set_n(bool value) noexcept { raw = bits::n::set_bit(raw, value); return *this; }
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static spsr_fiq read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, SPSR_fiq" : "=r"(value));
+    return spsr_fiq{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr SPSR_fiq, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
 /** @brief Raw accessor for the AArch32 64-bit `LPAE_TTBR0` coprocessor register pair (1 named field(s)). */
 struct lpae_ttbr0 {
   std::uint64_t raw{0};

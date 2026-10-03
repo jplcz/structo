@@ -182,6 +182,40 @@ struct {name} {{
 """
 
 
+def cpp_struct_banked(name: str, enc: dict, fields: list[str]) -> str:
+    """AArch32 Virtualization-Extensions banked-register transfer: the
+    architected way to read/write another exception mode's banked `SPSR`
+    without switching into that mode (`CPS`) -- switching mode to reach,
+    say, `SPSR_irq` is unsafe from Hyp mode (its banked-mode-switch rules
+    differ from the other modes), and the AArch64 EL2 mnemonic form
+    (`mrs x0, spsr_irq`) does not exist on ARMv7 and traps as an
+    undefined instruction. Requires the Virtualization Extensions
+    (ARMv7VE+); `.arch_extension virt` is emitted locally so the
+    enclosing translation unit can still target a plain `armv7-a`
+    baseline and only this asm block needs the extension."""
+    reg = enc["reg"]
+    bitfields = emit_bitfield_members(fields, "std::uint32_t")
+    return f"""\
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `{reg}` register ({_doc_suffix(fields)}). */
+struct {name} {{
+  std::uint32_t raw{{0}};
+
+{bitfields}#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static {name} read() noexcept {{
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\\n\\t"
+                 "mrs %0, {reg}" : "=r"(value));
+    return {name}{{value}};
+  }}
+  void write() const noexcept {{
+    asm volatile(".arch_extension virt\\n\\t"
+                 "msr {reg}, %0" ::"r"(raw));
+  }}
+#endif // defined(__arm__) && !defined(__aarch64__)
+}};
+"""
+
+
 def cpp_struct_status(name: str, enc: dict, fields: list[str]) -> str:
     """AArch32 CPSR/SPSR: plain `mrs`/`msr` (no coprocessor tuple)."""
     reg = enc["reg"]
@@ -344,6 +378,7 @@ ARM_STRUCT_FNS = {
     "coproc": cpp_struct_coproc,
     "coproc64": cpp_struct_coproc64,
     "status": cpp_struct_status,
+    "banked": cpp_struct_banked,
 }
 
 

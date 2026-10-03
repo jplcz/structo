@@ -13,6 +13,15 @@
 #              generic timer registers (cntpct, cntvct, ...). Fields:
 #              coproc, opc1, crm (no crn/opc2 in this transfer form).
 #   status   - plain MRS/MSR status register access (cpsr, spsr).
+#   banked   - Virtualization-Extensions (ARMv7VE+) banked-register transfer
+#              (MRS/MSR Rd, <banked_reg>), used to reach another exception
+#              mode's banked SPSR (spsr_svc/abt/und/irq/fiq) from Hyp mode
+#              without switching modes. Field: reg (literal banked-register
+#              name recognized by the assembler, e.g. "SPSR_svc"). Needs
+#              `.arch_extension virt`, emitted per-asm-block by the codegen
+#              so the rest of the translation unit can stay on a plain
+#              armv7-a baseline -- do NOT use the AArch64 EL2 mnemonic form
+#              (mrs x0, spsr_irq); it does not exist on ARMv7 and traps.
 #
 # fields: list of "name:bit:len" strings (bit = LSB offset, len = width in bits).
 #
@@ -1758,6 +1767,51 @@ registers:
   encoding:
     kind: status
     reg: spsr
+  fields: *id001
+- name: spsr_svc
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: SPSR_svc
+  fields: *id001
+- name: spsr_abt
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: SPSR_abt
+  fields: *id001
+- name: spsr_und
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: SPSR_und
+  fields: *id001
+- name: spsr_irq
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: SPSR_irq
+  fields: *id001
+- name: spsr_fiq
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: SPSR_fiq
   fields: *id001
 - name: lpae_ttbr0
   width: 64
