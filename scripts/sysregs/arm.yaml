@@ -562,7 +562,15 @@ registers:
     crn: 1
     crm: 0
     opc2: 0
-  fields: []
+  fields:
+  - m:0:1
+  - a:1:1
+  - c:2:1
+  - i:12:1
+  - fi:21:1
+  - wxn:19:1
+  - ee:25:1
+  - te:30:1
 - name: hcr
   width: 32
   access:
@@ -575,7 +583,25 @@ registers:
     crn: 1
     crm: 1
     opc2: 0
-  fields: []
+  fields:
+  - vm:0:1
+  - swio:1:1
+  - ptw:2:1
+  - fmo:3:1
+  - imo:4:1
+  - amo:5:1
+  - vf:6:1
+  - vi:7:1
+  - va:8:1
+  - fb:9:1
+  - bsu:10:2
+  - dc:12:1
+  - twi:13:1
+  - twe:14:1
+  - tsc:19:1
+  - ttlb:25:1
+  - tvm:26:1
+  - tge:27:1
 - name: hdcr
   width: 32
   access:
@@ -588,7 +614,15 @@ registers:
     crn: 1
     crm: 1
     opc2: 1
-  fields: []
+  fields:
+  - hpmn:0:5
+  - tpmcr:5:1
+  - tpm:6:1
+  - hpme:7:1
+  - tde:8:1
+  - tda:9:1
+  - tdosa:10:1
+  - tdra:11:1
 - name: hcptr
   width: 32
   access:
@@ -601,7 +635,11 @@ registers:
     crn: 1
     crm: 1
     opc2: 2
-  fields: []
+  fields:
+  - tcp_mask:0:14
+  - tase:15:1
+  - tta:20:1
+  - tcpac:31:1
 - name: hstr
   width: 32
   access:
@@ -666,7 +704,11 @@ registers:
     crn: 2
     crm: 0
     opc2: 2
-  fields: []
+  fields:
+  - t0sz:0:3
+  - irgn0:8:2
+  - orgn0:10:2
+  - sh0:12:2
 - name: vtcr
   width: 32
   access:
@@ -679,7 +721,13 @@ registers:
     crn: 2
     crm: 1
     opc2: 2
-  fields: []
+  fields:
+  - t0sz:0:4
+  - s:4:1
+  - sl0:6:2
+  - irgn0:8:2
+  - orgn0:10:2
+  - sh0:12:2
 - name: dacr
   width: 32
   access:
@@ -718,7 +766,10 @@ registers:
     crn: 5
     crm: 2
     opc2: 0
-  fields: []
+  fields:
+  - iss:0:25
+  - il:25:1
+  - ec:26:6
 - name: ifsr
   width: 32
   access:
@@ -809,7 +860,8 @@ registers:
     crn: 6
     crm: 0
     opc2: 4
-  fields: []
+  fields:
+  - fipa:4:28
 - name: ifar
   width: 32
   access:
@@ -1394,7 +1446,11 @@ registers:
     crn: 10
     crm: 2
     opc2: 0
-  fields: []
+  fields:
+  - attr0:0:8
+  - attr1:8:8
+  - attr2:16:8
+  - attr3:24:8
 - name: hmair1
   width: 32
   access:
@@ -1407,7 +1463,11 @@ registers:
     crn: 10
     crm: 2
     opc2: 1
-  fields: []
+  fields:
+  - attr4:0:8
+  - attr5:8:8
+  - attr6:16:8
+  - attr7:24:8
 - name: vbar
   width: 32
   access:
