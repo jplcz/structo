@@ -211,6 +211,13 @@ struct secure_tlb_space {};
 /** @brief ARM TrustZone Non-secure world translations. */
 struct nonsecure_tlb_space {};
 
+// `hypervisor_tlb_space`/`guest_tlb_space`/`secure_tlb_space`/
+// `nonsecure_tlb_space` are each only architecturally valid to target
+// from specific privilege modes (see each backend's own docs); none of
+// that is enforced here yet -- see `arch/execution_domain.hpp` for the
+// (currently informational-only) build-time customization point meant
+// for that, should it be added later.
+
 /** @brief ARM Realm Management Extension (RME) Root world (EL3 monitor) translations -- untagged. */
 struct root_tlb_space {};
 
