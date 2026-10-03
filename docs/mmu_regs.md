@@ -71,7 +71,15 @@ sctlr.write();
   `ST` (Secure EL1 access to the generic timer), and `TWI`/`TWE` (trap
   `WFI`/`WFE` to EL3). This is the AArch64 analogue of ARMv7-A's `SCR`;
   unlike `SCR`, it is not itself banked (EL3 has no "other world" copy
-  of its own state).
+  of its own state). Unlike ARMv7-A's `SCTLR`/`TTBR0`/`TTBR1`/
+  `CONTEXTIDR`, however, AArch64's EL1 registers (`sctlr_el1`,
+  `ttbr0_el1`/`ttbr1_el1`, `tcr_el1`, `mair_el1`, `contextidr_el1`,
+  `vbar_el1`, ...) have **no hardware-banked per-world copy** at all --
+  `NS` only selects which world the next lower EL runs as, never which
+  physical register bank a plain `MRS`/`MSR` reaches. EL3 firmware must
+  explicitly save/restore them across every world switch -- see
+  [`world_switch_guard.md`](world_switch_guard.md) and Arm Trusted
+  Firmware-A's `cm_el1_sysregs_context_save()`/`_restore()`.
 
 ```cpp
 using namespace structo::arch::arm64;

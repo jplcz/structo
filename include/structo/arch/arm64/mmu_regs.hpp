@@ -454,10 +454,24 @@ struct scr_el3_bits {
 /**
  * @brief Parsed/built view of `SCR_EL3`: the AArch64 analog of ARMv7-A's
  * `SCR` (see `structo::arch::arm::scr`) -- `NS` selects which world
- * (Secure or Non-secure) the next lower exception level runs in, which
- * in turn selects which banked copy of the lower-EL MMU registers
- * (`SCTLR_EL1`, `TTBR0_EL1`/`TTBR1_EL1`, etc.) is live, plus the handful
- * of related exception-routing and `SMC`/`HVC` availability bits.
+ * (Secure or Non-secure) the next lower exception level runs in, plus
+ * the handful of related exception-routing and `SMC`/`HVC` availability
+ * bits.
+ *
+ * Unlike ARMv7-A's `SCTLR`/`TTBR0`/`TTBR1`/`CONTEXTIDR` (see
+ * `structo::arch::arm::sctlr` et al.), AArch64's EL1 system registers --
+ * `SCTLR_EL1`, `TTBR0_EL1`/`TTBR1_EL1`, `TCR_EL1`, `MAIR_EL1`,
+ * `CONTEXTIDR_EL1`, `VBAR_EL1`, and more -- have **no hardware-banked
+ * per-world copy** at all: `NS` only ever picks which world the next
+ * lower EL *runs as*, it never multiplexes which physical register bank
+ * a plain `MRS`/`MSR` reaches. Switching worlds therefore requires EL3
+ * firmware to save the outgoing world's live EL1 register values
+ * somewhere and load the incoming world's values in their place before
+ * `ERET`, exactly what Arm Trusted Firmware-A's `cm_el1_sysregs_context_
+ * save()`/`cm_el1_sysregs_context_restore()` (see `el1_sysregs_t` in
+ * `include/lib/el3_runtime/context_el1.h`) do on every Secure/Non-secure
+ * transition. See `world_switch_guard.hpp` for a generic customization
+ * point modeling exactly this save-before/restore-after obligation.
  */
 struct scr_el3 {
   std::uint64_t raw{0};
