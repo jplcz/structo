@@ -290,6 +290,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_clock_cycles.cpp
         tests/test_async_kernel_object.cpp
         tests/test_callout.cpp
+        tests/test_load_average.cpp
         tests/test_runqueue.cpp
         tests/test_sched.cpp
         tests/test_phys_translator.cpp
