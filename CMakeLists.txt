@@ -270,6 +270,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_device_tree.cpp
         tests/test_phys_addr.cpp
         tests/test_phys_page.cpp
+        tests/test_slot_map_ptr.cpp
         tests/test_target_ptr.cpp
         tests/test_io_address.cpp
         tests/test_io_space_ref.cpp
