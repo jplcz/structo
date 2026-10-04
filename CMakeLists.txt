@@ -294,6 +294,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_cpu_load.cpp
         tests/test_runqueue.cpp
         tests/test_sched.cpp
+        tests/test_sched_world_handoff.cpp
         tests/test_phys_translator.cpp
         tests/test_region_set.cpp
         tests/test_early_region_allocator.cpp
