@@ -324,6 +324,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_queue_spin_lock.cpp
         tests/test_rw_spin_lock.cpp
         tests/test_queue_rw_spin_lock.cpp
+        tests/test_lock_striping.cpp
         tests/test_per_cpu_ptr.cpp
         tests/test_per_thread_ptr.cpp
         tests/test_per_domain_ptr.cpp
@@ -347,6 +348,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_prng.cpp
         tests/test_debug_symtab.cpp
         tests/test_world_switch_guard.cpp
+        tests/test_backref_ptr.cpp
     )
     target_link_libraries(jplcz_structo_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)
