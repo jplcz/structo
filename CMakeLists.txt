@@ -313,6 +313,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_cpu_topology.cpp
         tests/test_fdt_cpu_topology.cpp
         tests/test_cpu_sibling_map.cpp
+        tests/test_work_steal.cpp
         tests/test_irq_guard.cpp
         tests/test_preemption_guard.cpp
         tests/test_spinlock_entry_guard.cpp
