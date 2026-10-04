@@ -31,6 +31,11 @@
  *   read-only CSR address traps as an illegal instruction.
  * - `vm_sysreg_state`: both groups together, the full per-VM CSR set a
  *   VM-exit/VM-entry path saves/restores as a unit.
+ * - `vcpu_sysreg_traits`: a `structo::hypervisor::vcpu_entry_guard<Traits>`
+ *   (and `structo::arch::world_switch_guard<Traits>`) policy wrapping
+ *   `vm_sysreg_state` as a single register group, so a vCPU's full
+ *   VS-level/H-extension CSR set can be entered/exited with one guard
+ *   instead of hand-calling `save()`/`restore()`.
  *
  * RV64 only (matching the rest of this repository's RISC-V scope);
  * `_h`-suffixed high-half CSRs that only exist on RV32 are out of
@@ -172,6 +177,20 @@ struct vm_sysreg_state {
     guest_vs.restore();
     hyp.restore();
   }
+};
+
+/**
+ * @brief `structo::hypervisor::vcpu_entry_guard<Traits>` (and
+ * `structo::arch::world_switch_guard<Traits>`) policy wrapping
+ * `vm_sysreg_state` as a single register group: this vCPU's full
+ * VS-level/H-extension CSR set, saved/restored as one unit.
+ */
+struct vcpu_sysreg_traits {
+  using state_type = vm_sysreg_state;
+
+  [[nodiscard]] static state_type save() noexcept { return state_type::save(); }
+
+  static void restore(const state_type &state) noexcept { state.restore(); }
 };
 
 } // namespace structo::arch::riscv
