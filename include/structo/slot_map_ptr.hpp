@@ -232,6 +232,20 @@ struct slot_map_no_wait_policy {
  * hash map's own backing storage is reserved up front, in `try_init()`,
  * to exactly this many rows, and `acquire()` never grows it further.
  *
+ * `release()` needs the reverse mapping (which physical page a given
+ * slot currently backs) to find its row in `by_phys` again. Rather than
+ * shadowing that in a second, separately-maintained array -- which the
+ * page table itself already records -- `ArchHooks` must additionally
+ * provide:
+ * - `static PhysInt phys_of(std::size_t slot) noexcept;` (the
+ *   `slot_size`-aligned physical address last passed to `program()` for
+ *   `slot`; undefined for a slot that is not currently programmed)
+ *
+ * This is on top of the `ArchHooks` contract documented at the top of
+ * this file for `slot_map_mapper` (`slot_size`, `slot_base()`,
+ * `program()`, `unprogram()`); `slot_map_mapper` itself has no need for
+ * `phys_of()` and does not call it.
+ *
  * `Lock` must provide `lock()`/`unlock()`; it defaults to
  * `reloco::spin_lock`, but any type with that minimal surface -- a
  * kernel's own native spinlock/mutex type included -- works equally well.
@@ -414,7 +428,6 @@ struct shared_slot_map_mapper {
         return unexpected(ins_res.error());
       }
       ls.data.busy[free_slot] = true;
-      ls.data.phys_of_slot[free_slot] = phys_aligned;
 
       RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
       void *vaddr = static_cast<std::byte *>(ArchHooks::slot_base(free_slot)) + page_offset;
@@ -432,7 +445,9 @@ struct shared_slot_map_mapper {
   static void release(std::size_t slot) noexcept {
     locked_state &ls = shared();
     ls.lock.lock();
-    const PhysInt phys_aligned = ls.data.phys_of_slot[slot];
+    // Must be read before unprogram() below, which may tear down whatever
+    // page-table state ArchHooks::phys_of() relies on.
+    const PhysInt phys_aligned = ArchHooks::phys_of(slot);
     auto found = ls.data.by_phys.try_at(phys_aligned);
     RELOCO_ASSERT(found.has_value(), "shared_slot_map_mapper::release: slot not currently mapped");
     entry &e = found->get();
@@ -459,7 +474,6 @@ private:
   struct state {
     flat_hash_map<PhysInt, entry> by_phys{};
     bool busy[EntryCount]{};
-    PhysInt phys_of_slot[EntryCount]{};
   };
 
   /** @brief `Lock` paired directly with the data it guards, so `WaitPolicy::wait()` can unlock/relock it by reference. */

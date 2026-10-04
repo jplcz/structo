@@ -48,6 +48,11 @@ template <std::size_t NumSlots> struct fake_hooks {
     mapped[slot] = false;
     ++unprogram_calls;
   }
+
+  // The page table (here, `phys_offset[]`) is the only source of truth for
+  // which physical page a slot currently backs; shared_slot_map_mapper
+  // queries this instead of shadowing it in a second array of its own.
+  static std::uint64_t phys_of(std::size_t slot) noexcept { return phys_offset[slot]; }
 };
 
 using two_slot_hooks = fake_hooks<2>;
