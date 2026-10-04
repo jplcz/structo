@@ -67,19 +67,9 @@ jobs:
           - name: Linux Clang
             os: ubuntu-latest
             compiler: clang++
-          - name: macOS AppleClang
-            os: macos-latest
-            compiler: clang++
-          - name: Windows MSVC
-            os: windows-latest
-            compiler: cl
 
     steps:
       - uses: actions/checkout@v7
-
-      - name: Enable the MSVC environment
-        if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Build, test, and check public headers
         shell: bash

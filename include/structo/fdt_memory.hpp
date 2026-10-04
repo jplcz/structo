@@ -41,7 +41,6 @@
 
 #include "fdt_reader.hpp"
 #include "region_set.hpp"
-#include <reloco/optional.hpp>
 
 namespace structo::fdt {
 
@@ -165,7 +164,8 @@ result<void> scan_memory_nodes(fdt_reader reader, region_set<Capacity, PhysInt> 
   bool tracking = false;
   bool is_memory = false;
   node_status_tracker status;
-  optional<span<const std::byte>> pending_reg;
+  span<const std::byte> pending_reg{};
+  bool has_pending_reg = false;
 
   for (auto ev : reader) {
     if (!ev)
@@ -177,7 +177,7 @@ result<void> scan_memory_nodes(fdt_reader reader, region_set<Capacity, PhysInt> 
       if (own_depth == 1) {
         tracking = true;
         status.reset();
-        pending_reg = nullopt;
+        has_pending_reg = false;
         is_memory = base_node_name(ev->node_name) == "memory" || base_node_name(ev->node_name) == "secure-memory" ||
                     base_node_name(ev->node_name) == "secure_memory";
       }
@@ -206,6 +206,7 @@ result<void> scan_memory_nodes(fdt_reader reader, region_set<Capacity, PhysInt> 
             is_memory = true;
         } else if (ev->prop.name == "reg") {
           pending_reg = ev->prop.value;
+          has_pending_reg = true;
         }
       }
       break;
@@ -213,8 +214,8 @@ result<void> scan_memory_nodes(fdt_reader reader, region_set<Capacity, PhysInt> 
     case fdt_event_kind::end_node: {
       --depth;
       if (depth == 1 && tracking) {
-        if (is_memory && status.enabled() && pending_reg.has_value()) {
-          auto added = for_each_reg_entry(*pending_reg, root_address_cells, root_size_cells,
+        if (is_memory && status.enabled() && has_pending_reg) {
+          auto added = for_each_reg_entry(pending_reg, root_address_cells, root_size_cells,
                                           [&full](uint64_t base, uint64_t size) noexcept {
                                             return full.try_add(static_cast<PhysInt>(base), static_cast<PhysInt>(size));
                                           });
@@ -246,7 +247,8 @@ result<void> scan_reserved_memory(fdt_reader reader, region_set<Capacity, PhysIn
   // Reused per depth-2 child of /reserved-memory -- only one is ever open at a time.
   bool tracking_child = false;
   bool child_disabled = false;
-  optional<span<const std::byte>> child_pending_reg;
+  span<const std::byte> child_pending_reg{};
+  bool has_child_pending_reg = false;
 
   for (auto ev : reader) {
     if (!ev)
@@ -262,7 +264,7 @@ result<void> scan_reserved_memory(fdt_reader reader, region_set<Capacity, PhysIn
       } else if (own_depth == 2 && in_reserved_memory) {
         tracking_child = true;
         child_disabled = false;
-        child_pending_reg = nullopt;
+        has_child_pending_reg = false;
       }
       break;
     }
@@ -285,6 +287,7 @@ result<void> scan_reserved_memory(fdt_reader reader, region_set<Capacity, PhysIn
             child_disabled = true;
         } else if (ev->prop.name == "reg") {
           child_pending_reg = ev->prop.value;
+          has_child_pending_reg = true;
         }
       }
       break;
@@ -292,9 +295,9 @@ result<void> scan_reserved_memory(fdt_reader reader, region_set<Capacity, PhysIn
     case fdt_event_kind::end_node: {
       --depth;
       if (depth == 2 && in_reserved_memory && tracking_child) {
-        if (!child_disabled && child_pending_reg.has_value()) {
+        if (!child_disabled && has_child_pending_reg) {
           auto subtracted = for_each_reg_entry(
-              *child_pending_reg, address_cells, size_cells, [&free](uint64_t base, uint64_t size) noexcept {
+              child_pending_reg, address_cells, size_cells, [&free](uint64_t base, uint64_t size) noexcept {
                 return free.try_subtract(static_cast<PhysInt>(base), static_cast<PhysInt>(size));
               });
           if (!subtracted)
