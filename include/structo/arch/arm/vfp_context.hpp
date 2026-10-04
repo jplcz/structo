@@ -8,7 +8,11 @@
  * extension register file -- `D0`-`D31` (32 double-precision
  * registers, 256 bytes) plus `FPSCR` -- as a hardware-register
  * save/restore policy usable standalone or composed into a full
- * `structo::arch::lazy_context<Traits, CpuId>` `Traits` type.
+ * `structo::arch::lazy_context<Traits, CpuId>` `Traits` type, plus
+ * `vcpu_vfp_traits`, a `structo::hypervisor::vcpu_entry_guard<Traits>`
+ * (and `structo::arch::world_switch_guard<Traits>`) adapter for
+ * hypervisors that switch a guest's VFP/NEON state directly on every
+ * VM-entry/VM-exit rather than deferring to a per-thread lazy_context.
  *
  * `vfp_regs` only implements the register-level half of the `Traits`
  * contract (`state_type`, `is_enabled()`, `enable()`, `disable()`,
@@ -22,6 +26,17 @@
  * struct my_vfp_traits : structo::arch::arm::vfp_regs,
  *                        structo::arch::static_per_cpu_storage<8, void, std::size_t> {};
  * using vfp_switcher = structo::arch::lazy_context_switcher<my_vfp_traits>;
+ * @endcode
+ *
+ * `vcpu_vfp_traits` takes the opposite approach: it assumes `FPEXC.EN`
+ * is already set for the whole lifetime of guest execution (set that up
+ * once during vCPU/hypervisor initialization -- see
+ * `structo/arch/arm/hyp_vm_regs.hpp`'s `vcpu_sysreg_traits` for the
+ * matching sysreg-level guard this is meant to run alongside) and only
+ * saves/restores `D0`-`D31`/`FPSCR` content directly on every
+ * entry/exit, with no lazy trap-and-restore step:
+ * @code
+ * using vfp_guard = structo::hypervisor::vcpu_entry_guard<structo::arch::arm::vcpu_vfp_traits>;
  * @endcode
  *
  * `FPEXC.EN` (bit 30) is the sole hardware latch gating every VFP/NEON
@@ -95,6 +110,26 @@ struct vfp_regs {
                  : "memory");
     state.fpscr.write();
   }
+};
+
+/**
+ * @brief `structo::hypervisor::vcpu_entry_guard<Traits>` (and
+ * `structo::arch::world_switch_guard<Traits>`) adapter wrapping
+ * `vfp_regs` as a single directly-switched register group: assumes
+ * `FPEXC.EN` is already set for the duration of guest execution and
+ * only saves/restores `D0`-`D31`/`FPSCR` content, with no lazy
+ * trap-and-restore step.
+ */
+struct vcpu_vfp_traits {
+  using state_type = vfp_regs::state_type;
+
+  [[nodiscard]] static state_type save() noexcept {
+    state_type state{};
+    vfp_regs::save_context(state);
+    return state;
+  }
+
+  static void restore(const state_type &state) noexcept { vfp_regs::restore_context(state); }
 };
 
 } // namespace structo::arch::arm

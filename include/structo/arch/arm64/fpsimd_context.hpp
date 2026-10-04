@@ -8,7 +8,11 @@
  * extension register file -- `V0`-`V31` (32 128-bit vector/scalar-FP
  * registers, 512 bytes) plus `FPSR`/`FPCR` -- as a hardware-register
  * save/restore policy usable standalone or composed into a full
- * `structo::arch::lazy_context<Traits, CpuId>` `Traits` type.
+ * `structo::arch::lazy_context<Traits, CpuId>` `Traits` type, plus
+ * `vcpu_fpsimd_traits`, a `structo::hypervisor::vcpu_entry_guard<Traits>`
+ * (and `structo::arch::world_switch_guard<Traits>`) adapter for
+ * hypervisors that switch a guest's FPSIMD state directly on every
+ * VM-entry/VM-exit rather than deferring to a per-thread lazy_context.
  *
  * `fpsimd_regs` only implements the register-level half of the
  * `Traits` contract (`state_type`, `is_enabled()`, `enable()`,
@@ -22,6 +26,18 @@
  * struct my_fpsimd_traits : structo::arch::arm64::fpsimd_regs,
  *                           structo::arch::static_per_cpu_storage<8, void, std::size_t> {};
  * using fpsimd_switcher = structo::arch::lazy_context_switcher<my_fpsimd_traits>;
+ * @endcode
+ *
+ * `vcpu_fpsimd_traits` takes the opposite approach: it assumes
+ * `CPACR_EL1.FPEN` is already set to `0b11` for the whole lifetime of
+ * guest execution (set that up once during vCPU/hypervisor
+ * initialization -- see `structo/arch/arm64/hyp_vm_regs.hpp`'s
+ * `vcpu_sysreg_traits` for the matching sysreg-level guard this is
+ * meant to run alongside) and only saves/restores `V0`-`V31`/`FPSR`/
+ * `FPCR` content directly on every entry/exit, with no lazy
+ * trap-and-restore step:
+ * @code
+ * using fpsimd_guard = structo::hypervisor::vcpu_entry_guard<structo::arch::arm64::vcpu_fpsimd_traits>;
  * @endcode
  *
  * `CPACR_EL1.FPEN` (bits 20-21) is the EL1-self-trap control gating
@@ -131,6 +147,26 @@ struct fpsimd_regs {
     state.fpsr.write();
     state.fpcr.write();
   }
+};
+
+/**
+ * @brief `structo::hypervisor::vcpu_entry_guard<Traits>` (and
+ * `structo::arch::world_switch_guard<Traits>`) adapter wrapping
+ * `fpsimd_regs` as a single directly-switched register group: assumes
+ * `CPACR_EL1.FPEN` is already set to `0b11` for the duration of guest
+ * execution and only saves/restores `V0`-`V31`/`FPSR`/`FPCR` content,
+ * with no lazy trap-and-restore step.
+ */
+struct vcpu_fpsimd_traits {
+  using state_type = fpsimd_regs::state_type;
+
+  [[nodiscard]] static state_type save() noexcept {
+    state_type state{};
+    fpsimd_regs::save_context(state);
+    return state;
+  }
+
+  static void restore(const state_type &state) noexcept { fpsimd_regs::restore_context(state); }
 };
 
 } // namespace structo::arch::arm64

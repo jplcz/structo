@@ -9,7 +9,12 @@
  * assuming the `D` extension per this repository's RV64 scope) plus
  * `FCSR` -- as a hardware-register save/restore policy usable
  * standalone or composed into a full
- * `structo::arch::lazy_context<Traits, CpuId>` `Traits` type.
+ * `structo::arch::lazy_context<Traits, CpuId>` `Traits` type, plus
+ * `vcpu_fpe_traits`, a `structo::hypervisor::vcpu_entry_guard<Traits>`
+ * (and `structo::arch::world_switch_guard<Traits>`) adapter for
+ * hypervisors that switch a guest's `F`/`D`-extension state directly on
+ * every VM-entry/VM-exit rather than deferring to a per-thread
+ * lazy_context.
  *
  * `fpe_regs` only implements the register-level half of the `Traits`
  * contract (`state_type`, `is_enabled()`, `enable()`, `disable()`,
@@ -23,6 +28,17 @@
  * struct my_fpe_traits : structo::arch::riscv::fpe_regs,
  *                        structo::arch::static_per_cpu_storage<8, void, std::size_t> {};
  * using fpe_switcher = structo::arch::lazy_context_switcher<my_fpe_traits>;
+ * @endcode
+ *
+ * `vcpu_fpe_traits` takes the opposite approach: it assumes
+ * `sstatus.FS` is already `Dirty` for the whole lifetime of guest
+ * execution (set that up once during vCPU/hypervisor initialization --
+ * see `structo/arch/riscv/hyp_vm_regs.hpp`'s `vcpu_sysreg_traits` for
+ * the matching CSR-level guard this is meant to run alongside) and only
+ * saves/restores `F0`-`F31`/`FCSR` content directly on every
+ * entry/exit, with no lazy trap-and-restore step:
+ * @code
+ * using fpe_guard = structo::hypervisor::vcpu_entry_guard<structo::arch::riscv::vcpu_fpe_traits>;
  * @endcode
  *
  * `sstatus.FS` (bits 13-14, a 2-bit field: `0`=Off, `1`=Initial,
@@ -160,6 +176,26 @@ struct fpe_regs {
     // clang-format on
     state.fcsr.write();
   }
+};
+
+/**
+ * @brief `structo::hypervisor::vcpu_entry_guard<Traits>` (and
+ * `structo::arch::world_switch_guard<Traits>`) adapter wrapping
+ * `fpe_regs` as a single directly-switched register group: assumes
+ * `sstatus.FS` is already `Dirty` for the duration of guest execution
+ * and only saves/restores `F0`-`F31`/`FCSR` content, with no lazy
+ * trap-and-restore step.
+ */
+struct vcpu_fpe_traits {
+  using state_type = fpe_regs::state_type;
+
+  [[nodiscard]] static state_type save() noexcept {
+    state_type state{};
+    fpe_regs::save_context(state);
+    return state;
+  }
+
+  static void restore(const state_type &state) noexcept { fpe_regs::restore_context(state); }
 };
 
 } // namespace structo::arch::riscv

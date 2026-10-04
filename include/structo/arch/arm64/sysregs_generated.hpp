@@ -789,9 +789,19 @@ struct far_el12 {
 #endif // defined(__aarch64__)
 };
 
-/** @brief Raw accessor for the `GCR_EL1` AArch64 system register (no named fields yet). */
+/** @brief Raw accessor for the `GCR_EL1` AArch64 system register (2 named field(s)). */
 struct gcr_el1 {
   std::uint64_t raw{0};
+
+  struct bits {
+    using excl = ::structo::arch::pte_bit_field<0, 16, std::uint64_t>;
+    using rrnd = ::structo::arch::pte_bit_field<16, 1, std::uint64_t>;
+  };
+
+  [[nodiscard]] constexpr std::uint64_t excl() const noexcept { return bits::excl::get(raw); }
+  constexpr auto &set_excl(std::uint64_t value) noexcept { raw = bits::excl::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool rrnd() const noexcept { return bits::rrnd::test(raw); }
+  constexpr auto &set_rrnd(bool value) noexcept { raw = bits::rrnd::set_bit(raw, value); return *this; }
 
 #if defined(__aarch64__)
   [[nodiscard]] static gcr_el1 read() noexcept {
@@ -1671,9 +1681,19 @@ struct pmxevtyper_el0 {
 #endif // defined(__aarch64__)
 };
 
-/** @brief Raw accessor for the `RGSR_EL1` AArch64 system register (no named fields yet). */
+/** @brief Raw accessor for the `RGSR_EL1` AArch64 system register (2 named field(s)). */
 struct rgsr_el1 {
   std::uint64_t raw{0};
+
+  struct bits {
+    using tag = ::structo::arch::pte_bit_field<0, 4, std::uint64_t>;
+    using seed = ::structo::arch::pte_bit_field<8, 16, std::uint64_t>;
+  };
+
+  [[nodiscard]] constexpr std::uint64_t tag() const noexcept { return bits::tag::get(raw); }
+  constexpr auto &set_tag(std::uint64_t value) noexcept { raw = bits::tag::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint64_t seed() const noexcept { return bits::seed::get(raw); }
+  constexpr auto &set_seed(std::uint64_t value) noexcept { raw = bits::seed::set(raw, value); return *this; }
 
 #if defined(__aarch64__)
   [[nodiscard]] static rgsr_el1 read() noexcept {
@@ -1699,7 +1719,7 @@ struct rndrrs {
 #endif // defined(__aarch64__)
 };
 
-/** @brief Raw accessor for the `SCTLR_EL1` AArch64 system register (6 named field(s)). */
+/** @brief Raw accessor for the `SCTLR_EL1` AArch64 system register (14 named field(s)). */
 struct sctlr_el1 {
   std::uint64_t raw{0};
 
@@ -1709,6 +1729,14 @@ struct sctlr_el1 {
     using c = ::structo::arch::pte_bit_field<2, 1, std::uint64_t>;
     using sa = ::structo::arch::pte_bit_field<3, 1, std::uint64_t>;
     using i = ::structo::arch::pte_bit_field<12, 1, std::uint64_t>;
+    using enda = ::structo::arch::pte_bit_field<27, 1, std::uint64_t>;
+    using endb = ::structo::arch::pte_bit_field<13, 1, std::uint64_t>;
+    using enia = ::structo::arch::pte_bit_field<31, 1, std::uint64_t>;
+    using enib = ::structo::arch::pte_bit_field<30, 1, std::uint64_t>;
+    using tcf0 = ::structo::arch::pte_bit_field<38, 2, std::uint64_t>;
+    using tcf = ::structo::arch::pte_bit_field<40, 2, std::uint64_t>;
+    using ata0 = ::structo::arch::pte_bit_field<42, 1, std::uint64_t>;
+    using ata = ::structo::arch::pte_bit_field<43, 1, std::uint64_t>;
     using wxn = ::structo::arch::pte_bit_field<19, 1, std::uint64_t>;
   };
 
@@ -1722,6 +1750,22 @@ struct sctlr_el1 {
   constexpr auto &set_sa(bool value) noexcept { raw = bits::sa::set_bit(raw, value); return *this; }
   [[nodiscard]] constexpr bool i() const noexcept { return bits::i::test(raw); }
   constexpr auto &set_i(bool value) noexcept { raw = bits::i::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool enda() const noexcept { return bits::enda::test(raw); }
+  constexpr auto &set_enda(bool value) noexcept { raw = bits::enda::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool endb() const noexcept { return bits::endb::test(raw); }
+  constexpr auto &set_endb(bool value) noexcept { raw = bits::endb::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool enia() const noexcept { return bits::enia::test(raw); }
+  constexpr auto &set_enia(bool value) noexcept { raw = bits::enia::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool enib() const noexcept { return bits::enib::test(raw); }
+  constexpr auto &set_enib(bool value) noexcept { raw = bits::enib::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint64_t tcf0() const noexcept { return bits::tcf0::get(raw); }
+  constexpr auto &set_tcf0(std::uint64_t value) noexcept { raw = bits::tcf0::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint64_t tcf() const noexcept { return bits::tcf::get(raw); }
+  constexpr auto &set_tcf(std::uint64_t value) noexcept { raw = bits::tcf::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool ata0() const noexcept { return bits::ata0::test(raw); }
+  constexpr auto &set_ata0(bool value) noexcept { raw = bits::ata0::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool ata() const noexcept { return bits::ata::test(raw); }
+  constexpr auto &set_ata(bool value) noexcept { raw = bits::ata::set_bit(raw, value); return *this; }
   [[nodiscard]] constexpr bool wxn() const noexcept { return bits::wxn::test(raw); }
   constexpr auto &set_wxn(bool value) noexcept { raw = bits::wxn::set_bit(raw, value); return *this; }
 
@@ -1894,9 +1938,19 @@ struct tcr_el12 {
 #endif // defined(__aarch64__)
 };
 
-/** @brief Raw accessor for the `TFSRE0_EL1` AArch64 system register (no named fields yet). */
+/** @brief Raw accessor for the `TFSRE0_EL1` AArch64 system register (2 named field(s)). */
 struct tfsre0_el1 {
   std::uint64_t raw{0};
+
+  struct bits {
+    using tf0 = ::structo::arch::pte_bit_field<0, 1, std::uint64_t>;
+    using tf1 = ::structo::arch::pte_bit_field<1, 1, std::uint64_t>;
+  };
+
+  [[nodiscard]] constexpr bool tf0() const noexcept { return bits::tf0::test(raw); }
+  constexpr auto &set_tf0(bool value) noexcept { raw = bits::tf0::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tf1() const noexcept { return bits::tf1::test(raw); }
+  constexpr auto &set_tf1(bool value) noexcept { raw = bits::tf1::set_bit(raw, value); return *this; }
 
 #if defined(__aarch64__)
   [[nodiscard]] static tfsre0_el1 read() noexcept {
@@ -1908,9 +1962,19 @@ struct tfsre0_el1 {
 #endif // defined(__aarch64__)
 };
 
-/** @brief Raw accessor for the `TFSR_EL1` AArch64 system register (no named fields yet). */
+/** @brief Raw accessor for the `TFSR_EL1` AArch64 system register (2 named field(s)). */
 struct tfsr_el1 {
   std::uint64_t raw{0};
+
+  struct bits {
+    using tf0 = ::structo::arch::pte_bit_field<0, 1, std::uint64_t>;
+    using tf1 = ::structo::arch::pte_bit_field<1, 1, std::uint64_t>;
+  };
+
+  [[nodiscard]] constexpr bool tf0() const noexcept { return bits::tf0::test(raw); }
+  constexpr auto &set_tf0(bool value) noexcept { raw = bits::tf0::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tf1() const noexcept { return bits::tf1::test(raw); }
+  constexpr auto &set_tf1(bool value) noexcept { raw = bits::tf1::set_bit(raw, value); return *this; }
 
 #if defined(__aarch64__)
   [[nodiscard]] static tfsr_el1 read() noexcept {

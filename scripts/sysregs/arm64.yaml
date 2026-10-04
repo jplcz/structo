@@ -720,7 +720,9 @@ registers:
     crn: 1
     crm: 0
     op2: 6
-  fields: []
+  fields:
+  - excl:0:16
+  - rrnd:16:1
 - name: gmid_el1
   width: 64
   access:
@@ -1521,7 +1523,9 @@ registers:
     crn: 1
     crm: 0
     op2: 5
-  fields: []
+  fields:
+  - tag:0:4
+  - seed:8:16
 - name: rndrrs
   width: 64
   access:
@@ -1553,6 +1557,14 @@ registers:
   - c:2:1
   - sa:3:1
   - i:12:1
+  - enda:27:1
+  - endb:13:1
+  - enia:31:1
+  - enib:30:1
+  - tcf0:38:2
+  - tcf:40:2
+  - ata0:42:1
+  - ata:43:1
   - wxn:19:1
 - name: sctlr_el12
   width: 64
@@ -1676,7 +1688,9 @@ registers:
     crn: 5
     crm: 6
     op2: 1
-  fields: []
+  fields:
+  - tf0:0:1
+  - tf1:1:1
 - name: tfsr_el1
   width: 64
   access:
@@ -1689,7 +1703,9 @@ registers:
     crn: 5
     crm: 6
     op2: 0
-  fields: []
+  fields:
+  - tf0:0:1
+  - tf1:1:1
 - name: ttbr0_el1
   width: 64
   access:
