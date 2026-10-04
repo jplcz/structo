@@ -291,6 +291,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_async_kernel_object.cpp
         tests/test_callout.cpp
         tests/test_load_average.cpp
+        tests/test_cpu_load.cpp
         tests/test_runqueue.cpp
         tests/test_sched.cpp
         tests/test_phys_translator.cpp
@@ -309,6 +310,9 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_cpu_index.cpp
         tests/test_hw_id_map.cpp
         tests/test_fdt_cpu_map.cpp
+        tests/test_cpu_topology.cpp
+        tests/test_fdt_cpu_topology.cpp
+        tests/test_cpu_sibling_map.cpp
         tests/test_irq_guard.cpp
         tests/test_preemption_guard.cpp
         tests/test_spinlock_entry_guard.cpp
