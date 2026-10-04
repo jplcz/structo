@@ -106,27 +106,40 @@ TEST_F(EarlyRendezvousBarrierTest, NonLeaderInvokesOnSpinCallbackWhileWaiting) {
 }
 
 TEST_F(EarlyRendezvousBarrierTest, OnSpinCallbackReceivesProvisionalArrivalCountWhenRequested) {
+  // The provisional count is documented as a racy lower-bound hint: once
+  // the leader arrives, a non-leader's *last* observed value can legally
+  // be 0 (read just after the leader resets `arrived` for the next wave)
+  // or the leader's own post-increment value, not just 1 -- so this test
+  // must assert that the callback *ever* observed the expected mid-wave
+  // count of 1, not that it was the final snapshot.
   structo_early_rendezvous_state state{};
-  std::atomic<std::size_t> last_seen_count{0};
+  std::atomic<bool> saw_expected_count{false};
   std::atomic<bool> waiter_started{false};
 
   std::thread waiter([&] {
     waiter_started.store(true, std::memory_order_release);
-    early_rendezvous_wait<fake_spin_traits>(
-        state, 2, [&](std::size_t arrived) { last_seen_count.store(arrived, std::memory_order_relaxed); });
+    early_rendezvous_wait<fake_spin_traits>(state, 2, [&](std::size_t arrived) {
+      if (arrived == 1) {
+        saw_expected_count.store(true, std::memory_order_relaxed);
+      }
+    });
   });
 
   while (!waiter_started.load(std::memory_order_acquire)) {
     std::this_thread::yield();
   }
-  while (fake_spin_traits::spin_count.load(std::memory_order_relaxed) == 0) {
+  // Only release the leader once the waiter has genuinely observed the
+  // expected provisional count at least once, instead of racing against
+  // `spin_count` alone (which only proves *a* spin happened, not that it
+  // happened with the value this test cares about).
+  while (!saw_expected_count.load(std::memory_order_relaxed)) {
     std::this_thread::yield();
   }
 
   EXPECT_TRUE((early_rendezvous_wait<fake_spin_traits>(state, 2)));
   waiter.join();
 
-  EXPECT_EQ(last_seen_count.load(), 1U);
+  EXPECT_TRUE(saw_expected_count.load());
 }
 
 TEST_F(EarlyRendezvousBarrierTest, BarrierIsReusableAcrossMultipleWaves) {
