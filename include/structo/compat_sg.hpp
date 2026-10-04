@@ -9,6 +9,7 @@
 #include "sg_list.hpp"
 #include "sg_translator.hpp"
 #include <algorithm>
+#include <limits>
 #include <reloco/lifetime.hpp>
 #include <reloco/packed_bits.hpp>
 #include <reloco/speculation_defense.hpp>
@@ -61,6 +62,74 @@ struct chained_sg_layout {
   using chain_flag = ChainFlagField;
   static constexpr size_t header_size = HeaderSize;
 };
+
+// ============================================================================
+// Mapper Handle Support (dmap_ptr::guard / slot_map_ptr::guard interop)
+// ============================================================================
+
+/**
+ * @brief Helpers letting `compact_sg_codec`/`chained_sg_codec`/
+ * `two_level_sg_codec`'s `Mapper` callable return either a bare pointer
+ * (the original, still-supported contract) or an RAII "mapping handle" --
+ * `dmap_ptr<T, M>::guard` or `slot_map_ptr<T, M>::guard`
+ * (`phys_addr.hpp`/`slot_map_ptr.hpp`), both of which expose the same
+ * `get()`/move-only/`reset()` shape -- so the exact same codec code works
+ * whether pages are permanently direct-mapped or only dynamically,
+ * scope-mapped one (or a handful) at a time.
+ *
+ * `slot_map_mapper` maps exactly one physical page per slot (see its own
+ * docs): its `ArchHooks::slot_size` must be set to the *same*
+ * `PageTraits::page_size` as whichever codec it is paired with below (e.g.
+ * `page_4k`), since every `try_map()` call here requests a full
+ * `PageTraits::page_size`-sized page and `slot_map_mapper::acquire()`
+ * rejects any request that doesn't fit within a single slot.
+ *
+ * @code
+ * // On a target with a permanent direct map:
+ * using dmap = dmap_mapper<...>;
+ * auto mapper = [](paddr_type p) {
+ *   return dmap_ptr<packed_type, dmap>::from_paddr(p.cast_type<packed_type>()).value().try_map();
+ * };
+ *
+ * // On a target without one (e.g. TEE peeking into a handful of REE
+ * // pages at a time), only the `Mapper` changes -- the codec call sites
+ * // (`chained_sg_codec::encode/decode`, `two_level_sg_codec::encode/decode`)
+ * // are identical either way:
+ * using slots = slot_map_mapper<2, ns_peek_hooks, nonsecure_phys_space>;
+ * auto mapper = [](paddr_type p) {
+ *   return slot_map_ptr<packed_type, slots>::from_paddr(p.cast_type<packed_type>())
+ *       .value()
+ *       .try_map(PageTraits::page_size);
+ * };
+ * @endcode
+ */
+namespace sg_mapper_detail {
+
+/** @brief Extracts the raw pointer from either a bare pointer or a `.get()`-style handle. */
+template <typename Handle> [[nodiscard]] constexpr auto *mapped_ptr(Handle &h) noexcept {
+  if constexpr (std::is_pointer_v<std::remove_reference_t<Handle>>) {
+    return h;
+  } else {
+    return h.get();
+  }
+}
+
+/**
+ * @brief Releases a handle's mapping *before* the `Mapper` is asked for the
+ * next one, so a `slot_map_mapper` pool needs only as many concurrently-held
+ * slots as the codec genuinely needs at once (one for `compact_sg_codec`'s
+ * paged `decode()` or `chained_sg_codec`, two -- root plus leaf -- for
+ * `two_level_sg_codec`) rather than one extra transient slot for the old
+ * page while the new one is being acquired. No-op for bare-pointer handles,
+ * which own nothing to release.
+ */
+template <typename Handle> constexpr void release_handle(Handle &h) noexcept {
+  if constexpr (!std::is_pointer_v<std::remove_reference_t<Handle>>) {
+    h.reset();
+  }
+}
+
+} // namespace sg_mapper_detail
 
 /**
  * @brief Encodes and decodes between plain sg_list and bit-packed hardware descriptors.
@@ -188,129 +257,170 @@ public:
     // Skip the header portion of the layout before decoding.
     for (size_t i = header_elements; i < input.size(); ++i) {
       // TOCTOU mitigation: always copy before reading
-      const auto desc = input[i];
+      const packed_type desc = input[i];
 
-      uint64_t pfn_val = desc.template get<typename Layout::pfn_field>();
-
-      uint64_t offset = 0;
-      if constexpr (!std::is_void_v<typename Layout::offset_field>) {
-        offset = desc.template get<typename Layout::offset_field>();
-      }
-
-      uint64_t length = PageTraits::page_size;
-      if constexpr (!std::is_void_v<typename Layout::length_field>) {
-        length = desc.template get<typename Layout::length_field>();
-        if constexpr (std::is_same_v<typename Layout::length_unit, length_unit_pages>) {
-          // The length field counts whole pages, not bytes; convert before
-          // the bounds check below (which operates on byte lengths).
-          length *= PageTraits::page_size;
-        }
-      }
-
-      // --- Speculation Defenses ---
-      // Evaluate all bounds in a single bitwise boolean expression.
-      // A page-count length field (no Offset field, always page-aligned) can
-      // legitimately span many pages, so the intra-page `offset + length`
-      // bound below only applies to a byte-unit length field.
-      bool is_safe = true;
-      if constexpr (!std::is_same_v<typename Layout::length_unit, length_unit_pages>) {
-        is_safe &= (offset < PageTraits::page_size) & ((offset + length) <= PageTraits::page_size);
-      }
-
-      if constexpr (!std::is_void_v<typename Layout::length_field>) {
-        is_safe &= (length > 0);
-      }
-
-      // Architecturally mask the data BEFORE branching.
-      // Speculative execution passing this line uses clamped, safe values
-      offset = nospec::sanitize(offset, is_safe, UINT64_C(0));
-      length = nospec::sanitize(length, is_safe, UINT64_C(0));
-
-      if (!is_safe)
-        RELOCO_UNLIKELY { return unexpected(error::security_violation); }
-
-      phys_addr<void, SpaceTag, uint64_t> paddr{(pfn_val << PageTraits::page_shift) | offset};
-
-      auto res = output.try_push_back(paddr, length);
-      if (!res)
+      auto stop_res = decode_descriptor(desc, output);
+      if (!stop_res)
         RELOCO_UNLIKELY
-      return unexpected(res.error());
-
-      if constexpr (!std::is_void_v<typename Layout::last_flag>) {
-        if (desc.template get<typename Layout::last_flag>())
-          RELOCO_UNLIKELY
+      return unexpected(stop_res.error());
+      if (*stop_res)
         break;
-      }
     }
     return {};
   }
+
+  /**
+   * @brief Decodes a compact SG descriptor table spanning one or more
+   * physical pages, mapping each page on demand via `mapper` rather than
+   * requiring the whole table already be reachable through one contiguous
+   * span -- e.g. a VM handing the hypervisor a `(phys_addr, page_count)`
+   * pair describing its descriptor table, rather than a pointer the
+   * hypervisor could dereference directly.
+   *
+   * @param table_base Physical address of the first page of the descriptor table.
+   * @param page_count Number of `PageTraits::page_size` pages the table spans.
+   * @param output The sg_list to populate.
+   * @param mapper Callable `result<Handle>(phys_addr<void, SpaceTag, uint64_t>)`
+   * mapping one page of the table for CPU read access, where `Handle` is
+   * either a bare `const packed_type*` or a move-only RAII handle exposing
+   * `.get()`/`.reset()` -- see the "Mapper Handle Support" docs above
+   * (`dmap_ptr<const packed_type, M>::guard` / `slot_map_ptr<const packed_type, M>::guard`).
+   * Exactly one page is held mapped at a time, so a `slot_map_mapper`-backed
+   * `Mapper` needs only a single slot (whose `ArchHooks::slot_size` must
+   * equal `PageTraits::page_size`).
+   */
+  template <typename OutContainer, typename Mapper>
+  [[nodiscard]] static RELOCO_CONSTEXPR20 result<void> decode(phys_addr<void, SpaceTag, uint64_t> table_base,
+                                                              size_t page_count, sg_list<OutContainer> &output,
+                                                              Mapper &&mapper) noexcept {
+    // Descriptor pages are raw hardware/guest memory reached through
+    // whatever `mapper()` returns, not a bounds-checked span: the safety
+    // invariant here is `entries_per_page`/`header_elements`, enforced
+    // manually below.
+    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+    constexpr size_t entries_per_page = PageTraits::page_size / sizeof(packed_type);
+    static_assert(entries_per_page > 0, "page_size must hold at least one descriptor");
+
+    if (page_count == 0 || table_base.is_null())
+      RELOCO_UNLIKELY
+    return unexpected(error::invalid_argument);
+
+    // Overflow guard: `page_count` is caller/guest-controlled (e.g. a VM
+    // reporting its own descriptor table size), so `page_count * entries_per_page`
+    // must not be allowed to silently wrap before the header_elements check below.
+    if (page_count > (std::numeric_limits<size_t>::max)() / entries_per_page)
+      RELOCO_UNLIKELY
+    return unexpected(error::out_of_range);
+
+    if (page_count * entries_per_page < header_elements)
+      RELOCO_UNLIKELY
+    return unexpected(error::invalid_argument);
+
+    for (size_t page_idx = 0; page_idx < page_count; ++page_idx) {
+      phys_addr<void, SpaceTag, uint64_t> page_paddr{table_base.value + page_idx * PageTraits::page_size};
+
+      auto map_res = mapper(page_paddr);
+      if (!map_res)
+        RELOCO_UNLIKELY
+      return unexpected(map_res.error());
+
+      // Scoped to this page's loop iteration: released (if owning) at the
+      // closing brace below, before the next page is mapped -- so a
+      // single-slot slot_map_mapper suffices, same as chained_sg_codec::decode().
+      auto page_handle = std::move(*map_res);
+      const packed_type *page_vaddr = sg_mapper_detail::mapped_ptr(page_handle);
+
+      // `header_elements` may itself span more than one page (e.g. a large
+      // reserved region ahead of the table); skip however much of it still
+      // falls within *this* page rather than assuming it is entirely
+      // contained in page 0.
+      const size_t page_start_entry = page_idx * entries_per_page;
+      const size_t start_i = (header_elements > page_start_entry)
+                                  ? std::min(header_elements - page_start_entry, entries_per_page)
+                                  : 0;
+      for (size_t i = start_i; i < entries_per_page; ++i) {
+        // TOCTOU mitigation: always copy before reading. Doubly important
+        // here versus the span overload above: `mapper()` may expose
+        // memory a concurrently-running, untrusted guest/peer can still
+        // write to for as long as the page stays mapped.
+        const packed_type desc = page_vaddr[i];
+
+        auto stop_res = decode_descriptor(desc, output);
+        if (!stop_res)
+          RELOCO_UNLIKELY
+        return unexpected(stop_res.error());
+        if (*stop_res)
+          return {};
+      }
+    }
+    return {};
+    RELOCO_END_UNSAFE_BUFFER_USAGE
+  }
+
+private:
+  /**
+   * @brief Validates and decodes one already-TOCTOU-copied descriptor into `output`.
+   * @return Whether `desc` was flagged as the table's final descriptor
+   * (always `false` if `Layout::last_flag` is disabled).
+   */
+  template <typename OutContainer>
+  [[nodiscard]] static RELOCO_CONSTEXPR20 result<bool> decode_descriptor(const packed_type &desc,
+                                                                          sg_list<OutContainer> &output) noexcept {
+    uint64_t pfn_val = desc.template get<typename Layout::pfn_field>();
+
+    uint64_t offset = 0;
+    if constexpr (!std::is_void_v<typename Layout::offset_field>) {
+      offset = desc.template get<typename Layout::offset_field>();
+    }
+
+    uint64_t length = PageTraits::page_size;
+    if constexpr (!std::is_void_v<typename Layout::length_field>) {
+      length = desc.template get<typename Layout::length_field>();
+      if constexpr (std::is_same_v<typename Layout::length_unit, length_unit_pages>) {
+        // The length field counts whole pages, not bytes; convert before
+        // the bounds check below (which operates on byte lengths).
+        length *= PageTraits::page_size;
+      }
+    }
+
+    // --- Speculation Defenses ---
+    // Evaluate all bounds in a single bitwise boolean expression.
+    // A page-count length field (no Offset field, always page-aligned) can
+    // legitimately span many pages, so the intra-page `offset + length`
+    // bound below only applies to a byte-unit length field.
+    bool is_safe = true;
+    if constexpr (!std::is_same_v<typename Layout::length_unit, length_unit_pages>) {
+      is_safe &= (offset < PageTraits::page_size) & ((offset + length) <= PageTraits::page_size);
+    }
+
+    if constexpr (!std::is_void_v<typename Layout::length_field>) {
+      is_safe &= (length > 0);
+    }
+
+    // Architecturally mask the data BEFORE branching.
+    // Speculative execution passing this line uses clamped, safe values
+    offset = nospec::sanitize(offset, is_safe, UINT64_C(0));
+    length = nospec::sanitize(length, is_safe, UINT64_C(0));
+
+    if (!is_safe)
+      RELOCO_UNLIKELY { return unexpected(error::security_violation); }
+
+    phys_addr<void, SpaceTag, uint64_t> paddr{(pfn_val << PageTraits::page_shift) | offset};
+
+    auto res = output.try_push_back(paddr, length);
+    if (!res)
+      RELOCO_UNLIKELY
+    return unexpected(res.error());
+
+    if constexpr (!std::is_void_v<typename Layout::last_flag>) {
+      return desc.template get<typename Layout::last_flag>() != 0;
+    } else {
+      return false;
+    }
+  }
+
+public:
 };
-
-// ============================================================================
-// Mapper Handle Support (dmap_ptr::guard / slot_map_ptr::guard interop)
-// ============================================================================
-
-/**
- * @brief Helpers letting `chained_sg_codec`/`two_level_sg_codec`'s `Mapper`
- * callable return either a bare pointer (the original, still-supported
- * contract) or an RAII "mapping handle" -- `dmap_ptr<T, M>::guard` or
- * `slot_map_ptr<T, M>::guard` (`phys_addr.hpp`/`slot_map_ptr.hpp`), both of
- * which expose the same `get()`/move-only/`reset()` shape -- so the exact
- * same codec code works whether pages are permanently direct-mapped or
- * only dynamically, scope-mapped one (or a handful) at a time.
- *
- * `slot_map_mapper` maps exactly one physical page per slot (see its own
- * docs): its `ArchHooks::slot_size` must be set to the *same*
- * `PageTraits::page_size` as whichever codec it is paired with below (e.g.
- * `page_4k`), since every `try_map()` call here requests a full
- * `PageTraits::page_size`-sized page and `slot_map_mapper::acquire()`
- * rejects any request that doesn't fit within a single slot.
- *
- * @code
- * // On a target with a permanent direct map:
- * using dmap = dmap_mapper<...>;
- * auto mapper = [](paddr_type p) {
- *   return dmap_ptr<packed_type, dmap>::from_paddr(p.cast_type<packed_type>()).value().try_map();
- * };
- *
- * // On a target without one (e.g. TEE peeking into a handful of REE
- * // pages at a time), only the `Mapper` changes -- the codec call sites
- * // (`chained_sg_codec::encode/decode`, `two_level_sg_codec::encode/decode`)
- * // are identical either way:
- * using slots = slot_map_mapper<2, ns_peek_hooks, nonsecure_phys_space>;
- * auto mapper = [](paddr_type p) {
- *   return slot_map_ptr<packed_type, slots>::from_paddr(p.cast_type<packed_type>())
- *       .value()
- *       .try_map(PageTraits::page_size);
- * };
- * @endcode
- */
-namespace sg_mapper_detail {
-
-/** @brief Extracts the raw pointer from either a bare pointer or a `.get()`-style handle. */
-template <typename Handle> [[nodiscard]] constexpr auto *mapped_ptr(Handle &h) noexcept {
-  if constexpr (std::is_pointer_v<std::remove_reference_t<Handle>>) {
-    return h;
-  } else {
-    return h.get();
-  }
-}
-
-/**
- * @brief Releases a handle's mapping *before* the `Mapper` is asked for the
- * next one, so a `slot_map_mapper` pool needs only as many concurrently-held
- * slots as the codec genuinely needs at once (one for `chained_sg_codec`,
- * two -- root plus leaf -- for `two_level_sg_codec`) rather than one extra
- * transient slot for the old page while the new one is being acquired.
- * No-op for bare-pointer handles, which own nothing to release.
- */
-template <typename Handle> constexpr void release_handle(Handle &h) noexcept {
-  if constexpr (!std::is_pointer_v<std::remove_reference_t<Handle>>) {
-    h.reset();
-  }
-}
-
-} // namespace sg_mapper_detail
 
 /**
  * @brief Encodes and decodes chained SG lists in physical memory.

@@ -244,6 +244,180 @@ TEST(CompactSgCodecTest, RejectsDescriptorCrossingPageBoundary) {
   EXPECT_EQ(result.error(), error::security_violation);
 }
 
+// ============================================================================
+// `compact_sg_codec::decode(phys_addr, page_count, output, mapper)`: decodes
+// a descriptor table the caller only knows as a `(phys_addr, page_count)`
+// pair -- e.g. a guest VM reporting its own descriptor table's location and
+// size to the hypervisor -- rather than a `span` over memory the caller can
+// already dereference directly.
+// ============================================================================
+
+// A software-only ArchHooks: "slot_size"-aligned windows into a flat backing
+// buffer, indexed directly by the (small, test-only) physical address used
+// as the offset -- enough to prove slot acquire/release pairing without a
+// real MMU. `NumSlots` is part of the type so each (count, buffer) pairing
+// used below gets its own independent static pool/storage.
+template <std::size_t NumSlots, std::size_t BufSize> struct fake_page_hooks {
+  static constexpr std::size_t slot_size = page_4k::page_size;
+  static_assert(BufSize % slot_size == 0);
+
+  alignas(16) static inline std::byte backing[BufSize]{};
+  static inline std::size_t phys_offset[NumSlots] = {};
+  static inline int program_calls = 0;
+  static inline int unprogram_calls = 0;
+
+  static void reset_counters() noexcept {
+    program_calls = 0;
+    unprogram_calls = 0;
+  }
+
+  static void *slot_base(std::size_t slot) noexcept { return backing + phys_offset[slot]; }
+
+  static result<void> program(std::size_t slot, std::uint64_t phys_aligned) noexcept {
+    if (phys_aligned >= BufSize)
+      return unexpected(error::out_of_range);
+    phys_offset[slot] = static_cast<std::size_t>(phys_aligned);
+    ++program_calls;
+    return {};
+  }
+
+  static void unprogram(std::size_t /*slot*/) noexcept { ++unprogram_calls; }
+};
+
+TEST(CompactSgCodecTest, DecodesATableSpanningMultiplePagesViaABarePointerMapper) {
+  using packed_type = compact_codec::packed_type;
+  using paddr_type = phys_addr<void, dma_bus_space>;
+  constexpr size_t entries_per_page = page_4k::page_size / sizeof(packed_type);
+
+  // A table spanning 2 pages: the first page is completely full of
+  // descriptors, and the final descriptor (the table's very first entry on
+  // the second page) carries `last_flag`.
+  reloco::array<packed_type, entries_per_page> page0{};
+  reloco::array<packed_type, entries_per_page> page1{};
+  for (size_t i = 0; i < entries_per_page; ++i) {
+    page0[i].truncating_set<pfn_field>(i);
+    page0[i].truncating_set<length_field>(1);
+  }
+  page1[0].truncating_set<pfn_field>(entries_per_page);
+  page1[0].truncating_set<length_field>(1);
+  page1[0].truncating_set<last_field>(1);
+
+  auto map_page = [&](paddr_type address) -> result<const packed_type *> {
+    if (address.value == 0x1000)
+      return page0.data();
+    if (address.value == 0x2000)
+      return page1.data();
+    return unexpected(error::not_found);
+  };
+
+  sg_list<inline_vector<compact_codec::entry_type, 600>> decoded;
+  ASSERT_TRUE(compact_codec::decode(paddr_type{0x1000}, 2, decoded, map_page));
+  // Each descriptor's 1-byte length leaves a gap before the next
+  // pfn-aligned descriptor, so sg_list cannot coalesce them: every
+  // descriptor on both table pages must have been visited individually.
+  ASSERT_EQ(decoded.size(), entries_per_page + 1);
+  EXPECT_EQ(decoded.begin()->addr.value, 0u);
+  EXPECT_EQ(decoded.begin()->length, 1u);
+  EXPECT_EQ(decoded.base().back().addr.value, entries_per_page * 4096u);
+  EXPECT_EQ(decoded.base().back().length, 1u);
+}
+
+TEST(CompactSgCodecTest, DecodesATableSpanningMultiplePagesViaASingleSlotRaiiMapper) {
+  using packed_type = compact_codec::packed_type;
+  using paddr_type = phys_addr<void, dma_bus_space>;
+  constexpr size_t entries_per_page = page_4k::page_size / sizeof(packed_type);
+
+  // Only a *single* slot: proves `compact_sg_codec::decode`'s paged overload
+  // releases the previous page's handle before mapping the next one.
+  using hooks = fake_page_hooks<1, 0x3000>;
+  using mapper_type = slot_map_mapper<1, hooks, dma_bus_space>;
+  hooks::reset_counters();
+
+  auto *page0 = reinterpret_cast<packed_type *>(hooks::backing + 0x1000);
+  auto *page1 = reinterpret_cast<packed_type *>(hooks::backing + 0x2000);
+  for (size_t i = 0; i < entries_per_page; ++i) {
+    page0[i].truncating_set<pfn_field>(i);
+    page0[i].truncating_set<length_field>(1);
+  }
+  page1[0].truncating_set<pfn_field>(entries_per_page);
+  page1[0].truncating_set<length_field>(1);
+  page1[0].truncating_set<last_field>(1);
+
+  auto map_page = [](paddr_type address) -> result<slot_map_ptr<const packed_type, mapper_type>::guard> {
+    auto ptr = slot_map_ptr<const packed_type, mapper_type>::from_paddr(
+        phys_addr<const packed_type, dma_bus_space>{address.value});
+    if (!ptr)
+      return unexpected(ptr.error());
+    return ptr->try_map(page_4k::page_size);
+  };
+
+  sg_list<inline_vector<compact_codec::entry_type, 600>> decoded;
+  ASSERT_TRUE(compact_codec::decode(paddr_type{0x1000}, 2, decoded, map_page));
+  ASSERT_EQ(decoded.size(), entries_per_page + 1);
+  EXPECT_EQ(decoded.begin()->addr.value, 0u);
+  EXPECT_EQ(decoded.begin()->length, 1u);
+  EXPECT_EQ(decoded.base().back().addr.value, entries_per_page * 4096u);
+  EXPECT_EQ(decoded.base().back().length, 1u);
+  EXPECT_EQ(hooks::program_calls, 2);
+  EXPECT_EQ(hooks::unprogram_calls, 2);
+}
+
+// `header_elements` here deliberately spans 2 whole table pages, so the
+// first real descriptor only appears on the table's *third* page -- proving
+// the paged decode()'s header-skip logic accounts for a header that doesn't
+// fit within page 0, rather than assuming `header_elements < entries_per_page`.
+using huge_header_layout =
+    sg_descriptor_layout<uint64_t, pfn_field, void, length_field, last_field, 2 * page_4k::page_size>;
+using huge_header_codec = compact_sg_codec<huge_header_layout, page_4k>;
+
+TEST(CompactSgCodecTest, PagedDecodeSkipsAHeaderSpanningMultiplePages) {
+  using packed_type = huge_header_codec::packed_type;
+  using paddr_type = phys_addr<void, dma_bus_space>;
+  constexpr size_t entries_per_page = page_4k::page_size / sizeof(packed_type);
+  static_assert(huge_header_codec::header_elements == 2 * entries_per_page);
+
+  reloco::array<packed_type, entries_per_page> page0{}; // all header
+  reloco::array<packed_type, entries_per_page> page1{}; // all header
+  reloco::array<packed_type, entries_per_page> page2{}; // first real descriptor
+  page2[0].truncating_set<pfn_field>(99);
+  page2[0].truncating_set<length_field>(10);
+  page2[0].truncating_set<last_field>(1);
+
+  auto map_page = [&](paddr_type address) -> result<const packed_type *> {
+    if (address.value == 0x1000)
+      return page0.data();
+    if (address.value == 0x2000)
+      return page1.data();
+    if (address.value == 0x3000)
+      return page2.data();
+    return unexpected(error::not_found);
+  };
+
+  sg_list<inline_vector<huge_header_codec::entry_type, 2>> decoded;
+  ASSERT_TRUE(huge_header_codec::decode(paddr_type{0x1000}, 3, decoded, map_page));
+  ASSERT_EQ(decoded.size(), 1u);
+  EXPECT_EQ(decoded.begin()->addr.value, uint64_t{99} << page_4k::page_shift);
+  EXPECT_EQ(decoded.begin()->length, 10u);
+}
+
+TEST(CompactSgCodecTest, PagedDecodeRejectsNullOrZeroPageCount) {
+  using packed_type = compact_codec::packed_type;
+  using paddr_type = phys_addr<void, dma_bus_space>;
+  auto never_called = [](paddr_type) -> result<const packed_type *> {
+    ADD_FAILURE() << "mapper should not be invoked";
+    return unexpected(error::not_found);
+  };
+
+  sg_list<inline_vector<compact_codec::entry_type, 2>> decoded;
+  auto zero_pages = compact_codec::decode(paddr_type{0x1000}, 0, decoded, never_called);
+  ASSERT_FALSE(zero_pages);
+  EXPECT_EQ(zero_pages.error(), error::invalid_argument);
+
+  auto null_base = compact_codec::decode(paddr_type{nullptr}, 1, decoded, never_called);
+  ASSERT_FALSE(null_base);
+  EXPECT_EQ(null_base.error(), error::invalid_argument);
+}
+
 TEST(ChainedSgCodecTest, LinksPagesWhenDescriptorPageFills) {
   using layout = chained_sg_layout<uint64_t, pfn_field, offset_field, length_field, last_field, chain_field>;
   using codec = chained_sg_codec<layout, page_4k, dma_bus_space>;
@@ -337,38 +511,6 @@ TEST(TwoLevelSgCodecTest, RoundTripsRootAndLeafTables) {
 // is called early enough that the codecs work even with pools far smaller
 // than the number of physical pages visited.
 // ============================================================================
-
-// A software-only ArchHooks: "slot_size"-aligned windows into a flat backing
-// buffer, indexed directly by the (small, test-only) physical address used
-// as the offset -- enough to prove slot acquire/release pairing without a
-// real MMU. `NumSlots` is part of the type so each (count, buffer) pairing
-// used below gets its own independent static pool/storage.
-template <std::size_t NumSlots, std::size_t BufSize> struct fake_page_hooks {
-  static constexpr std::size_t slot_size = page_4k::page_size;
-  static_assert(BufSize % slot_size == 0);
-
-  alignas(16) static inline std::byte backing[BufSize]{};
-  static inline std::size_t phys_offset[NumSlots] = {};
-  static inline int program_calls = 0;
-  static inline int unprogram_calls = 0;
-
-  static void reset_counters() noexcept {
-    program_calls = 0;
-    unprogram_calls = 0;
-  }
-
-  static void *slot_base(std::size_t slot) noexcept { return backing + phys_offset[slot]; }
-
-  static result<void> program(std::size_t slot, std::uint64_t phys_aligned) noexcept {
-    if (phys_aligned >= BufSize)
-      return unexpected(error::out_of_range);
-    phys_offset[slot] = static_cast<std::size_t>(phys_aligned);
-    ++program_calls;
-    return {};
-  }
-
-  static void unprogram(std::size_t /*slot*/) noexcept { ++unprogram_calls; }
-};
 
 TEST(ChainedSgCodecTest, WorksWithASingleSlotRaiiMapper) {
   using layout = chained_sg_layout<uint64_t, pfn_field, offset_field, length_field, last_field, chain_field>;
