@@ -55,6 +55,7 @@
 
 #include <atomic>
 #include <cstddef>
+#include <iterator>
 #include <reloco/error.hpp>
 #include <reloco/expected.hpp>
 #include <reloco/optional.hpp>
@@ -63,6 +64,57 @@
 namespace structo {
 
 using namespace reloco;
+
+/**
+ * @brief Forward iterator yielding each set bit index, ascending, over a
+ * `span<const unsigned long>` + logical bit count snapshot -- shared by
+ * every `bitmap_ops<Derived>`-based bitmap's `begin()`/`end()`, mirroring
+ * `arch::cpu_mask<Tag, MaxCpus>::const_iterator`'s own shape. Holds a
+ * snapshot span/`nbits` rather than a `Derived*`, so the exact same
+ * iterator type works whether `Derived` owns its storage
+ * (`fixed_bitmap<N>`/`dynamic_bitmap`) or merely views someone else's
+ * (`bitmap_view`) -- it never needs to know which.
+ */
+class bitmap_bit_iterator {
+public:
+  using value_type = std::size_t;
+  using difference_type = std::ptrdiff_t;
+  using iterator_category = std::forward_iterator_tag;
+
+  /** @brief Constructs a past-the-end-like, empty iterator; only meaningful once assigned a real one. */
+  bitmap_bit_iterator() noexcept = default;
+
+  /** @brief Constructs an iterator positioned at `pos` over `words`/`nbits`. Typically obtained via `bitmap_ops::begin()`/`end()`, not called directly. */
+  bitmap_bit_iterator(span<const unsigned long> words, std::size_t nbits, std::size_t pos) noexcept
+      : words_(words), nbits_(nbits), pos_(pos) {}
+
+  [[nodiscard]] std::size_t operator*() const noexcept { return pos_; }
+
+  bitmap_bit_iterator &operator++() noexcept {
+    auto next = bitmap_utils::lowest_set_from(words_, nbits_, pos_ + 1);
+    pos_ = next.has_value() ? *next : nbits_;
+    return *this;
+  }
+
+  bitmap_bit_iterator operator++(int) noexcept {
+    bitmap_bit_iterator tmp = *this;
+    ++(*this);
+    return tmp;
+  }
+
+  [[nodiscard]] friend bool operator==(const bitmap_bit_iterator &a, const bitmap_bit_iterator &b) noexcept {
+    return a.pos_ == b.pos_;
+  }
+
+  [[nodiscard]] friend bool operator!=(const bitmap_bit_iterator &a, const bitmap_bit_iterator &b) noexcept {
+    return !(a == b);
+  }
+
+private:
+  span<const unsigned long> words_{};
+  std::size_t nbits_{0};
+  std::size_t pos_{0};
+};
 
 /**
  * @brief CRTP base providing the full `bitmap_utils`-backed instance API
@@ -425,6 +477,90 @@ public:
   atomic_find_and_set(std::memory_order order = std::memory_order_seq_cst) noexcept {
     return bitmap_utils::atomic_find_and_set(derived().words(), derived().nbits(), order);
   }
+
+  // ---------------------------------------------------------------------------
+  // Iteration (yields set bit indices, ascending)
+  // ---------------------------------------------------------------------------
+
+  using const_iterator = bitmap_bit_iterator;
+  using iterator = const_iterator;
+
+  /** @brief Iterator to the lowest set bit, or `end()` if none is set. */
+  [[nodiscard]] const_iterator begin() const noexcept {
+    auto first = bitmap_utils::lowest_set_from(derived().words(), derived().nbits(), 0);
+    return const_iterator(derived().words(), derived().nbits(), first.has_value() ? *first : derived().nbits());
+  }
+
+  /** @brief Past-the-end iterator. */
+  [[nodiscard]] const_iterator end() const noexcept {
+    return const_iterator(derived().words(), derived().nbits(), derived().nbits());
+  }
+
+  // ---------------------------------------------------------------------------
+  // Rust `bitflags`-Flavored Set Algebra (in place only -- see
+  // `fixed_bitmap<N>` for copy-producing `union_with()`/`intersection()`/
+  // `difference()`/`symmetric_difference()`/`complement()` and their
+  // non-assignment operators, which need to construct a brand-new
+  // bitmap value and are therefore only feasible for a type that is
+  // freely default-constructible/copyable -- not `dynamic_bitmap`
+  // (needs an allocator) or `bitmap_view` (non-copyable, non-movable by
+  // design; see `bitmap_view.hpp`))
+  // ---------------------------------------------------------------------------
+  //
+  // `OtherBitmap` is duck-typed: any type providing the same
+  // `words()`/`nbits()` contract `bitmap_ops` itself requires of
+  // `Derived` works here, so these compose across different concrete
+  // bitmap types (e.g. `fixed_bitmap<64> &= some_bitmap_view`) as long
+  // as both share the same logical `nbits()`.
+
+  /** @brief `true` if every bit set in `other` is also set in `*this` (superset test). Traps if `nbits()` differ. */
+  template <typename OtherBitmap> [[nodiscard]] bool contains(const OtherBitmap &other) const noexcept {
+    RELOCO_ASSERT(derived().nbits() == other.nbits(), "bitmap_ops: contains() size mismatch");
+    return bitmap_utils::is_superset_of(derived().words(), other.words());
+  }
+
+  /** @brief `true` if `*this` and `other` have at least one set bit in common. Traps if `nbits()` differ. */
+  template <typename OtherBitmap> [[nodiscard]] bool intersects(const OtherBitmap &other) const noexcept {
+    RELOCO_ASSERT(derived().nbits() == other.nbits(), "bitmap_ops: intersects() size mismatch");
+    return bitmap_utils::intersects(derived().words(), other.words());
+  }
+
+  /** @brief `true` if `*this` and `other` are bitwise identical. Traps if `nbits()` differ. */
+  template <typename OtherBitmap> [[nodiscard]] bool equals(const OtherBitmap &other) const noexcept {
+    RELOCO_ASSERT(derived().nbits() == other.nbits(), "bitmap_ops: equals() size mismatch");
+    return bitmap_utils::equals(derived().words(), other.words());
+  }
+
+  /** @brief Sets every bit `other` has set (set union, in place). Traps if `nbits()` differ. */
+  template <typename OtherBitmap> Derived &operator|=(const OtherBitmap &other) noexcept {
+    RELOCO_ASSERT(derived().nbits() == other.nbits(), "bitmap_ops: operator|=() size mismatch");
+    bitmap_utils::union_with(derived().words(), other.words());
+    return derived();
+  }
+
+  /** @brief Clears every bit `other` doesn't have set (set intersection, in place). Traps if `nbits()` differ. */
+  template <typename OtherBitmap> Derived &operator&=(const OtherBitmap &other) noexcept {
+    RELOCO_ASSERT(derived().nbits() == other.nbits(), "bitmap_ops: operator&=() size mismatch");
+    bitmap_utils::intersect_with(derived().words(), other.words());
+    return derived();
+  }
+
+  /** @brief Flips every bit `other` has set (symmetric difference, in place). Traps if `nbits()` differ. */
+  template <typename OtherBitmap> Derived &operator^=(const OtherBitmap &other) noexcept {
+    RELOCO_ASSERT(derived().nbits() == other.nbits(), "bitmap_ops: operator^=() size mismatch");
+    bitmap_utils::symmetric_difference_with(derived().words(), other.words());
+    return derived();
+  }
+
+  /** @brief Clears every bit `other` has set (set difference, in place). Traps if `nbits()` differ. */
+  template <typename OtherBitmap> Derived &operator-=(const OtherBitmap &other) noexcept {
+    RELOCO_ASSERT(derived().nbits() == other.nbits(), "bitmap_ops: operator-=() size mismatch");
+    bitmap_utils::subtract(derived().words(), other.words());
+    return derived();
+  }
+
+  /** @brief Flips every bit in `[0, size())` in place (set complement). */
+  void invert() noexcept { bitmap_utils::invert(derived().words(), derived().nbits()); }
 
 private:
   [[nodiscard]] Derived &derived() noexcept { return static_cast<Derived &>(*this); }

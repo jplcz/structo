@@ -79,6 +79,71 @@ public:
   }
   [[nodiscard]] static constexpr std::size_t nbits() noexcept { return N; }
 
+  // ---------------------------------------------------------------------------
+  // Rust `bitflags`-flavored set algebra that returns a *new* `fixed_bitmap`
+  // rather than mutating `*this`. These live here -- not in `bitmap_ops`
+  // -- because constructing a fresh value requires `Derived` to be
+  // freely copyable, which only `fixed_bitmap<N>` guarantees among the
+  // three `bitmap_ops` users (`dynamic_bitmap` needs an allocator;
+  // `bitmap_view` is deliberately non-copyable). For in-place mutation
+  // use the inherited `operator|=`/`&=`/`^=`/`-=`/`invert()` instead.
+  // ---------------------------------------------------------------------------
+
+  /** @brief Returns a copy with every bit either `*this` or `other` has set (set union). */
+  template <typename OtherBitmap> [[nodiscard]] fixed_bitmap union_with(const OtherBitmap &other) const noexcept {
+    fixed_bitmap result = *this;
+    result |= other;
+    return result;
+  }
+
+  /** @brief Returns a copy with only the bits both `*this` and `other` have set (set intersection). */
+  template <typename OtherBitmap> [[nodiscard]] fixed_bitmap intersection(const OtherBitmap &other) const noexcept {
+    fixed_bitmap result = *this;
+    result &= other;
+    return result;
+  }
+
+  /** @brief Returns a copy with every bit `*this` has set that `other` does not (set difference). */
+  template <typename OtherBitmap> [[nodiscard]] fixed_bitmap difference(const OtherBitmap &other) const noexcept {
+    fixed_bitmap result = *this;
+    result -= other;
+    return result;
+  }
+
+  /** @brief Returns a copy with every bit set in exactly one of `*this`/`other` (symmetric difference). */
+  template <typename OtherBitmap>
+  [[nodiscard]] fixed_bitmap symmetric_difference(const OtherBitmap &other) const noexcept {
+    fixed_bitmap result = *this;
+    result ^= other;
+    return result;
+  }
+
+  /** @brief Returns a copy with every bit flipped (set complement). */
+  [[nodiscard]] fixed_bitmap complement() const noexcept {
+    fixed_bitmap result = *this;
+    result.invert();
+    return result;
+  }
+
+  [[nodiscard]] friend fixed_bitmap operator|(const fixed_bitmap &a, const fixed_bitmap &b) noexcept {
+    return a.union_with(b);
+  }
+  [[nodiscard]] friend fixed_bitmap operator&(const fixed_bitmap &a, const fixed_bitmap &b) noexcept {
+    return a.intersection(b);
+  }
+  [[nodiscard]] friend fixed_bitmap operator^(const fixed_bitmap &a, const fixed_bitmap &b) noexcept {
+    return a.symmetric_difference(b);
+  }
+  [[nodiscard]] friend fixed_bitmap operator-(const fixed_bitmap &a, const fixed_bitmap &b) noexcept {
+    return a.difference(b);
+  }
+  [[nodiscard]] fixed_bitmap operator~() const noexcept { return complement(); }
+
+  [[nodiscard]] friend bool operator==(const fixed_bitmap &a, const fixed_bitmap &b) noexcept {
+    return bitmap_utils::equals(a.words(), b.words());
+  }
+  [[nodiscard]] friend bool operator!=(const fixed_bitmap &a, const fixed_bitmap &b) noexcept { return !(a == b); }
+
 private:
   unsigned long words_[word_count == 0 ? 1 : word_count]{};
 };

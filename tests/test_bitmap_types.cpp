@@ -9,6 +9,7 @@
 
 #include <cstddef>
 #include <utility>
+#include <vector>
 
 using structo::bitmap_view;
 using structo::dynamic_bitmap;
@@ -95,6 +96,135 @@ TEST(FixedBitmapTest, LowestClearFindsFreeSlot) {
   auto free_slot = bm.lowest_clear();
   ASSERT_TRUE(free_slot.has_value());
   EXPECT_EQ(*free_slot, 3u);
+}
+
+TEST(FixedBitmapTest, IteratorYieldsSetBitsAscending) {
+  fixed_bitmap<70> bm;
+  bm.set(3);
+  bm.set(64); // crosses a word boundary
+  bm.set(69); // last valid bit
+  std::vector<std::size_t> seen;
+  for (auto bit : bm) {
+    seen.push_back(bit);
+  }
+  EXPECT_EQ(seen, (std::vector<std::size_t>{3u, 64u, 69u}));
+}
+
+TEST(FixedBitmapTest, IteratorOnEmptyBitmapIsEmptyRange) {
+  fixed_bitmap<70> bm;
+  EXPECT_EQ(bm.begin(), bm.end());
+}
+
+TEST(FixedBitmapTest, ContainsIntersectsEquals) {
+  fixed_bitmap<16> a;
+  fixed_bitmap<16> b;
+  a.set(1);
+  a.set(2);
+  b.set(1);
+  EXPECT_TRUE(a.contains(b));
+  EXPECT_FALSE(b.contains(a));
+  EXPECT_TRUE(a.intersects(b));
+  EXPECT_FALSE(a.equals(b));
+  b.set(2);
+  EXPECT_TRUE(a.equals(b));
+}
+
+TEST(FixedBitmapTest, CompoundAssignmentOperatorsMutateInPlace) {
+  fixed_bitmap<16> a;
+  fixed_bitmap<16> b;
+  a.set(0);
+  a.set(1);
+  b.set(1);
+  b.set(2);
+
+  fixed_bitmap<16> u = a;
+  u |= b;
+  EXPECT_TRUE(u.test(0));
+  EXPECT_TRUE(u.test(1));
+  EXPECT_TRUE(u.test(2));
+
+  fixed_bitmap<16> i = a;
+  i &= b;
+  EXPECT_FALSE(i.test(0));
+  EXPECT_TRUE(i.test(1));
+  EXPECT_FALSE(i.test(2));
+
+  fixed_bitmap<16> d = a;
+  d -= b;
+  EXPECT_TRUE(d.test(0));
+  EXPECT_FALSE(d.test(1));
+
+  fixed_bitmap<16> x = a;
+  x ^= b;
+  EXPECT_TRUE(x.test(0));
+  EXPECT_FALSE(x.test(1));
+  EXPECT_TRUE(x.test(2));
+}
+
+TEST(FixedBitmapTest, InvertFlipsEveryBitInPlace) {
+  fixed_bitmap<16> bm;
+  bm.set(0);
+  bm.invert();
+  EXPECT_FALSE(bm.test(0));
+  EXPECT_EQ(bm.count(), 15u);
+}
+
+TEST(FixedBitmapTest, CopyProducingSetAlgebraReturnsNewValueAndLeavesOperandsUnchanged) {
+  fixed_bitmap<16> a;
+  fixed_bitmap<16> b;
+  a.set(0);
+  a.set(1);
+  b.set(1);
+  b.set(2);
+
+  auto u = a.union_with(b);
+  EXPECT_TRUE(u.test(0));
+  EXPECT_TRUE(u.test(1));
+  EXPECT_TRUE(u.test(2));
+  EXPECT_TRUE(a.test(0)); // operands unchanged
+  EXPECT_FALSE(a.test(2));
+
+  auto n = a.intersection(b);
+  EXPECT_FALSE(n.test(0));
+  EXPECT_TRUE(n.test(1));
+
+  auto d = a.difference(b);
+  EXPECT_TRUE(d.test(0));
+  EXPECT_FALSE(d.test(1));
+
+  auto s = a.symmetric_difference(b);
+  EXPECT_TRUE(s.test(0));
+  EXPECT_FALSE(s.test(1));
+  EXPECT_TRUE(s.test(2));
+
+  auto c = a.complement();
+  EXPECT_FALSE(c.test(0));
+  EXPECT_FALSE(c.test(1));
+  EXPECT_TRUE(c.test(2));
+}
+
+TEST(FixedBitmapTest, NonAssignmentOperatorsMatchNamedMethods) {
+  fixed_bitmap<16> a;
+  fixed_bitmap<16> b;
+  a.set(0);
+  a.set(1);
+  b.set(1);
+  b.set(2);
+
+  EXPECT_EQ(a | b, a.union_with(b));
+  EXPECT_EQ(a & b, a.intersection(b));
+  EXPECT_EQ(a - b, a.difference(b));
+  EXPECT_EQ(a ^ b, a.symmetric_difference(b));
+  EXPECT_EQ(~a, a.complement());
+}
+
+TEST(FixedBitmapTest, EqualityOperators) {
+  fixed_bitmap<16> a;
+  fixed_bitmap<16> b;
+  a.set(3);
+  EXPECT_NE(a, b);
+  b.set(3);
+  EXPECT_EQ(a, b);
 }
 
 TEST(FixedBitmapTest, CopyableAndMovable) {

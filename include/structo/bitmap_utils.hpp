@@ -604,6 +604,96 @@ public:
   }
 
   // ---------------------------------------------------------------------------
+  // Set Algebra (Rust `bitflags`-flavored, word-for-word across two
+  // same-sized bitmaps)
+  // ---------------------------------------------------------------------------
+  //
+  // Every function below treats `a`/`b` (or `dst`/`src`) as two bitmaps of
+  // the *same* logical size and operates word-for-word; callers are
+  // responsible for only ever comparing/combining bitmaps that share the
+  // same `nbits` (mismatched word-span sizes trap via `RELOCO_ASSERT`).
+  // The mutating members never need to allocate or construct a new bitmap,
+  // so they work uniformly across `fixed_bitmap<N>`, `dynamic_bitmap`, and
+  // even non-owning `bitmap_view`.
+
+  /** @brief `true` if every bit set in `b` is also set in `a` (`a` is a superset of `b`). Traps if sizes differ. */
+  [[nodiscard]] static bool is_superset_of(span<const unsigned long> a, span<const unsigned long> b) noexcept {
+    RELOCO_ASSERT(a.size() == b.size(), "bitmap_utils: is_superset_of() size mismatch");
+    for (std::size_t i = 0; i < a.size(); ++i) {
+      if ((b.unsafe_at(i) & ~a.unsafe_at(i)) != 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /** @brief `true` if `a` and `b` have at least one set bit in common. Traps if sizes differ. */
+  [[nodiscard]] static bool intersects(span<const unsigned long> a, span<const unsigned long> b) noexcept {
+    RELOCO_ASSERT(a.size() == b.size(), "bitmap_utils: intersects() size mismatch");
+    for (std::size_t i = 0; i < a.size(); ++i) {
+      if ((a.unsafe_at(i) & b.unsafe_at(i)) != 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** @brief `true` if `a` and `b` are bitwise identical. Traps if sizes differ. */
+  [[nodiscard]] static bool equals(span<const unsigned long> a, span<const unsigned long> b) noexcept {
+    RELOCO_ASSERT(a.size() == b.size(), "bitmap_utils: equals() size mismatch");
+    for (std::size_t i = 0; i < a.size(); ++i) {
+      if (a.unsafe_at(i) != b.unsafe_at(i)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /** @brief `dst |= src`, word-for-word (set union, in place). Traps if sizes differ. */
+  static void union_with(span<unsigned long> dst, span<const unsigned long> src) noexcept {
+    RELOCO_ASSERT(dst.size() == src.size(), "bitmap_utils: union_with() size mismatch");
+    for (std::size_t i = 0; i < dst.size(); ++i) {
+      dst.unsafe_at(i) |= src.unsafe_at(i);
+    }
+  }
+
+  /** @brief `dst &= src`, word-for-word (set intersection, in place). Traps if sizes differ. */
+  static void intersect_with(span<unsigned long> dst, span<const unsigned long> src) noexcept {
+    RELOCO_ASSERT(dst.size() == src.size(), "bitmap_utils: intersect_with() size mismatch");
+    for (std::size_t i = 0; i < dst.size(); ++i) {
+      dst.unsafe_at(i) &= src.unsafe_at(i);
+    }
+  }
+
+  /**
+   * @brief `dst &= ~src`, word-for-word (set difference, in place: clears
+   * every bit that `src` has set, leaving the rest of `dst` untouched).
+   * Traps if sizes differ.
+   */
+  static void subtract(span<unsigned long> dst, span<const unsigned long> src) noexcept {
+    RELOCO_ASSERT(dst.size() == src.size(), "bitmap_utils: subtract() size mismatch");
+    for (std::size_t i = 0; i < dst.size(); ++i) {
+      dst.unsafe_at(i) &= ~src.unsafe_at(i);
+    }
+  }
+
+  /** @brief `dst ^= src`, word-for-word (symmetric difference, in place). Traps if sizes differ. */
+  static void symmetric_difference_with(span<unsigned long> dst, span<const unsigned long> src) noexcept {
+    RELOCO_ASSERT(dst.size() == src.size(), "bitmap_utils: symmetric_difference_with() size mismatch");
+    for (std::size_t i = 0; i < dst.size(); ++i) {
+      dst.unsafe_at(i) ^= src.unsafe_at(i);
+    }
+  }
+
+  /** @brief Flips every bit in `[0, nbits)` in place (set complement), re-masking any tail padding back to zero. */
+  static void invert(span<unsigned long> words, std::size_t nbits) noexcept {
+    for (std::size_t i = 0; i < words.size(); ++i) {
+      words.unsafe_at(i) = ~words.unsafe_at(i);
+    }
+    mask_tail_padding(words, nbits);
+  }
+
+  // ---------------------------------------------------------------------------
   // Atomic Operations (lock-free, GCC/Clang `__atomic_*` builtins)
   // ---------------------------------------------------------------------------
   //
