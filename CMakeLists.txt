@@ -349,6 +349,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_debug_symtab.cpp
         tests/test_world_switch_guard.cpp
         tests/test_backref_ptr.cpp
+        tests/test_backref_owner.cpp
     )
     target_link_libraries(jplcz_structo_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)

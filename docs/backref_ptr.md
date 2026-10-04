@@ -149,5 +149,9 @@ a `Cell` lacking either is otherwise entirely unaffected.
 
 - [`structo::sync::lock_striping`](lock_striping.md) -- the shared
   table backing the `striped_*` cells.
+- [`structo::backref_owner`](backref_owner.md) -- the owner-side
+  registry that keeps a `backref_ptr` in lock-step with whatever
+  membership structure (tail queue, splay tree, ...) the owner keeps
+  its holders in, and clears every holder's pointer on owner teardown.
 - `reloco::guarded_mutex`/`reloco::rw_lock`/`reloco::guarded_seqlock` --
   the embedded-lock types the other cells compose.
