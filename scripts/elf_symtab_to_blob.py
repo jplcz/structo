@@ -18,6 +18,14 @@ dynamic-linker path, so keeping them here would just waste space); see
 change these defaults, and `--exclude-regex`/`--exclude-list` for
 additional, deliberate redaction.
 
+`--demangle` stores Itanium-ABI-demangled C++ names instead of raw
+mangled ones (via libstdc++'s `__cxa_demangle`, loaded at runtime
+through ctypes -- no extra dependency); demangled names are often much
+longer than their mangled form though (template instantiations
+especially), which just means more of them get clipped by
+`--max-name-len`, so `--demangle-if-shorter` keeps whichever spelling
+is no longer in bytes per symbol.
+
 Requires pyelftools (`pip install pyelftools`).
 
 Example:
@@ -31,6 +39,8 @@ Example:
 from __future__ import annotations
 
 import argparse
+import ctypes
+import ctypes.util
 import fnmatch
 import re
 import sys
@@ -54,6 +64,69 @@ DEFAULT_TRUNCATION_MARKER = ord("~")
 # Symbol types/visibilities that are never address-resolution-relevant,
 # regardless of any other flag.
 _NEVER_KEPT_TYPES = {"STT_NOTYPE", "STT_FILE", "STT_SECTION"}
+
+_demangle_lib: Optional[ctypes.CDLL] = None
+_demangle_lib_load_attempted = False
+
+
+def _load_demangle_lib() -> Optional[ctypes.CDLL]:
+    """Loads whichever Itanium-ABI-compatible C++ runtime
+    (`libstdc++`/`libc++abi`) exposes `__cxa_demangle`, caching the
+    result (including the "not found" case) across calls."""
+    global _demangle_lib, _demangle_lib_load_attempted
+    if _demangle_lib_load_attempted:
+        return _demangle_lib
+    _demangle_lib_load_attempted = True
+    candidates = [ctypes.util.find_library("stdc++"), ctypes.util.find_library("c++abi"),
+                  "libstdc++.so.6", "libc++abi.so.1"]
+    for name in candidates:
+        if not name:
+            continue
+        try:
+            lib = ctypes.CDLL(name)
+        except OSError:
+            continue
+        if hasattr(lib, "__cxa_demangle"):
+            lib.__cxa_demangle.restype = ctypes.c_void_p
+            lib.__cxa_demangle.argtypes = [ctypes.c_char_p, ctypes.c_void_p, ctypes.c_void_p,
+                                            ctypes.POINTER(ctypes.c_int)]
+            _demangle_lib = lib
+            break
+    return _demangle_lib
+
+
+def cxx_demangle(mangled: str) -> Optional[str]:
+    """Demangles an Itanium-ABI-mangled `mangled` name (e.g.
+    `_ZN3foo3barEv`) via `__cxa_demangle`, or returns `None` if no
+    demangler is available or `mangled` isn't valid mangled input (in
+    which case the caller should keep the original name)."""
+    lib = _load_demangle_lib()
+    if lib is None:
+        return None
+    status = ctypes.c_int(0)
+    result_ptr = lib.__cxa_demangle(mangled.encode("utf-8"), None, None, ctypes.byref(status))
+    if status.value != 0 or not result_ptr:
+        return None
+    try:
+        return ctypes.cast(result_ptr, ctypes.c_char_p).value.decode("utf-8", errors="replace")
+    finally:
+        ctypes.CDLL(None).free(result_ptr)
+
+
+def resolve_symbol_name(mangled: str, args: argparse.Namespace) -> tuple[str, bool]:
+    """Applies `--demangle`/`--demangle-if-shorter` to `mangled`,
+    falling back to `mangled` unchanged whenever demangling isn't
+    requested, unavailable, unsuccessful, or (with
+    `--demangle-if-shorter`) not actually shorter. Returns `(name,
+    was_demangled)`."""
+    if not args.demangle:
+        return mangled, False
+    demangled = cxx_demangle(mangled)
+    if demangled is None:
+        return mangled, False
+    if args.demangle_if_shorter and len(demangled.encode("utf-8")) > len(mangled.encode("utf-8")):
+        return mangled, False
+    return demangled, True
 
 
 @dataclass
@@ -124,7 +197,19 @@ def name_excluded(name: str, regexes: list["re.Pattern[str]"], list_patterns: li
     return False
 
 
-def collect_symbols(args: argparse.Namespace, elf: "ELFFile", verbose: bool) -> list[Symbol]:
+@dataclass
+class CollectStats:
+    using_dynsym_fallback: bool
+    dropped_local: int
+    dropped_hidden: int
+    dropped_dynamic: int
+    dropped_excluded: int
+    merged: int
+    demangled: int
+    demangler_available: bool
+
+
+def collect_symbols(args: argparse.Namespace, elf: "ELFFile", verbose: bool) -> tuple[list[Symbol], CollectStats]:
     symtab = elf.get_section_by_name(".symtab")
     using_dynsym_fallback = False
     if symtab is None:
@@ -136,6 +221,11 @@ def collect_symbols(args: argparse.Namespace, elf: "ELFFile", verbose: bool) -> 
               "-- far fewer symbols, but still useful", file=sys.stderr)
 
     dynsym_addrs: set[int] = set() if using_dynsym_fallback or args.keep_dynamic else read_dynsym_addresses(elf)
+
+    demangler_available = _load_demangle_lib() is not None
+    if args.demangle and not demangler_available:
+        print("warning: --demangle requested but no Itanium-ABI demangler (libstdc++/libc++abi) "
+              "could be loaded; keeping mangled names", file=sys.stderr)
 
     exclude_regexes = [re.compile(p) for p in args.exclude_regex]
     exclude_list_patterns = load_exclude_list(args.exclude_list) if args.exclude_list else []
@@ -152,6 +242,7 @@ def collect_symbols(args: argparse.Namespace, elf: "ELFFile", verbose: bool) -> 
     dropped_excluded = 0
     seen_addresses: dict[int, Symbol] = {}
     merged = 0
+    demangled_count = 0
 
     for sym in symtab.iter_symbols():
         entry = sym.entry
@@ -185,14 +276,22 @@ def collect_symbols(args: argparse.Namespace, elf: "ELFFile", verbose: bool) -> 
         if address in seen_addresses:
             merged += 1
             continue
-        seen_addresses[address] = Symbol(name=sym.name, address=address)
+        name, was_demangled = resolve_symbol_name(sym.name, args)
+        if was_demangled:
+            demangled_count += 1
+        seen_addresses[address] = Symbol(name=name, address=address)
+
+    stats = CollectStats(using_dynsym_fallback=using_dynsym_fallback, dropped_local=dropped_local,
+                          dropped_hidden=dropped_hidden, dropped_dynamic=dropped_dynamic,
+                          dropped_excluded=dropped_excluded, merged=merged, demangled=demangled_count,
+                          demangler_available=demangler_available)
 
     if verbose:
         print(f"verbose: kept {len(seen_addresses)} symbols; dropped {dropped_local} local, "
               f"{dropped_hidden} hidden-visibility, {dropped_dynamic} already-exported-dynamic, "
               f"{dropped_excluded} excluded, {merged} duplicate-address aliases", file=sys.stderr)
 
-    return sorted(seen_addresses.values(), key=lambda s: s.address)
+    return sorted(seen_addresses.values(), key=lambda s: s.address), stats
 
 
 def truncate_name(name: str, max_name_len: int, truncation_marker: int) -> bytes:
@@ -202,6 +301,11 @@ def truncate_name(name: str, max_name_len: int, truncation_marker: int) -> bytes
     truncated = bytearray(raw[:max_name_len])
     truncated[-1] = truncation_marker
     return bytes(truncated)
+
+
+def count_truncated(symbols: list[Symbol], max_name_len: int) -> int:
+    """Counts how many `symbols` have a name that `truncate_name()` will clip."""
+    return sum(1 for s in symbols if len(s.name.encode("utf-8", errors="replace")) > max_name_len)
 
 
 @dataclass
@@ -243,7 +347,8 @@ def encode_entries(symbols: list[Symbol], addr_width: int, group_size: int, max_
                         checkpoint_count=checkpoint_count)
 
 
-def build_blob(args: argparse.Namespace, symbols: list[Symbol], addr_width: int, build_id: bytes) -> bytes:
+def build_blob(args: argparse.Namespace, symbols: list[Symbol], addr_width: int,
+               build_id: bytes) -> tuple[bytes, EncodedBlob]:
     encoded = encode_entries(symbols, addr_width, args.group_size, args.max_name_len, args.truncation_marker)
 
     checkpoint_table_offset = HEADER_SIZE
@@ -272,7 +377,7 @@ def build_blob(args: argparse.Namespace, symbols: list[Symbol], addr_width: int,
     header[40:44] = crc.to_bytes(4, "little")
     header[44:48] = (0).to_bytes(4, "little")  # reserved3
 
-    return bytes(header) + payload
+    return bytes(header) + payload, encoded
 
 
 def format_c_array(blob: bytes, args: argparse.Namespace) -> str:
@@ -317,6 +422,78 @@ def format_c_array(blob: bytes, args: argparse.Namespace) -> str:
     return "\n".join(lines)
 
 
+def format_report(args: argparse.Namespace, input_path: str, symbols: list[Symbol], stats: CollectStats,
+                   blob: bytes, encoded: EncodedBlob, addr_width: int, build_id: bytes) -> str:
+    """Renders a human-readable Markdown summary of one `collect_symbols()`/`build_blob()` run,
+    for `--report` -- counts kept/dropped symbols and demangling/truncation/size statistics;
+    purely informational, not read back by the decoder."""
+    truncated = count_truncated(symbols, args.max_name_len)
+    total_scanned = (len(symbols) + stats.dropped_local + stats.dropped_hidden + stats.dropped_dynamic
+                     + stats.dropped_excluded + stats.merged)
+    payload_size = len(blob) - HEADER_SIZE
+    build_id_hex = build_id.hex() if build_id else "(none)"
+
+    lines: list[str] = []
+    lines.append(f"# DSYM build report: `{Path(input_path).name}`")
+    lines.append("")
+    lines.append(f"- **Source ELF**: `{input_path}`")
+    lines.append(f"- **Build ID**: `{build_id_hex}`")
+    lines.append(f"- **Address width**: {addr_width * 8}-bit")
+    lines.append(f"- **Symbol source**: {'`.dynsym` (fallback, `.symtab` absent)' if stats.using_dynsym_fallback else '`.symtab`'}")
+    lines.append(f"- **Output format**: `{args.format}`")
+    lines.append("")
+
+    lines.append("## Symbol counts")
+    lines.append("")
+    lines.append("| Category | Count |")
+    lines.append("| --- | --- |")
+    lines.append(f"| Scanned (address-bearing, matching `--include-objects`) | {total_scanned} |")
+    lines.append(f"| **Kept** | **{len(symbols)}** |")
+    lines.append(f"| Dropped: local (`--drop-local`) | {stats.dropped_local} |")
+    lines.append(f"| Dropped: hidden visibility (`--drop-hidden-visibility`) | {stats.dropped_hidden} |")
+    lines.append(f"| Dropped: already in `.dynsym` | {stats.dropped_dynamic} |")
+    lines.append(f"| Dropped: excluded (`--exclude-regex`/`--exclude-list`) | {stats.dropped_excluded} |")
+    lines.append(f"| Merged: duplicate-address aliases | {stats.merged} |")
+    lines.append("")
+
+    if args.demangle:
+        lines.append("## Demangling")
+        lines.append("")
+        lines.append(f"- **Demangler available**: {'yes' if stats.demangler_available else 'no'}")
+        lines.append(f"- **Demangled**: {stats.demangled} / {len(symbols)} kept symbols")
+        if args.demangle_if_shorter:
+            lines.append("- **`--demangle-if-shorter`**: kept the mangled spelling whenever the "
+                          "demangled one was longer")
+        lines.append("")
+
+    lines.append("## Name truncation")
+    lines.append("")
+    lines.append(f"- **`--max-name-len`**: {args.max_name_len} bytes")
+    if symbols:
+        lines.append(f"- **Truncated**: {truncated} / {len(symbols)} kept symbols "
+                      f"({100.0 * truncated / len(symbols):.1f}%)")
+    else:
+        lines.append("- **Truncated**: 0 / 0 kept symbols")
+    lines.append("")
+
+    lines.append("## Blob size")
+    lines.append("")
+    lines.append("| Section | Bytes |")
+    lines.append("| --- | --- |")
+    lines.append(f"| Header | {HEADER_SIZE} |")
+    lines.append(f"| Checkpoint table ({encoded.checkpoint_count} checkpoints, "
+                 f"`--group-size {args.group_size}`) | {len(encoded.checkpoint_table)} |")
+    lines.append(f"| Build ID | {len(build_id)} |")
+    lines.append(f"| Entry stream | {len(encoded.entry_stream)} |")
+    lines.append(f"| **Total payload** | **{payload_size}** |")
+    lines.append(f"| **Total blob** | **{len(blob)}** |")
+    if symbols:
+        lines.append(f"| Average bytes/symbol | {len(blob) / len(symbols):.1f} |")
+    lines.append("")
+
+    return "\n".join(lines)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Build a compressed DSYM debug symbol table blob from an ELF's .symtab.",
@@ -345,17 +522,36 @@ def main() -> int:
                               "(default: dropped, since those resolve via the dynamic linker "
                               "already)")
     parser.add_argument("--exclude-regex", action="append", default=[],
-                         help="Regex (repeatable) matching symbol names to drop")
+                         help="Regex (repeatable) matching symbol names to drop (matched "
+                              "against the raw mangled name, regardless of --demangle)")
     parser.add_argument("--exclude-list", default=None,
-                         help="File with one exact name or 'glob:'-prefixed pattern per line to drop")
+                         help="File with one exact name or 'glob:'-prefixed pattern per line to drop "
+                              "(matched against the raw mangled name, regardless of --demangle)")
+    parser.add_argument("--demangle", action="store_true",
+                         help="Store Itanium-ABI-demangled C++ names instead of raw mangled ones "
+                              "(via libstdc++/libc++abi's __cxa_demangle, loaded at runtime); "
+                              "falls back to the mangled name per-symbol if no demangler is "
+                              "available or demangling that symbol fails")
+    parser.add_argument("--demangle-if-shorter", action="store_true",
+                         help="With --demangle, only use the demangled spelling when it is no "
+                              "longer in bytes than the mangled one -- demangled C++ names "
+                              "(especially templates) are often much longer and would just get "
+                              "clipped more by --max-name-len; implies --demangle")
     parser.add_argument("--format", choices=["bin", "c-array"], default="bin",
                          help="Output format; default bin")
     parser.add_argument("--array-name", default="g_debug_symtab_blob",
                          help="Array name for --format c-array; default g_debug_symtab_blob")
     parser.add_argument("--namespace", default="",
                          help="'::'-separated namespace to wrap the array in for --format c-array")
+    parser.add_argument("--report", default=None,
+                         help="Path to write a human-readable Markdown build report to (symbol "
+                              "counts, drop/demangle/truncation stats, blob size breakdown); "
+                              "not required to decode the blob, purely informational")
     parser.add_argument("--verbose", action="store_true", help="Print filtering/dedup statistics")
     args = parser.parse_args()
+
+    if args.demangle_if_shorter:
+        args.demangle = True
 
     if not (1 <= args.max_name_len <= MAX_NAME_LEN_LIMIT):
         parser.error(f"--max-name-len must be between 1 and {MAX_NAME_LEN_LIMIT}")
@@ -370,12 +566,12 @@ def main() -> int:
         elf = ELFFile(f)
         addr_width = 8 if elf.elfclass == 64 else 4
         build_id = read_build_id(elf)
-        symbols = collect_symbols(args, elf, args.verbose)
+        symbols, stats = collect_symbols(args, elf, args.verbose)
 
     if not symbols:
         print("warning: no symbols survived filtering; blob will be empty", file=sys.stderr)
 
-    blob = build_blob(args, symbols, addr_width, build_id)
+    blob, encoded = build_blob(args, symbols, addr_width, build_id)
 
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -383,6 +579,13 @@ def main() -> int:
         output_path.write_text(format_c_array(blob, args), encoding="utf-8")
     else:
         output_path.write_bytes(blob)
+
+    if args.report:
+        report_path = Path(args.report)
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            format_report(args, args.input, symbols, stats, blob, encoded, addr_width, build_id), encoding="utf-8")
+        print(f"wrote {report_path}")
 
     print(f"wrote {output_path} ({len(symbols)} symbols, {len(blob)} bytes, addr_width={addr_width})")
     return 0
