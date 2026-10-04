@@ -703,6 +703,20 @@ struct elr_el12 {
 #endif // defined(__aarch64__)
 };
 
+/** @brief Raw accessor for the `SP_EL1` AArch64 system register (no named fields yet). */
+struct sp_el1 {
+  std::uint64_t raw{0};
+
+#if defined(__aarch64__)
+  [[nodiscard]] static sp_el1 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mrs %0, S3_4_C4_C1_0" : "=r"(value));
+    return sp_el1{value};
+  }
+  void write() const noexcept { asm volatile("msr S3_4_C4_C1_0, %0" ::"r"(raw) : "memory"); }
+#endif // defined(__aarch64__)
+};
+
 /** @brief Raw accessor for the `ESR_EL1` AArch64 system register (no named fields yet). */
 struct esr_el1 {
   std::uint64_t raw{0};

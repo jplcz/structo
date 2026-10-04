@@ -639,6 +639,19 @@ registers:
     crm: 0
     op2: 1
   fields: []
+- name: sp_el1
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 4
+    crn: 4
+    crm: 1
+    op2: 0
+  fields: []
 - name: esr_el1
   width: 64
   access:

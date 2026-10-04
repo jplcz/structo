@@ -7,24 +7,34 @@
  * @brief AArch64 hypervisor VM system-register sets: the system
  * registers a type-2 hypervisor must save on VM exit and restore before
  * VM entry so a guest's EL1/EL0 view of the machine survives across a
- * trap to EL2 -- *system registers only*, never general-purpose
- * registers (`X0`-`X30`, `SP_EL0`/`SP_EL1`, `PC`), which live in the
- * trap frame built by the exception vector, not here.
+ * trap to EL2. *System registers only* -- `X0`-`X30`, `SP_EL0`, and
+ * `PC` live in the GPR trap frame built by the exception vector, not
+ * here, but `SP_EL1` is **not** part of that trap frame: it is its own
+ * named EL2-accessible system register (`MRS`/`MSR <Rd>, SP_EL1`, only
+ * encodable with `op1=4`, i.e. from EL2 or higher), so it needs the
+ * same explicit `read()`/`write()` treatment as every other member
+ * below, not a GPR-frame copy.
  *
  * Three groups, each a flat struct of `sysreg_raw::*` members plus
  * `save()`/`restore()`:
  *
  * - `vm_guest_el1_state`: the guest's own EL1/EL0 control state
- *   (`SCTLR_EL1`, `TTBR0_EL1`/`TTBR1_EL1`, `TCR_EL1`, `MAIR_EL1`, ...) --
- *   banked per `vttbr_el2`/VMID by the MMU hardware itself, but still
- *   software-visible as ordinary EL1 registers that must be swapped
- *   when switching which guest (or the host) is scheduled at EL1.
+ *   (`SCTLR_EL1`, `TTBR0_EL1`/`TTBR1_EL1`, `TCR_EL1`, `MAIR_EL1`,
+ *   `SP_EL1`, ...) -- banked per `vttbr_el2`/VMID by the MMU hardware
+ *   itself, but still software-visible as ordinary EL1 registers that
+ *   must be swapped when switching which guest (or the host) is
+ *   scheduled at EL1.
  * - `vm_hyp_el2_state`: the hypervisor's own EL2 virtualization-control
  *   state for this VM (`HCR_EL2`, `VTTBR_EL2`, `VTCR_EL2`, `CPTR_EL2`,
  *   ...) -- not banked by hardware, so the hypervisor must track one
  *   copy per VM itself and reload it on every world switch.
  * - `vm_sysreg_state`: both of the above together, the full per-VM
  *   sysreg set a VM-exit/VM-entry path saves/restores as a unit.
+ * - `vcpu_sysreg_traits`: a `structo::hypervisor::vcpu_entry_guard<Traits>`
+ *   (and `structo::arch::world_switch_guard<Traits>`) policy wrapping
+ *   `vm_sysreg_state` as a single register group, so a vCPU's full
+ *   EL1/EL2 sysreg set can be entered/exited with one guard instead of
+ *   hand-calling `save()`/`restore()`.
  *
  * Only compiled on a real AArch64 target (`__aarch64__`); on every
  * other host this header is an intentional no-op so it stays
@@ -87,6 +97,7 @@ struct vm_guest_el1_state {
   sysreg_raw::cntp_ctl_el0 cntp_ctl_el0{};
   sysreg_raw::tpidr_el0 tpidr_el0{};
   sysreg_raw::tpidr_el1 tpidr_el1{};
+  sysreg_raw::sp_el1 sp_el1{};
 
   /** @brief Read every member register's current value. */
   [[nodiscard]] static vm_guest_el1_state save() noexcept {
@@ -117,6 +128,7 @@ struct vm_guest_el1_state {
     s.cntp_ctl_el0 = sysreg_raw::cntp_ctl_el0::read();
     s.tpidr_el0 = sysreg_raw::tpidr_el0::read();
     s.tpidr_el1 = sysreg_raw::tpidr_el1::read();
+    s.sp_el1 = sysreg_raw::sp_el1::read();
     return s;
   }
 
@@ -148,6 +160,7 @@ struct vm_guest_el1_state {
     cntp_ctl_el0.write();
     tpidr_el0.write();
     tpidr_el1.write();
+    sp_el1.write();
   }
 };
 
@@ -215,6 +228,20 @@ struct vm_sysreg_state {
     el1.restore();
     el2.restore();
   }
+};
+
+/**
+ * @brief `structo::hypervisor::vcpu_entry_guard<Traits>` (and
+ * `structo::arch::world_switch_guard<Traits>`) policy wrapping
+ * `vm_sysreg_state` as a single register group: this vCPU's full
+ * EL1/EL2 sysreg set, saved/restored as one unit.
+ */
+struct vcpu_sysreg_traits {
+  using state_type = vm_sysreg_state;
+
+  [[nodiscard]] static state_type save() noexcept { return state_type::save(); }
+
+  static void restore(const state_type &state) noexcept { state.restore(); }
 };
 
 } // namespace structo::arch::arm64
