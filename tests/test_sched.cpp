@@ -79,6 +79,30 @@ TEST_F(NoopSchedTest, IsLinkedAndRemove) {
   EXPECT_TRUE(noop::empty());
 }
 
+TEST_F(NoopSchedTest, UniformInterfaceMethodsAllBehaveAsEnqueue) {
+  noop_task a{{}, 1};
+  noop_task b{{}, 2};
+  noop::enqueue(a);
+  noop_task *dispatched = noop::pick_next();
+  ASSERT_EQ(dispatched, &a);
+  noop::on_block(*dispatched); // no-op: already removed from the queue
+  EXPECT_FALSE(noop::is_linked(a));
+  noop::on_wake(*dispatched); // becomes runnable again, same as enqueue
+  EXPECT_TRUE(noop::is_linked(a));
+
+  dispatched = noop::pick_next();
+  ASSERT_EQ(dispatched, &a);
+  noop::enqueue(b);
+  noop::requeue(*dispatched); // quantum expired while still runnable -- back to the tail
+  EXPECT_EQ(noop::pick_next()->id, 2);
+  EXPECT_EQ(noop::pick_next()->id, 1);
+
+  noop::enqueue(a);
+  dispatched = noop::pick_next();
+  noop::on_yield(*dispatched); // voluntary yield -- same as requeue for this policy
+  EXPECT_TRUE(noop::is_linked(a));
+}
+
 // --------------------------------------------------------------------
 // fixed_priority_sched
 // --------------------------------------------------------------------
@@ -153,6 +177,21 @@ TEST_F(FixedPrioritySchedTest, IsLinkedAndRemove) {
   EXPECT_FALSE(fixed::is_linked(a));
 }
 
+TEST_F(FixedPrioritySchedTest, UniformInterfaceMethodsAllBehaveAsEnqueue) {
+  fixed_task a{{}, 2, 1};
+  fixed::enqueue(a);
+  fixed_task *dispatched = fixed::pick_next();
+  ASSERT_EQ(dispatched, &a);
+  fixed::on_block(*dispatched); // no-op: already removed from the queue
+  EXPECT_FALSE(fixed::is_linked(a));
+  fixed::on_wake(*dispatched); // becomes runnable again, same as enqueue
+  EXPECT_TRUE(fixed::is_linked(a));
+
+  dispatched = fixed::pick_next();
+  fixed::on_yield(*dispatched); // voluntary yield -- same as requeue for this policy
+  EXPECT_TRUE(fixed::is_linked(a));
+}
+
 // --------------------------------------------------------------------
 // edf_sched
 // --------------------------------------------------------------------
@@ -214,6 +253,21 @@ TEST_F(EdfSchedTest, IsLinkedAndRemove) {
   EXPECT_TRUE(edf::is_linked(a));
   edf::remove(a);
   EXPECT_FALSE(edf::is_linked(a));
+}
+
+TEST_F(EdfSchedTest, UniformInterfaceMethodsAllBehaveAsEnqueue) {
+  edf_task a{{}, at(10), 1};
+  edf::enqueue(a);
+  edf_task *dispatched = edf::pick_next();
+  ASSERT_EQ(dispatched, &a);
+  edf::on_block(*dispatched); // no-op: already removed from the queue
+  EXPECT_FALSE(edf::is_linked(a));
+  edf::on_wake(*dispatched); // becomes runnable again, same as enqueue
+  EXPECT_TRUE(edf::is_linked(a));
+
+  dispatched = edf::pick_next();
+  edf::requeue(*dispatched); // quantum expired while still runnable
+  EXPECT_TRUE(edf::is_linked(a));
 }
 
 // --------------------------------------------------------------------
@@ -284,6 +338,16 @@ TEST_F(SchedUleTest, RemoveWorksFromEitherQueue) {
   ule::remove(a);
   EXPECT_FALSE(ule::is_linked(a));
   EXPECT_TRUE(ule::empty());
+}
+
+TEST_F(SchedUleTest, RequeueIsSameOperationAsOnYield) {
+  ule_task a{{}, 0, {}, 1};
+  ule::enqueue(a, at(0));
+  ule_task *dispatched = ule::pick_next(at(1));
+  ASSERT_EQ(dispatched, &a);
+  ule::requeue(*dispatched, at(5000)); // quantum expired while still runnable
+  EXPECT_TRUE(ule::is_linked(a));
+  EXPECT_EQ(ule::size(), 1u);
 }
 
 // --------------------------------------------------------------------
@@ -366,6 +430,15 @@ TEST_F(Sched4BsdTest, IsLinkedAndRemove) {
   EXPECT_TRUE(bsd::is_linked(a));
   bsd::remove(a);
   EXPECT_FALSE(bsd::is_linked(a));
+}
+
+TEST_F(Sched4BsdTest, RequeueIsSameOperationAsOnYield) {
+  bsd_task a{{}, 0, {}, 1};
+  bsd::enqueue(a, at(0));
+  bsd_task *dispatched = bsd::pick_next(at(0));
+  ASSERT_EQ(dispatched, &a);
+  bsd::requeue(*dispatched, at(5000)); // quantum expired while still runnable
+  EXPECT_TRUE(bsd::is_linked(a));
 }
 
 } // namespace

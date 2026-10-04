@@ -31,6 +31,32 @@
  * round-robin quantum boundary, a sleep timeout), never a fixed-period
  * heartbeat.
  *
+ * ## One uniform interface across all five, so they're interchangeable
+ *
+ * Every policy exposes the exact same nine method names and signatures
+ * -- `enqueue(entry, now)`, `pick_next(now)`, `on_yield(entry, now)`,
+ * `on_block(entry, now)`, `on_wake(entry, now)`, `requeue(entry, now)`,
+ * `remove(entry)`, `is_linked(entry)`, `empty()`, `size()` -- so
+ * generic/templated caller code (a test harness driving "whichever
+ * policy this instantiation picked" through one fixed call sequence, in
+ * particular) never has to branch on *which* of the five is bound.
+ * `noop_sched`/`fixed_priority_sched`/`edf_sched` accept @p now as a
+ * defaulted, unused parameter on every method that takes it (they have
+ * no clock/duration logic of their own) purely for this signature
+ * parity -- it's `[[maybe_unused]]`/discarded, never read. Where a
+ * policy has nothing extra to compute for an operation (e.g. `on_block`
+ * for the three clock-free policies: `pick_next` already removed the
+ * entry from the queue, so there's nothing to track until the matching
+ * `on_wake`/`enqueue`), that method is a documented no-op or a plain
+ * alias for whichever other method does the equivalent work (e.g.
+ * `requeue` for `sched_ule`/`sched_4bsd` is exactly `on_yield`: both
+ * mean "this still-runnable entry needs to be re-scored and put back",
+ * whether that happened voluntarily or because a round-robin quantum
+ * expired). `sched_4bsd::set_nice` is the one deliberate exception to
+ * full parity -- no other policy has any notion of a caller-adjustable
+ * "niceness", so faking a no-op `set_nice` elsewhere would silently
+ * discard a caller's intent rather than genuinely support it.
+ *
  * ## `Entry` owns its own per-task scheduling state
  *
  * Exactly like `runqueue.hpp`, these policies are intrusive and
@@ -198,11 +224,38 @@ template <typename Entry, auto Hook, typename PerCpu> class noop_sched {
 public:
   using state_type = noop_sched_state<Entry, Hook>;
 
-  /** @brief Makes @p entry runnable, at the tail of the queue. O(1). */
-  static void enqueue(Entry &entry) noexcept { PerCpu::get()->enqueue(entry); }
+  /** @brief Makes @p entry runnable, at the tail of the queue. O(1). @p now is accepted but unused -- this
+   * policy has no clock/duration logic of its own -- purely so generic caller code can drive any of this
+   * header's five policies through one uniform `enqueue(entry, now)` call site; see the file-level "Common
+   * operations" section. */
+  static void enqueue(Entry &entry, instant now = instant{}) noexcept {
+    (void)now;
+    PerCpu::get()->enqueue(entry);
+  }
 
-  /** @brief Selects and removes the next task to run, or `nullptr` if none is runnable. O(1). */
-  static Entry *pick_next() noexcept { return PerCpu::get()->dequeue(); }
+  /** @brief Selects and removes the next task to run, or `nullptr` if none is runnable. O(1). @p now is accepted
+   * but unused; see `enqueue`'s doc. */
+  static Entry *pick_next(instant now = instant{}) noexcept {
+    (void)now;
+    return PerCpu::get()->dequeue();
+  }
+
+  /** @brief A dispatched @p entry voluntarily gives up the CPU but stays runnable; re-enqueues it at the tail,
+   * same as `enqueue` -- this policy has no interactivity/decay state to recompute. O(1). */
+  static void on_yield(Entry &entry, instant now = instant{}) noexcept { enqueue(entry, now); }
+
+  /** @brief A dispatched @p entry blocks (becomes non-runnable); no-op -- `pick_next` already removed it from the
+   * queue, and this policy has nothing else to track until `on_wake`/`enqueue`. O(1). */
+  static void on_block(Entry & /*entry*/, instant /*now*/ = instant{}) noexcept {}
+
+  /** @brief A previously-`on_block`ed @p entry becomes runnable again; re-enqueues it at the tail, same as
+   * `enqueue`. O(1). */
+  static void on_wake(Entry &entry, instant now = instant{}) noexcept { enqueue(entry, now); }
+
+  /** @brief Re-enqueues a just-dispatched @p entry at the tail -- call this (instead of leaving it dispatched)
+   * when a caller-armed, tickless round-robin quantum timer fires while @p entry is still runnable. Same as
+   * `enqueue`: this policy has nothing extra to recompute on quantum expiry. O(1). */
+  static void requeue(Entry &entry, instant now = instant{}) noexcept { enqueue(entry, now); }
 
   /** @brief Removes @p entry. O(1). Precondition: `is_linked(entry)`. */
   static void remove(Entry &entry) noexcept { PerCpu::get()->remove(entry); }
@@ -243,19 +296,41 @@ class fixed_priority_sched {
 public:
   using state_type = fixed_priority_sched_state<Entry, Hook, Priority, NumPriorities>;
 
-  /** @brief Makes @p entry runnable, at the tail of its `Entry.*Priority` bucket. O(1). */
-  static void enqueue(Entry &entry) noexcept { PerCpu::get()->enqueue(entry); }
+  /** @brief Makes @p entry runnable, at the tail of its `Entry.*Priority` bucket. O(1). @p now is accepted but
+   * unused -- this policy has no clock/duration logic of its own -- purely so generic caller code can drive any
+   * of this header's five policies through one uniform `enqueue(entry, now)` call site; see the file-level
+   * "Common operations" section. */
+  static void enqueue(Entry &entry, instant now = instant{}) noexcept {
+    (void)now;
+    PerCpu::get()->enqueue(entry);
+  }
 
-  /** @brief Selects and removes the highest-priority runnable task, or `nullptr`. O(1). */
-  static Entry *pick_next() noexcept { return PerCpu::get()->dequeue(); }
+  /** @brief Selects and removes the highest-priority runnable task, or `nullptr`. O(1). @p now is accepted but
+   * unused; see `enqueue`'s doc. */
+  static Entry *pick_next(instant now = instant{}) noexcept {
+    (void)now;
+    return PerCpu::get()->dequeue();
+  }
 
   /**
    * @brief Re-enqueues a just-dispatched @p entry at the tail of its own
    * bucket -- call this (instead of leaving it dispatched) when a
    * caller-armed, tickless round-robin quantum timer fires while
    * @p entry is still runnable, for `SCHED_RR`-like behavior. O(1).
+   * @p now is accepted but unused; see `enqueue`'s doc.
    */
-  static void requeue(Entry &entry) noexcept { PerCpu::get()->enqueue(entry); }
+  static void requeue(Entry &entry, instant now = instant{}) noexcept { enqueue(entry, now); }
+
+  /** @brief A dispatched @p entry voluntarily gives up the CPU but stays runnable; same as `requeue` -- this
+   * policy has no interactivity/decay state to recompute. O(1). */
+  static void on_yield(Entry &entry, instant now = instant{}) noexcept { requeue(entry, now); }
+
+  /** @brief A dispatched @p entry blocks (becomes non-runnable); no-op -- `pick_next` already removed it from the
+   * queue, and this policy has nothing else to track until `on_wake`/`enqueue`. O(1). */
+  static void on_block(Entry & /*entry*/, instant /*now*/ = instant{}) noexcept {}
+
+  /** @brief A previously-`on_block`ed @p entry becomes runnable again; same as `enqueue`. O(1). */
+  static void on_wake(Entry &entry, instant now = instant{}) noexcept { enqueue(entry, now); }
 
   /** @brief Removes @p entry. O(1). Precondition: `is_linked(entry)`. */
   static void remove(Entry &entry) noexcept { PerCpu::get()->remove(entry); }
@@ -298,11 +373,36 @@ template <typename Entry, auto Hook, auto Deadline, typename PerCpu> class edf_s
 public:
   using state_type = edf_sched_state<Entry, Hook, Deadline>;
 
-  /** @brief Makes @p entry runnable, inserted in `Entry.*Deadline` order. O(n). */
-  static void enqueue(Entry &entry) noexcept { PerCpu::get()->enqueue(entry); }
+  /** @brief Makes @p entry runnable, inserted in `Entry.*Deadline` order. O(n). @p now is accepted but unused --
+   * this policy never reads a clock, only compares already-computed deadlines -- purely so generic caller code
+   * can drive any of this header's five policies through one uniform `enqueue(entry, now)` call site; see the
+   * file-level "Common operations" section. */
+  static void enqueue(Entry &entry, instant now = instant{}) noexcept {
+    (void)now;
+    PerCpu::get()->enqueue(entry);
+  }
 
-  /** @brief Selects and removes the task with the soonest deadline, or `nullptr` if none is runnable. O(1). */
-  static Entry *pick_next() noexcept { return PerCpu::get()->dequeue(); }
+  /** @brief Selects and removes the task with the soonest deadline, or `nullptr` if none is runnable. O(1).
+   * @p now is accepted but unused; see `enqueue`'s doc. */
+  static Entry *pick_next(instant now = instant{}) noexcept {
+    (void)now;
+    return PerCpu::get()->dequeue();
+  }
+
+  /** @brief Re-inserts a just-dispatched @p entry in `Entry.*Deadline` order -- call this (instead of leaving it
+   * dispatched) when @p entry is still runnable after being dispatched (e.g. a cooperative yield). Same as
+   * `enqueue`: this policy has nothing extra to recompute. O(n). */
+  static void requeue(Entry &entry, instant now = instant{}) noexcept { enqueue(entry, now); }
+
+  /** @brief A dispatched @p entry voluntarily gives up the CPU but stays runnable; same as `requeue`. O(n). */
+  static void on_yield(Entry &entry, instant now = instant{}) noexcept { requeue(entry, now); }
+
+  /** @brief A dispatched @p entry blocks (becomes non-runnable); no-op -- `pick_next` already removed it from the
+   * queue, and this policy has nothing else to track until `on_wake`/`enqueue`. O(1). */
+  static void on_block(Entry & /*entry*/, instant /*now*/ = instant{}) noexcept {}
+
+  /** @brief A previously-`on_block`ed @p entry becomes runnable again; same as `enqueue`. O(n). */
+  static void on_wake(Entry &entry, instant now = instant{}) noexcept { enqueue(entry, now); }
 
   /** @brief Removes @p entry. O(1). Precondition: `is_linked(entry)`. */
   static void remove(Entry &entry) noexcept { PerCpu::get()->remove(entry); }
@@ -408,6 +508,11 @@ public:
     accumulate_run(entry, now);
     requeue_after_run(entry);
   }
+
+  /** @brief Re-scores and requeues a just-dispatched @p entry that's still runnable -- call this (instead of
+   * leaving it dispatched) when a caller-armed, tickless round-robin quantum timer fires. Same operation as
+   * `on_yield`: this policy always re-scores on every return-to-runnable transition, voluntary or not. O(1). */
+  static void requeue(Entry &entry, instant now) noexcept { on_yield(entry, now); }
 
   /** @brief A dispatched @p entry blocks (becomes non-runnable); not requeued until `on_wake`. O(1). */
   static void on_block(Entry &entry, instant now) noexcept {
@@ -572,6 +677,11 @@ public:
     recompute_priority(entry);
     PerCpu::get()->enqueue(entry);
   }
+
+  /** @brief Re-scores and requeues a just-dispatched @p entry that's still runnable -- call this (instead of
+   * leaving it dispatched) when a caller-armed, tickless round-robin quantum timer fires. Same operation as
+   * `on_yield`: this policy always re-scores on every return-to-runnable transition, voluntary or not. O(1). */
+  static void requeue(Entry &entry, instant now) noexcept { on_yield(entry, now); }
 
   /** @brief A dispatched @p entry blocks (becomes non-runnable); not requeued until `on_wake`. O(1). */
   static void on_block(Entry &entry, instant now) noexcept { accumulate_runtime(entry, now); }

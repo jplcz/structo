@@ -31,6 +31,32 @@ at all: round-robin quantum expiry is pushed entirely to the caller
 (arm a one-shot [`structo::callout`](callout.md) for `now + quantum`,
 call `requeue()` if it fires while the task is still runnable).
 
+## One uniform interface across all five, so they're interchangeable
+
+Every policy exposes the exact same nine method names and signatures --
+`enqueue(entry, now)`, `pick_next(now)`, `on_yield(entry, now)`,
+`on_block(entry, now)`, `on_wake(entry, now)`, `requeue(entry, now)`,
+`remove(entry)`, `is_linked(entry)`, `empty()`, `size()` -- so
+generic/templated caller code (a test harness driving "whichever policy
+this instantiation picked" through one fixed call sequence, in
+particular) never has to branch on *which* of the five is bound.
+`noop_sched`/`fixed_priority_sched`/`edf_sched` accept `now` as a
+defaulted, unused parameter on every method that takes it (they have no
+clock/duration logic of their own) purely for this signature parity --
+it's discarded, never read. Where a policy has nothing extra to compute
+for an operation (e.g. `on_block` for the three clock-free policies:
+`pick_next` already removed the entry from the queue, so there's
+nothing to track until the matching `on_wake`/`enqueue`), that method is
+a documented no-op or a plain alias for whichever other method does the
+equivalent work (e.g. `requeue` for `sched_ule`/`sched_4bsd` is exactly
+`on_yield`: both mean "this still-runnable entry needs to be re-scored
+and put back", whether that happened voluntarily or because a
+round-robin quantum expired). `sched_4bsd::set_nice` is the one
+deliberate exception to full parity -- no other policy has any notion
+of a caller-adjustable "niceness", so faking a no-op `set_nice`
+elsewhere would silently discard a caller's intent rather than
+genuinely support it.
+
 ## `Entry` owns its own per-task scheduling state
 
 Like `runqueue.hpp`, these policies are intrusive and non-owning:
@@ -191,19 +217,28 @@ priority-inversion/priority-propagation handling.
 
 ## Operations shared by all five
 
-- `enqueue(entry[, now])` -- makes `entry` runnable; `sched_ule`/
-  `sched_4bsd` take an explicit `instant now`.
-- `pick_next([now])` -- selects and removes the next task to run, or
+- `enqueue(entry, now)` -- makes `entry` runnable. `now` is accepted but
+  unused by `noop_sched`/`fixed_priority_sched`/`edf_sched` (defaulted,
+  for signature parity -- see "One uniform interface" above).
+- `pick_next(now)` -- selects and removes the next task to run, or
   `nullptr` if none is runnable.
+- `on_yield(entry, now)` -- a dispatched `entry` voluntarily gives up
+  the CPU but stays runnable.
+- `on_block(entry, now)` -- a dispatched `entry` blocks (becomes
+  non-runnable); no-op for the three clock-free policies.
+- `on_wake(entry, now)` -- a previously-`on_block`ed `entry` becomes
+  runnable again.
+- `requeue(entry, now)` -- re-enqueues a just-dispatched `entry` that's
+  still runnable, for round-robin-style quantum expiry (same operation
+  as `on_yield` for `sched_ule`/`sched_4bsd`).
 - `remove(entry)` -- removes `entry`. Precondition: `is_linked(entry)`.
 - `is_linked(entry)` -- O(1), whether `entry` is currently enqueued (on
   any CPU).
 - `empty()`, `size()`.
 
-`fixed_priority_sched` additionally has `requeue(entry)`; `sched_ule`/
-`sched_4bsd` additionally have `on_yield(entry, now)`/
-`on_block(entry, now)`/`on_wake(entry, now)` (see above); `sched_4bsd`
-additionally has `set_nice(entry, nice)`.
+`sched_4bsd` additionally has `set_nice(entry, nice)` -- the one
+operation with no equivalent on the other four, since none of them have
+any notion of caller-adjustable "niceness".
 
 See [`runqueue.md`](runqueue.md) for the three underlying runqueue
 policies these schedulers are built on, [`callout.md`](callout.md) for
