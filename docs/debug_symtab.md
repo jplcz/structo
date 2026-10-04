@@ -9,7 +9,7 @@ SPDX-License-Identifier: BSD-2-Clause
 `include/structo/debug_symtab.hpp`, `include/structo/debug_symtab_resolver.hpp`
 
 An allocation-free, read-only decoder for the compressed `DSYM`
-(`"DSY1"`) debug symbol table blob format -- see
+(`"DSY2"`) debug symbol table blob format -- see
 [`debug_symtab_format.md`](debug_symtab_format.md) for the full binary
 format specification this header implements, and
 `scripts/elf_symtab_to_blob.py` for the offline encoder that builds

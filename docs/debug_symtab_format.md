@@ -81,7 +81,13 @@ format's own space-saving knobs:
   LEB128**-encoded addresses and intra-group name de-duplication, decoded
   through a sparse **checkpoint table** so a lookup never has to decode
   the whole blob -- only one bounded-size group.
-* Fixed 48-byte header, little-endian regardless of host/target
+* Name bytes are additionally **Huffman-coded**, with a small canonical
+  decode table built from -- and embedded alongside -- the *same blob's*
+  own (already-truncated) kept symbol names, so the code is always a
+  good fit for this blob's alphabet with no corpus-mismatch risk and no
+  separate decoder-side table to keep in sync (see [Name
+  records](#name-records)).
+* Fixed 56-byte header, little-endian regardless of host/target
   endianness (the decoder always byte-swaps; this matches "blob built on
   a dev machine, loaded on a possibly different-endian target").
 * A copied GNU build-ID lets the decoder confirm, before trusting any
@@ -100,7 +106,11 @@ format's own space-saving knobs:
 
 ```
 +-------------------------------+  offset 0
-| header (48 bytes, fixed)      |
+| header (56 bytes, fixed)      |
++-------------------------------+  header.huffman_table_offset (if huffman_symbol_count > 0)
+| Huffman decode table           |
+| (header.huffman_table_size     |
+|  bytes)                        |
 +-------------------------------+  header.build_id_offset (if present)
 | build-ID bytes                 |
 | (header.build_id_size bytes)   |
@@ -115,19 +125,20 @@ format's own space-saving knobs:
 +-------------------------------+  end of blob
 ```
 
-All three regions are placed by the encoder (default: build-ID bytes,
-then the checkpoint table, then the entry stream, each immediately after
-the previous one), but the decoder always follows the header's offset
-fields rather than assuming adjacency, so an embedder is free to place
-additional, decoder-opaque data between or around them.
+All four regions are placed by the encoder (default: the Huffman decode
+table, then build-ID bytes, then the checkpoint table, then the entry
+stream, each immediately after the previous one), but the decoder always
+follows the header's offset fields rather than assuming adjacency, so an
+embedder is free to place additional, decoder-opaque data between or
+around them.
 
-### Header (48 bytes)
+### Header (56 bytes)
 
 All multi-byte fields are little-endian.
 
 | Offset | Size | Field | Description |
 |---|---|---|---|
-| 0 | 4 | `magic` | ASCII `"DSY1"` (`0x31595344` as a little-endian `uint32_t`load) -- identifies the format *and* version 1 in one check; a future incompatible version 2 would use `"DSY2"` rather than bumping a separate version field, so an old decoder's magic check rejects it instead of silently misreading it. |
+| 0 | 4 | `magic` | ASCII `"DSY2"` (`0x32595344` as a little-endian `uint32_t`load) -- identifies the format *and* version 2 in one check; version 1 (`"DSY1"`, uncompressed raw name bytes) is superseded by this Huffman-coded format, not kept as a parallel decode path, so an old (v1-only) decoder's magic check rejects a v2 blob outright instead of silently misreading it. |
 | 4 | 1 | `addr_width` | `4` or `8` -- bytes per address field, auto-detected from the source ELF's class. |
 | 5 | 1 | `max_name_len` | Configured truncation cap in bytes; `1..=127`. |
 | 6 | 1 | `truncation_marker` | ASCII byte appended in place of a truncated name's last character (default `'~'`); see [Name records](#name-records). |
@@ -142,13 +153,42 @@ All multi-byte fields are little-endian.
 | 32 | 4 | `build_id_offset` | Byte offset from blob start to the raw build-ID bytes copied from the source ELF's `.note.gnu.build-id` (see [Build-ID correlation](#build-id-correlation-matching-a-blob-to-its-stripped-binary)); `0` if the ELF had no build-ID note. |
 | 36 | 1 | `build_id_size` | Length in bytes of the build-ID (typically 20 for the default SHA-1 note); `0` if absent. |
 | 37 | 3 | `reserved2` | Zero; reserved. |
-| 40 | 4 | `payload_crc32` | CRC-32 (IEEE 802.3 polynomial) of every byte in the blob *after* the header, i.e. `[48, blob.size())` -- which includes the build-ID bytes, checkpoint table, and entry stream; validates a blob loaded over an unreliable transport (flash, debug probe, ...) before any offsets inside it are trusted. |
-| 44 | 4 | `reserved3` | Zero; reserved. |
+| 40 | 4 | `payload_crc32` | CRC-32 (IEEE 802.3 polynomial) of every byte in the blob *after* the header, i.e. `[56, blob.size())` -- which includes the Huffman decode table, build-ID bytes, checkpoint table, and entry stream; validates a blob loaded over an unreliable transport (flash, debug probe, ...) before any offsets inside it are trusted. |
+| 44 | 4 | `huffman_table_offset` | Byte offset from blob start to the [Huffman decode table](#huffman-decode-table); `0` if `huffman_symbol_count == 0` (see below). |
+| 48 | 4 | `huffman_table_size` | Size in bytes of the Huffman decode table; `0` if `huffman_symbol_count == 0`. |
+| 52 | 2 | `huffman_symbol_count` | Number of distinct byte values in the per-blob Huffman alphabet; `0` means **raw fallback** -- name bytes are stored uncompressed (same as `"DSY1"`'s name records), used for a degenerate/empty alphabet (fewer than 2 distinct bytes across every kept name) where a code table could not help. |
+| 54 | 2 | `reserved3` | Zero; reserved. |
 
-The decoder's very first step is always: check `blob.size() >= 48`, check
+The decoder's very first step is always: check `blob.size() >= 56`, check
 `magic`, check `addr_width` is `4` or `8`, then (if the caller asked for
-integrity checking) recompute `payload_crc32` over `[48, blob.size())`
+integrity checking) recompute `payload_crc32` over `[56, blob.size())`
 and compare. Every other field is only trusted after that.
+
+### Huffman decode table
+
+Present only when `huffman_symbol_count > 0`; this blob's own kept
+(already-truncated) symbol name bytes are frequency-analyzed by the
+encoder and assigned a **canonical Huffman code**, with the code
+itself -- not just its use -- embedded directly in the blob, so the
+decoder never ships or assumes any fixed, corpus-dependent table of its
+own:
+
+| Size | Field | Description |
+|---|---|---|
+| 1 | `max_code_len` | Longest code length in bits, `1..=15` (capped the same way DEFLATE caps its literal/length codes, via the length-limiting fix-up described in [Encoder rules](#encoder-rules-elf---blob)). |
+| `max_code_len` | `length_counts[1..=max_code_len]` | One byte per code length `1..=max_code_len`: how many symbols in the alphabet have that code length. |
+| `huffman_symbol_count` | `sorted_symbols` | One byte per alphabet symbol (a raw byte value, `0..=255`), in **canonical order**: ascending by code length, then ascending by byte value within the same length. |
+
+`huffman_table_size` is always exactly `1 + max_code_len +
+huffman_symbol_count`, redundant with the fields above but checked by the
+decoder at `try_create()` time as a cheap corruption guard before any
+code is decoded. From `length_counts`/`sorted_symbols` alone, both the
+encoder and decoder reconstruct the same canonical codes with the
+standard algorithm (first code of each length is `(first_code[len-1] +
+length_counts[len-1]) << 1`, codes within a length increase by one in
+`sorted_symbols` order) -- no code values are stored directly, only the
+lengths, exactly like a DEFLATE dynamic Huffman block's code-length
+sequence.
 
 ### Build-ID correlation: matching a blob to its stripped binary
 
@@ -210,14 +250,20 @@ Each entry's name record is:
 
 | Size | Field | Description |
 |---|---|---|
-| 1 | `control` | Bit 7: `repeat_previous` flag. Bits 6..0: `length` (`0..=127`). |
-| `length` (0 if `repeat_previous`) | `bytes` | Raw name bytes (ASCII/UTF-8, **not** NUL-terminated); if the original symbol name was cut to fit `max_name_len`, the final byte is `truncation_marker` instead of the original character. |
+| 1 | `control` | Bit 7: `repeat_previous` flag. Bits 6..0: `length` (`0..=127`), the number of *decoded* name bytes (not the number of bits/bytes the coded form occupies). |
+| variable (0 if `repeat_previous`) | `coded_bytes` | `length` symbols, each coded per [Huffman decode table](#huffman-decode-table) and packed MSB-first across bytes with no padding *between* symbols; after the last symbol, the stream is padded with zero bits up to the next byte boundary, so the record immediately following (whether a ULEB128 address delta or the next entry's own `control` byte) always starts at a fresh byte -- no bit-cursor state is ever carried across name records. When `huffman_symbol_count == 0` (raw fallback), `coded_bytes` is simply `length` raw bytes, byte-aligned already, identical to `"DSY1"`. |
+
+If the original symbol name was cut to fit `max_name_len`, the final
+decoded byte is `truncation_marker` instead of the original character --
+`truncation_marker` is just another byte value in the Huffman alphabet
+like any other, coded the same way.
 
 `repeat_previous` means "identical to the immediately preceding decoded
 entry's name in this same group" -- a cheap de-duplication win for runs of
 truncated names that collapse to the same prefix (common with templated/
-overloaded names once cut to `max_name_len`), without a separate string
-table or offsets to maintain. **Entry 0 of every group must not set
+overloaded names once cut to `max_name_len`), independent of (and
+additional to) Huffman-coding the non-repeated case, without a separate
+string table or offsets to maintain. **Entry 0 of every group must not set
 `repeat_previous`** (there is no preceding entry to reference within a
 self-contained group), so a group's first name is always written out in
 full; the encoder enforces this.
@@ -228,6 +274,13 @@ already capped at `max_name_len` and most backtraces only ever touching a
 handful of groups, this removes a whole offset field per entry (4 bytes)
 and keeps every group fully self-decodable without a second table to
 cross-reference.
+
+Byte-aligning every record (rather than packing bits continuously across
+the whole entry stream) costs up to 7 wasted bits per non-repeated name
+-- negligible next to the bits saved by Huffman-coding the name bytes
+themselves -- in exchange for every record remaining independently
+decodable without tracking a running bit offset through the rest of the
+group.
 
 ## Lookup algorithm
 
@@ -311,17 +364,35 @@ gen_sysreg_headers.py`):
 5. **Sort** the surviving set ascending by address.
 6. **Truncate** every name to `max_name_len` bytes, replacing the final
    byte with `truncation_marker` when a cut occurred.
-7. **Group** into `group_size`-sized runs and emit the checkpoint table +
+7. **Build the Huffman code.** Over every name byte that will actually be
+   written out literally (i.e. excluding bytes belonging to a name that
+   `repeat_previous` will dedup away -- see step 8), count byte
+   frequencies and build an unrestricted Huffman tree, then apply a
+   length-limiting fix-up (the classic zlib/DEFLATE "overflow"
+   redistribution: clamp any code longer than `max_code_len = 15` down to
+   15, then repeatedly donate one code from the deepest-still-short
+   length bucket to the next one up until the Kraft inequality holds
+   again) so no code exceeds 15 bits, then assign canonical codes
+   (ascending by length, then by byte value) the same way DEFLATE assigns
+   dynamic Huffman codes. If fewer than 2 distinct bytes appear (empty or
+   single-byte-alphabet corpus), skip this step entirely and use the raw
+   fallback (`huffman_symbol_count = 0`, name bytes written uncompressed
+   in step 8).
+8. **Group** into `group_size`-sized runs and emit the checkpoint table +
    entry stream exactly as decoded above (including the entry-0-never-
-   repeats and strictly-ascending-delta invariants).
-8. Emit the 48-byte header (computing `payload_crc32` over the finished
-   build-ID bytes + checkpoint table + entry stream), and write the
-   result as a raw `.bin` blob (default) or, with `--format c-array`, a
-   `#include`-able C++ header exposing it as a `static constexpr
-   std::byte[]` (matching `ttf_to_font_header.py`'s "raw asset or
-   generated header, caller's choice" convention) for embedding directly
-   into a firmware image, a separate diagnostics partition, or a host-
-   side symbol server, independent of the stripped binary itself.
+   repeats and strictly-ascending-delta invariants), bit-packing each
+   literal name's bytes per the Huffman code from step 7 (or writing them
+   raw, if that step was skipped) and byte-aligning after each record.
+9. Emit the 56-byte header and, if `huffman_symbol_count > 0`, the
+   Huffman decode table from step 7 (computing `payload_crc32` over the
+   finished Huffman table + build-ID bytes + checkpoint table + entry
+   stream), and write the result as a raw `.bin` blob (default) or, with
+   `--format c-array`, a `#include`-able C++ header exposing it as a
+   `static constexpr std::byte[]` (matching `ttf_to_font_header.py`'s
+   "raw asset or generated header, caller's choice" convention) for
+   embedding directly into a firmware image, a separate diagnostics
+   partition, or a host-side symbol server, independent of the stripped
+   binary itself.
 
 CLI sketch:
 
@@ -446,6 +517,15 @@ cover the whole address space.
   `addr_width`, CRC mismatch).
 * Build-ID correlation: matching bytes accepted, mismatched bytes
   rejected, absent build-ID (`build_id_size == 0`) always accepted.
+* Huffman decode correctness: a multi-symbol alphabet round-trips
+  exactly; the degenerate `huffman_symbol_count == 0` raw-fallback path
+  (empty blob, or every kept name reducing to fewer than 2 distinct
+  bytes); `repeat_previous` interacting correctly with Huffman-coded
+  literal names; a name whose bit-packed encoding crosses one or more
+  byte boundaries; a maximal `length == 127` name; a corrupt/truncated
+  Huffman table (bad `max_code_len`, `huffman_table_size` mismatch,
+  `length_counts` not summing to `huffman_symbol_count`) rejected by
+  `try_create()`.
 * `elf_symtab_to_blob.py` against a real small compiled ELF fixture,
   asserting the filter/truncation/merge rules above -- in particular that
   `STB_LOCAL`/hidden-visibility symbols are kept by default and only

@@ -6,7 +6,7 @@
 
 /** @file debug_symtab.hpp
  * @brief `structo::debug_symtab_view`: an allocation-free, read-only
- * decoder for the `DSYM` (`"DSY1"`) compressed debug symbol table blob
+ * decoder for the `DSYM` (`"DSY2"`) compressed debug symbol table blob
  * format.
  *
  * A `DSYM` blob is built offline (`scripts/elf_symtab_to_blob.py`) from an
@@ -40,6 +40,7 @@
 #include "detail/debug_symtab_format.hpp"
 #include <cstddef>
 #include <cstdint>
+#include <reloco/array.hpp>
 #include <reloco/error.hpp>
 #include <reloco/expected.hpp>
 #include <reloco/lifetime.hpp>
@@ -134,6 +135,9 @@ public:
     const auto build_id_offset = fmt::load_le32(base + fmt::header_offset::build_id_offset);
     const auto build_id_size = static_cast<std::uint8_t>(base[fmt::header_offset::build_id_size]);
     const auto payload_crc32 = fmt::load_le32(base + fmt::header_offset::payload_crc32);
+    const auto huffman_table_offset = fmt::load_le32(base + fmt::header_offset::huffman_table_offset);
+    const auto huffman_table_size = fmt::load_le32(base + fmt::header_offset::huffman_table_size);
+    const auto huffman_symbol_count = fmt::load_le16(base + fmt::header_offset::huffman_symbol_count);
 
     if (group_size == 0 || (symbol_count == 0) != (checkpoint_count == 0))
       return reloco::unexpected(reloco::error::invalid_argument);
@@ -144,8 +148,33 @@ public:
 
     if (!fits(checkpoint_table_offset, checkpoint_table_bytes, blob_size) ||
         !fits(entry_stream_offset, entry_stream_size, blob_size) ||
-        !fits(build_id_offset, build_id_size, blob_size))
+        !fits(build_id_offset, build_id_size, blob_size) ||
+        !fits(huffman_table_offset, huffman_table_size, blob_size))
       return reloco::unexpected(reloco::error::invalid_argument);
+
+    std::uint8_t max_code_len = 0;
+    reloco::span<const std::byte> length_counts{};
+    reloco::span<const std::byte> sorted_symbols{};
+    if (huffman_symbol_count != 0) {
+      if (huffman_table_size < 1)
+        return reloco::unexpected(reloco::error::invalid_argument);
+      const std::byte *table = base + huffman_table_offset;
+      max_code_len = static_cast<std::uint8_t>(table[0]);
+      if (max_code_len == 0 || max_code_len > fmt::huffman_max_code_len_limit)
+        return reloco::unexpected(reloco::error::invalid_argument);
+      const std::size_t expected_table_size =
+          1 + static_cast<std::size_t>(max_code_len) + static_cast<std::size_t>(huffman_symbol_count);
+      if (huffman_table_size != expected_table_size)
+        return reloco::unexpected(reloco::error::invalid_argument);
+      length_counts = blob.subspan(huffman_table_offset + 1, max_code_len);
+      sorted_symbols = blob.subspan(huffman_table_offset + 1 + max_code_len, huffman_symbol_count);
+
+      std::size_t total_symbols = 0;
+      for (std::size_t i = 0; i < length_counts.size(); ++i)
+        total_symbols += static_cast<std::uint8_t>(length_counts[i]);
+      if (total_symbols != huffman_symbol_count)
+        return reloco::unexpected(reloco::error::invalid_argument);
+    }
 
     if (verify_crc) {
       auto payload = blob.subspan(fmt::header_size);
@@ -166,6 +195,10 @@ public:
     view.entry_stream_size_ = entry_stream_size;
     view.build_id_offset_ = build_id_offset;
     view.build_id_size_ = build_id_size;
+    view.huffman_symbol_count_ = huffman_symbol_count;
+    view.huffman_max_code_len_ = max_code_len;
+    view.huffman_length_counts_ = length_counts;
+    view.huffman_sorted_symbols_ = sorted_symbols;
     return view;
   }
 
@@ -264,13 +297,18 @@ public:
     // Thread "previous decoded name in this scan" through explicit local
     // state (not member state) so concurrent try_resolve() calls on the
     // same view from different threads never race or leak state into
-    // each other.
+    // each other. `name_buffer` backs Huffman-decoded names (raw-mode
+    // names instead alias the blob directly, as before); it only needs
+    // to be overwritten on an actual (non-`repeat_previous`) decode, so
+    // a `repeat_previous` entry can keep reusing its predecessor's bytes
+    // without redoing any work.
+    reloco::array<std::byte, debug_symtab::detail::max_name_len_limit> name_buffer{};
     reloco::span<const std::byte> last_name{};
     bool last_name_truncated = false;
     bool last_name_valid = false;
 
     // Entry 0: name record only, address == group_start_addr.
-    auto entry0 = read_name_record(stream, pos, last_name, last_name_truncated, last_name_valid);
+    auto entry0 = read_name_record(stream, pos, name_buffer, last_name, last_name_truncated, last_name_valid);
     if (!entry0)
       return reloco::nullopt;
 
@@ -289,7 +327,7 @@ public:
 
         reloco::optional<name_record> record;
         if (current_addr <= addr) {
-          record = read_name_record(stream, pos, last_name, last_name_truncated, last_name_valid);
+          record = read_name_record(stream, pos, name_buffer, last_name, last_name_truncated, last_name_valid);
           if (!record)
             break;
         } else {
@@ -334,10 +372,15 @@ private:
    * scan's own local "previous entry in this group" state, threaded
    * through explicitly rather than held in `this` so this method stays
    * safely callable concurrently from several threads sharing one
-   * `debug_symtab_view`. */
+   * `debug_symtab_view`. `name_buffer` is the calling scan's own
+   * scratch storage for Huffman-decoded bytes (unused, and untouched,
+   * in raw-fallback mode, where a name aliases `stream`/the blob
+   * directly instead). */
   [[nodiscard]] reloco::optional<name_record>
-  read_name_record(reloco::span<const std::byte> stream, std::size_t &pos, reloco::span<const std::byte> &last_name,
-                   bool &last_name_truncated, bool &last_name_valid) const noexcept {
+  read_name_record(reloco::span<const std::byte> stream, std::size_t &pos,
+                   reloco::array<std::byte, debug_symtab::detail::max_name_len_limit> &name_buffer,
+                   reloco::span<const std::byte> &last_name, bool &last_name_truncated,
+                   bool &last_name_valid) const noexcept {
     if (pos >= stream.size())
       return reloco::nullopt;
     const auto control = static_cast<std::uint8_t>(stream[pos]);
@@ -350,16 +393,37 @@ private:
     }
 
     const std::uint8_t length = control & debug_symtab::detail::name_control_length_mask;
-    auto bytes = stream.try_subspan(pos, length);
-    if (!bytes)
-      return reloco::nullopt;
-    pos += length;
 
-    last_name = *bytes;
-    last_name_truncated =
-        length > 0 && length == max_name_len_ && static_cast<std::uint8_t>((*bytes)[length - 1]) == truncation_marker_;
+    reloco::span<const std::byte> decoded;
+    if (huffman_symbol_count_ == 0) {
+      // Raw fallback: `length` bytes, byte-aligned already, aliasing the
+      // blob directly (no copy needed).
+      auto bytes = stream.try_subspan(pos, length);
+      if (!bytes)
+        return reloco::nullopt;
+      pos += length;
+      decoded = *bytes;
+    } else {
+      // Huffman-coded: bit-unpack `length` symbols starting at `pos`,
+      // into the scan's own buffer, then byte-align `pos` past them.
+      debug_symtab::detail::bit_reader reader{stream, pos, 0};
+      for (std::uint8_t i = 0; i < length; ++i) {
+        auto symbol = debug_symtab::detail::decode_huffman_symbol(reader, huffman_length_counts_,
+                                                                   huffman_sorted_symbols_, huffman_max_code_len_);
+        if (!symbol)
+          return reloco::nullopt;
+        name_buffer[i] = static_cast<std::byte>(symbol.value());
+      }
+      reader.align();
+      pos = reader.byte_pos;
+      decoded = reloco::span<const std::byte>(name_buffer.data(), length);
+    }
+
+    last_name = decoded;
+    last_name_truncated = length > 0 && length == max_name_len_ &&
+                           static_cast<std::uint8_t>(decoded[length - 1]) == truncation_marker_;
     last_name_valid = true;
-    return name_record{*bytes, last_name_truncated};
+    return name_record{decoded, last_name_truncated};
   }
 
   [[nodiscard]] static constexpr bool fits(std::uint32_t offset, std::size_t size, std::size_t blob_size) noexcept {
@@ -378,6 +442,12 @@ private:
   std::uint8_t max_name_len_{0};
   std::uint8_t truncation_marker_{0};
   std::uint8_t build_id_size_{0};
+  std::uint16_t huffman_symbol_count_{0};
+  std::uint8_t huffman_max_code_len_{0};
+  // Both empty (default-constructed) spans when huffman_symbol_count_ ==
+  // 0 -- raw fallback, name bytes stored uncompressed.
+  reloco::span<const std::byte> huffman_length_counts_{};
+  reloco::span<const std::byte> huffman_sorted_symbols_{};
 };
 
 } // namespace structo

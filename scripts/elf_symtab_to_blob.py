@@ -26,6 +26,12 @@ especially), which just means more of them get clipped by
 `--max-name-len`, so `--demangle-if-shorter` keeps whichever spelling
 is no longer in bytes per symbol.
 
+Every kept (already-truncated) name's bytes are additionally
+Huffman-coded, with the canonical decode table embedded directly in the
+blob (built from -- and tailored to -- this blob's own alphabet, so
+there is never a corpus mismatch between encoder and decoder); see
+`docs/debug_symtab_format.md`'s "Huffman decode table" section.
+
 Requires pyelftools (`pip install pyelftools`).
 
 Example:
@@ -39,9 +45,12 @@ Example:
 from __future__ import annotations
 
 import argparse
+import collections
 import ctypes
 import ctypes.util
 import fnmatch
+import heapq
+import itertools
 import re
 import sys
 import zlib
@@ -54,9 +63,10 @@ try:
 except ImportError:  # pragma: no cover - environment-dependent
     sys.exit("error: pyelftools is required (pip install pyelftools)")
 
-MAGIC = 0x31595344  # "DSY1", little-endian uint32
-HEADER_SIZE = 48
+MAGIC = 0x32595344  # "DSY2", little-endian uint32
+HEADER_SIZE = 56
 MAX_NAME_LEN_LIMIT = 127
+HUFFMAN_MAX_CODE_LEN = 15
 DEFAULT_MAX_NAME_LEN = 31
 DEFAULT_GROUP_SIZE = 16
 DEFAULT_TRUNCATION_MARKER = ord("~")
@@ -309,17 +319,187 @@ def count_truncated(symbols: list[Symbol], max_name_len: int) -> int:
 
 
 @dataclass
+class HuffmanCode:
+    """A per-blob canonical Huffman code over kept (already-truncated) name
+    bytes -- see `docs/debug_symtab_format.md`'s "Huffman decode table"
+    section. `codes` is empty for the degenerate/raw-fallback case (fewer
+    than 2 distinct bytes across every literally-written name)."""
+    max_code_len: int
+    length_counts: list[int]  # index 0 unused; length_counts[1..max_code_len] are meaningful.
+    sorted_symbols: list[int]  # Canonical order: ascending length, then ascending byte value.
+    codes: dict[int, tuple[int, int]]  # byte -> (code, length); empty means raw fallback.
+
+    def table_bytes(self) -> bytes:
+        """Serializes the Huffman decode table block (empty if `codes` is empty)."""
+        if not self.codes:
+            return b""
+        block = bytearray()
+        block.append(self.max_code_len)
+        block += bytes(self.length_counts[1:self.max_code_len + 1])
+        block += bytes(self.sorted_symbols)
+        return bytes(block)
+
+
+def _limit_code_lengths(lengths_by_symbol: dict[int, int], max_code_len: int) -> dict[int, int]:
+    """Clamps an unrestricted Huffman tree's per-symbol code lengths so
+    none exceeds `max_code_len`, using the classic zlib/DEFLATE "overflow"
+    fix-up: collapse every over-long code into the `max_code_len` bucket,
+    then repeatedly donate one code from the deepest still-short length to
+    the next one up (turning it into two codes one bit longer) until the
+    Kraft inequality holds again. Symbols are then reassigned to the
+    fixed-up length histogram preserving their original relative order
+    (shortest original code first), which keeps the result a valid prefix
+    code at a small, practically negligible optimality cost."""
+    symbols = sorted(lengths_by_symbol, key=lambda s: (lengths_by_symbol[s], s))
+    bl_count = [0] * (max_code_len + 1)
+    for length in lengths_by_symbol.values():
+        bl_count[min(length, max_code_len)] += 1
+
+    # Kraft sum in units of 2**-max_code_len; a valid code has total == 2**max_code_len.
+    total = sum(bl_count[length] << (max_code_len - length) for length in range(1, max_code_len + 1))
+    target = 1 << max_code_len
+    while total > target:
+        # Find the deepest length strictly shorter than max_code_len with
+        # any codes left, donate one of its codes to the next length up.
+        length = max_code_len - 1
+        while length > 0 and bl_count[length] == 0:
+            length -= 1
+        bl_count[length] -= 1
+        bl_count[length + 1] += 2
+        bl_count[max_code_len] -= 1
+        total = sum(bl_count[length_] << (max_code_len - length_) for length_ in range(1, max_code_len + 1))
+
+    new_lengths: dict[int, int] = {}
+    index = 0
+    for length in range(1, max_code_len + 1):
+        for _ in range(bl_count[length]):
+            new_lengths[symbols[index]] = length
+            index += 1
+    assert index == len(symbols)
+    return new_lengths
+
+
+def build_huffman_code(freq: "collections.Counter[int]", max_code_len: int = HUFFMAN_MAX_CODE_LEN) -> HuffmanCode:
+    """Builds a canonical Huffman code over the byte alphabet in `freq`
+    (byte value -> occurrence count). Falls back to the degenerate/raw
+    representation (`codes == {}`) when fewer than 2 distinct bytes
+    appear, since a code table could not help (and a single-symbol
+    Huffman "code" has no well-defined non-zero length anyway)."""
+    symbols = sorted(freq)
+    if len(symbols) < 2:
+        return HuffmanCode(max_code_len=0, length_counts=[], sorted_symbols=[], codes={})
+
+    # Build an unrestricted Huffman tree via a min-heap of (frequency,
+    # insertion-order tie-breaker, node); a node is either a leaf (byte
+    # value) or an internal (left, right) pair of nodes.
+    counter = itertools.count()
+    heap: list[tuple[int, int, object]] = [(freq[s], next(counter), s) for s in symbols]
+    heapq.heapify(heap)
+    while len(heap) > 1:
+        freq1, _, node1 = heapq.heappop(heap)
+        freq2, _, node2 = heapq.heappop(heap)
+        heapq.heappush(heap, (freq1 + freq2, next(counter), (node1, node2)))
+    _, _, root = heap[0]
+
+    lengths: dict[int, int] = {}
+
+    def walk(node: object, depth: int) -> None:
+        if isinstance(node, tuple):
+            walk(node[0], depth + 1)
+            walk(node[1], depth + 1)
+        else:
+            lengths[node] = depth
+
+    walk(root, 0)
+
+    if max(lengths.values()) > max_code_len:
+        lengths = _limit_code_lengths(lengths, max_code_len)
+
+    sorted_symbols = sorted(lengths, key=lambda s: (lengths[s], s))
+    length_counts = [0] * (max_code_len + 1)
+    for s in sorted_symbols:
+        length_counts[lengths[s]] += 1
+
+    # Canonical code assignment (standard DEFLATE-style first_code/next_code).
+    next_code = [0] * (max_code_len + 1)
+    code = 0
+    for bits in range(1, max_code_len + 1):
+        code = (code + length_counts[bits - 1]) << 1
+        next_code[bits] = code
+    codes: dict[int, tuple[int, int]] = {}
+    for s in sorted_symbols:
+        length = lengths[s]
+        codes[s] = (next_code[length], length)
+        next_code[length] += 1
+
+    return HuffmanCode(max_code_len=max_code_len, length_counts=length_counts, sorted_symbols=sorted_symbols,
+                       codes=codes)
+
+
+class _BitWriter:
+    """MSB-first bit packer for one name record's Huffman-coded bytes;
+    see `docs/debug_symtab_format.md`'s "Name records" section --
+    byte-aligned on both ends, so a fresh writer is used per record."""
+
+    def __init__(self) -> None:
+        self.out = bytearray()
+        self._cur = 0
+        self._nbits = 0
+
+    def write_bits(self, value: int, length: int) -> None:
+        for i in range(length - 1, -1, -1):
+            self._cur = (self._cur << 1) | ((value >> i) & 1)
+            self._nbits += 1
+            if self._nbits == 8:
+                self.out.append(self._cur)
+                self._cur = 0
+                self._nbits = 0
+
+    def align(self) -> None:
+        if self._nbits:
+            self.out.append(self._cur << (8 - self._nbits))
+            self._cur = 0
+            self._nbits = 0
+
+
+@dataclass
 class EncodedBlob:
     checkpoint_table: bytes
     entry_stream: bytes
     checkpoint_count: int
+    huffman: HuffmanCode
 
 
 def encode_entries(symbols: list[Symbol], addr_width: int, group_size: int, max_name_len: int,
                     truncation_marker: int) -> EncodedBlob:
+    # Pass 1: truncate every name and determine, mirroring the dedup rule
+    # below exactly, which entries will be written out literally (as
+    # opposed to `repeat_previous`) -- only literal bytes enter the
+    # Huffman frequency analysis, since repeated names cost nothing
+    # further either way.
+    literal_flags: list[tuple[bool, bytes]] = []
+    for group_start in range(0, len(symbols), group_size):
+        group = symbols[group_start:group_start + group_size]
+        previous_name: Optional[bytes] = None
+        for i, sym in enumerate(group):
+            name_bytes = truncate_name(sym.name, max_name_len, truncation_marker)
+            is_literal = not (i > 0 and previous_name is not None and name_bytes == previous_name)
+            literal_flags.append((is_literal, name_bytes))
+            previous_name = name_bytes
+
+    freq: "collections.Counter[int]" = collections.Counter()
+    for is_literal, name_bytes in literal_flags:
+        if is_literal:
+            freq.update(name_bytes)
+    huffman = build_huffman_code(freq)
+
+    # Pass 2: emit the checkpoint table + entry stream, bit-packing
+    # literal names per `huffman.codes` (or writing them raw, in
+    # raw-fallback mode).
     checkpoint_records = bytearray()
     entry_stream = bytearray()
     checkpoint_count = 0
+    flag_index = 0
 
     for group_start in range(0, len(symbols), group_size):
         group = symbols[group_start:group_start + group_size]
@@ -327,31 +507,41 @@ def encode_entries(symbols: list[Symbol], addr_width: int, group_size: int, max_
         checkpoint_records += len(entry_stream).to_bytes(4, "little")
         checkpoint_count += 1
 
-        previous_name: Optional[bytes] = None
         previous_addr = group[0].address
         for i, sym in enumerate(group):
-            name_bytes = truncate_name(sym.name, max_name_len, truncation_marker)
+            is_literal, name_bytes = literal_flags[flag_index]
+            flag_index += 1
             if i > 0:
                 delta = sym.address - previous_addr
                 entry_stream += encode_uleb128(delta)
                 previous_addr = sym.address
 
-            if previous_name is not None and name_bytes == previous_name and i > 0:
+            if not is_literal:
                 entry_stream.append(0x80)  # repeat_previous flag, length bits unused.
+                continue
+
+            entry_stream.append(len(name_bytes) & 0x7F)
+            if huffman.codes:
+                bit_writer = _BitWriter()
+                for b in name_bytes:
+                    code, length = huffman.codes[b]
+                    bit_writer.write_bits(code, length)
+                bit_writer.align()
+                entry_stream += bit_writer.out
             else:
-                entry_stream.append(len(name_bytes) & 0x7F)
                 entry_stream += name_bytes
-            previous_name = name_bytes
 
     return EncodedBlob(checkpoint_table=bytes(checkpoint_records), entry_stream=bytes(entry_stream),
-                        checkpoint_count=checkpoint_count)
+                        checkpoint_count=checkpoint_count, huffman=huffman)
 
 
 def build_blob(args: argparse.Namespace, symbols: list[Symbol], addr_width: int,
                build_id: bytes) -> tuple[bytes, EncodedBlob]:
     encoded = encode_entries(symbols, addr_width, args.group_size, args.max_name_len, args.truncation_marker)
+    huffman_table = encoded.huffman.table_bytes()
 
-    checkpoint_table_offset = HEADER_SIZE
+    huffman_table_offset = HEADER_SIZE if huffman_table else 0
+    checkpoint_table_offset = HEADER_SIZE + len(huffman_table)
     build_id_offset = checkpoint_table_offset + len(encoded.checkpoint_table)
     entry_stream_offset = build_id_offset + len(build_id)
 
@@ -372,10 +562,13 @@ def build_blob(args: argparse.Namespace, symbols: list[Symbol], addr_width: int,
     header[36] = len(build_id)
     header[37:40] = b"\x00\x00\x00"  # reserved2
 
-    payload = bytes(encoded.checkpoint_table) + build_id + encoded.entry_stream
+    payload = huffman_table + bytes(encoded.checkpoint_table) + build_id + encoded.entry_stream
     crc = zlib.crc32(payload) & 0xFFFFFFFF
     header[40:44] = crc.to_bytes(4, "little")
-    header[44:48] = (0).to_bytes(4, "little")  # reserved3
+    header[44:48] = huffman_table_offset.to_bytes(4, "little")
+    header[48:52] = len(huffman_table).to_bytes(4, "little")
+    header[52:54] = len(encoded.huffman.codes).to_bytes(2, "little")
+    header[54:56] = (0).to_bytes(2, "little")  # reserved3
 
     return bytes(header) + payload, encoded
 
@@ -481,6 +674,12 @@ def format_report(args: argparse.Namespace, input_path: str, symbols: list[Symbo
     lines.append("| Section | Bytes |")
     lines.append("| --- | --- |")
     lines.append(f"| Header | {HEADER_SIZE} |")
+    huffman_table = encoded.huffman.table_bytes()
+    if huffman_table:
+        lines.append(f"| Huffman decode table ({len(encoded.huffman.codes)} symbols, "
+                     f"max code length {encoded.huffman.max_code_len} bits) | {len(huffman_table)} |")
+    else:
+        lines.append("| Huffman decode table (raw fallback: fewer than 2 distinct name bytes) | 0 |")
     lines.append(f"| Checkpoint table ({encoded.checkpoint_count} checkpoints, "
                  f"`--group-size {args.group_size}`) | {len(encoded.checkpoint_table)} |")
     lines.append(f"| Build ID | {len(build_id)} |")
