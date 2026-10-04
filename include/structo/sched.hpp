@@ -188,6 +188,67 @@
  * deadlines under *any* policy) is entirely the caller's concern, same
  * as real EDF implementations (e.g. Linux's `SCHED_DEADLINE`) layer
  * admission control on top of, not inside, the dispatch rule itself.
+ *
+ * ## Putting it together: SMP load balancing via `work_steal.hpp`
+ *
+ * "No SMP load balancing/migration" above describes what *this* header
+ * does on its own -- a single CPU's dispatch rule. Multi-CPU balancing
+ * is layered entirely on top, out of three other, independently usable
+ * pieces: `cpu_load` (per-CPU runnable-task tracking, `cpu_load.hpp`),
+ * `arch::cpu_sibling_map` (precomputed, distance-ordered steal
+ * candidates, `arch/cpu_sibling_map.hpp`), and `find_steal_candidate`
+ * plus a steal policy (the *decision* of which CPU to steal from,
+ * `work_steal.hpp`) -- this header has no opinion on any of it, exactly
+ * like it has no opinion on locking. The sketch below is pseudocode (it
+ * elides real per-CPU storage/locking/IPI wake-up plumbing, which is
+ * entirely OS-specific), showing where each piece plugs into one CPU's
+ * idle-vs-dispatch path:
+ *
+ * @code
+ * // Per-CPU state this fake OS already maintains elsewhere:
+ * //   my_sched              -- e.g. structo::fixed_priority_sched<...> for this CPU
+ * //   percpu_load[cpu]      -- structo::cpu_load<...>, updated on every enqueue/remove
+ * //   siblings[cpu]         -- structo::arch::cpu_sibling_map<...>, built once at boot
+ * //   online                -- structo::arch::cpu_online_dispatcher, hotplug-maintained
+ *
+ * void scheduler_tick(std::size_t this_cpu, instant now) {
+ *   if (Entry *next = my_sched::pick_next(now)) {
+ *     dispatch(next); // local work available -- no need to even look at other CPUs
+ *     return;
+ *   }
+ *
+ *   // Local runqueue is empty: this CPU is about to idle. Worth a last-resort
+ *   // steal before halting -- `local_load == 0` here trivially satisfies every
+ *   // built-in policy's `should_attempt_steal`, so this call is never skipped.
+ *   auto eligible = online.snapshot(); // arch::cpu_mask<Tag, MaxCpus>
+ *   for (int attempt = 0; attempt < max_steal_attempts; ++attempt) {
+ *     auto victim = structo::find_steal_candidate<structo::performance_steal_policy>(
+ *         siblings[this_cpu], this_cpu, eligible,
+ *         [&](std::size_t cpu) { return percpu_load[cpu].current(); });
+ *     if (!victim.has_value())
+ *       break; // nobody (left) worth stealing from this round -- genuinely idle
+ *
+ *     // Caller owns all locking: lock *victim's remote runqueue, re-check it
+ *     // isn't empty (it may have changed since the decision above), pop one
+ *     // task, unlock, then enqueue it into my_sched on this_cpu.
+ *     if (Entry *stolen = try_steal_one_task_from(*victim)) {
+ *       my_sched::enqueue(*stolen, now);
+ *       dispatch(my_sched::pick_next(now));
+ *       return;
+ *     }
+ *     eligible.clear(*victim); // that one didn't pan out -- don't reconsider it this round
+ *     if (eligible.none())
+ *       eligible = online.snapshot(); // every candidate excluded -- refresh for hotplug changes
+ *   }
+ *   halt_until_next_interrupt(); // truly nothing runnable anywhere reachable
+ * }
+ * @endcode
+ *
+ * Swapping `performance_steal_policy` for `power_save_steal_policy`/
+ * `always_steal_policy` (see `work_steal.hpp`) changes nothing else
+ * about this loop -- the policy alone decides whether/which candidate
+ * qualifies; `scheduler_tick` itself never changes based on which OS
+ * power/performance policy is configured.
  */
 
 #include <cstddef>
