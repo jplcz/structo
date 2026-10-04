@@ -8,7 +8,9 @@
 #include <reloco/detail/assert.hpp>
 #include <reloco/detail/compat.hpp>
 #include <reloco/error.hpp>
+#include <reloco/lifetime.hpp>
 #include <type_traits>
+#include <utility>
 
 namespace structo {
 
@@ -163,6 +165,67 @@ public:
       return unexpected(error::invalid_argument);
     }
     return Mapper::to_virt(paddr_);
+  }
+
+  /**
+   * @brief RAII handle shaped identically to `slot_map_ptr<T, Mapper>::guard`
+   * (`slot_map_ptr.hpp`), so code generic over "some scoped physical-address
+   * mapping" -- e.g. `compat_sg.hpp`'s `chained_sg_codec`/`two_level_sg_codec`
+   * -- can use either a `dmap_ptr` or a `slot_map_ptr` as its `Mapper`
+   * callable's return value without caring which. Since the direct map is
+   * permanent, there is nothing to actually release: `reset()`/the
+   * destructor are no-ops, but every other member (`get()`/`operator->()`/
+   * `operator*()`/`is_null()`/move semantics) behaves identically to
+   * `slot_map_ptr`'s guard.
+   */
+  class [[nodiscard]] RELOCO_POINTER guard {
+  public:
+    constexpr guard() noexcept = default;
+    ~guard() noexcept = default;
+
+    guard(const guard &) = delete;
+    guard &operator=(const guard &) = delete;
+
+    guard(guard &&other) noexcept : m_ptr(std::exchange(other.m_ptr, nullptr)) {}
+    guard &operator=(guard &&other) noexcept {
+      if (this != &other) {
+        m_ptr = std::exchange(other.m_ptr, nullptr);
+      }
+      return *this;
+    }
+
+    [[nodiscard]] constexpr bool is_null() const noexcept { return m_ptr == nullptr; }
+    constexpr explicit operator bool() const noexcept { return m_ptr != nullptr; }
+
+    [[nodiscard]] T *get() const noexcept RELOCO_LIFETIMEBOUND { return m_ptr; }
+    [[nodiscard]] T *operator->() const noexcept RELOCO_LIFETIMEBOUND { return m_ptr; }
+    [[nodiscard]] std::add_lvalue_reference_t<T> operator*() const noexcept RELOCO_LIFETIMEBOUND { return *m_ptr; }
+
+    /** @brief No-op (the direct map is permanent); present only for API parity with `slot_map_ptr::guard`. */
+    void reset() noexcept { m_ptr = nullptr; }
+
+  private:
+    friend class dmap_ptr;
+    constexpr explicit guard(T *ptr) noexcept : m_ptr(ptr) {}
+
+    T *m_ptr{nullptr};
+  };
+
+  /**
+   * @brief `try_get()`, wrapped in the same `guard` RAII handle `slot_map_ptr`
+   * returns from its own `try_map()`. Prefer this over `try_get()` when
+   * writing `Mapper`-callable code (e.g. for `compat_sg.hpp`) that must
+   * work unchanged whether the concrete pointer type is a `dmap_ptr` or a
+   * `slot_map_ptr`.
+   * @param (unnamed) Accepted and ignored for signature parity with
+   * `slot_map_ptr::try_map(std::size_t)`; the direct map always covers
+   * exactly one `T` at `phys()`, regardless of the requested byte span.
+   */
+  [[nodiscard]] result<guard> try_map(std::size_t = sizeof(T)) const noexcept {
+    auto res = try_get();
+    if (!res.has_value())
+      return unexpected(res.error());
+    return guard(res.value());
   }
 
   [[nodiscard]] static result<dmap_ptr> from_paddr(phys_type phys) noexcept {

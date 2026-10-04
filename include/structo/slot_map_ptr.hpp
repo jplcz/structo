@@ -40,7 +40,7 @@
  * a ready-made `Mapper`: it implements the slot bookkeeping (lock-free
  * acquire/release over a fixed-size pool of `SlotCount` slots) on top of an
  * architecture-supplied `ArchHooks` policy, which must provide:
- * - `static constexpr std::size_t slot_size;` (bytes per slot; a page or more)
+ * - `static constexpr std::size_t slot_size;` (bytes per slot)
  * - `static void *slot_base(std::size_t slot) noexcept;` (fixed VA of a slot)
  * - `static result<void> program(std::size_t slot, PhysInt phys_aligned) noexcept;`
  *   (points `slot`'s fixed VA window at the `slot_size`-aligned physical
@@ -48,6 +48,15 @@
  *   shootdown the architecture requires)
  * - `static void unprogram(std::size_t slot) noexcept;` (tears the mapping
  *   back down; must also be safe to call on an already-torn-down slot)
+ *
+ * Each slot maps exactly **one** `slot_size`-aligned physical page at a
+ * time: `acquire()` rejects any `[phys, phys + size)` request that would
+ * cross a `slot_size` boundary (`error::out_of_range`) rather than ever
+ * spanning a request across two slots. So when pairing `slot_map_mapper`
+ * with `compat_sg.hpp`'s codecs, `ArchHooks::slot_size` must match the
+ * same `PageTraits::page_size` the codec is instantiated with (e.g.
+ * `page_4k`) -- the caller picks both, and they must agree -- not some
+ * larger, multi-page window.
  *
  * @code
  * // Secure-world example: a handful of fixed VA windows used to peek into

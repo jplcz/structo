@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 #include <reloco/inline_vector.hpp>
 #include <structo/compat_sg.hpp>
+#include <structo/slot_map_ptr.hpp>
 
 #include <array>
 #include <cstdint>
@@ -327,6 +328,153 @@ TEST(TwoLevelSgCodecTest, RoundTripsRootAndLeafTables) {
   ASSERT_EQ(decoded.size(), 1u);
   EXPECT_EQ(decoded.begin()->addr.value, 0x3450u);
   EXPECT_EQ(decoded.begin()->length, 48u);
+}
+
+// ============================================================================
+// Proves the codecs' `Mapper` contract is satisfied not just by bare
+// pointers (above) but also by a move-only RAII handle such as
+// `slot_map_ptr<T, M>::guard` -- i.e. that `sg_mapper_detail::release_handle`
+// is called early enough that the codecs work even with pools far smaller
+// than the number of physical pages visited.
+// ============================================================================
+
+// A software-only ArchHooks: "slot_size"-aligned windows into a flat backing
+// buffer, indexed directly by the (small, test-only) physical address used
+// as the offset -- enough to prove slot acquire/release pairing without a
+// real MMU. `NumSlots` is part of the type so each (count, buffer) pairing
+// used below gets its own independent static pool/storage.
+template <std::size_t NumSlots, std::size_t BufSize> struct fake_page_hooks {
+  static constexpr std::size_t slot_size = page_4k::page_size;
+  static_assert(BufSize % slot_size == 0);
+
+  alignas(16) static inline std::byte backing[BufSize]{};
+  static inline std::size_t phys_offset[NumSlots] = {};
+  static inline int program_calls = 0;
+  static inline int unprogram_calls = 0;
+
+  static void reset_counters() noexcept {
+    program_calls = 0;
+    unprogram_calls = 0;
+  }
+
+  static void *slot_base(std::size_t slot) noexcept { return backing + phys_offset[slot]; }
+
+  static result<void> program(std::size_t slot, std::uint64_t phys_aligned) noexcept {
+    if (phys_aligned >= BufSize)
+      return unexpected(error::out_of_range);
+    phys_offset[slot] = static_cast<std::size_t>(phys_aligned);
+    ++program_calls;
+    return {};
+  }
+
+  static void unprogram(std::size_t /*slot*/) noexcept { ++unprogram_calls; }
+};
+
+TEST(ChainedSgCodecTest, WorksWithASingleSlotRaiiMapper) {
+  using layout = chained_sg_layout<uint64_t, pfn_field, offset_field, length_field, last_field, chain_field>;
+  using codec = chained_sg_codec<layout, page_4k, dma_bus_space>;
+  using packed_type = codec::packed_type;
+  using paddr_type = codec::paddr_type;
+  using entry_type = sg_entry<dma_bus_space, uint64_t>;
+
+  // Only a *single* slot: proves `chained_sg_codec` releases the previous
+  // page's handle before mapping the next one, rather than needing one
+  // slot per linked descriptor page.
+  using hooks = fake_page_hooks<1, 0x3000>;
+  using mapper_type = slot_map_mapper<1, hooks, dma_bus_space>;
+  hooks::reset_counters();
+
+  uint64_t next_page_address = 0x1000;
+  auto allocate = [&]() -> result<paddr_type> {
+    const auto address = paddr_type{next_page_address};
+    next_page_address += page_4k::page_size;
+    return address;
+  };
+  auto map_for_write = [](paddr_type address) -> result<slot_map_ptr<packed_type, mapper_type>::guard> {
+    auto ptr = slot_map_ptr<packed_type, mapper_type>::from_paddr(
+        phys_addr<packed_type, dma_bus_space>{address.value});
+    if (!ptr)
+      return unexpected(ptr.error());
+    return ptr->try_map(page_4k::page_size);
+  };
+
+  sg_list<inline_vector<entry_type, 512>> input;
+  for (uint64_t i = 0; i < 512; ++i) {
+    ASSERT_TRUE(input.try_push_back(phys_addr<void, dma_bus_space>{0x2100 + i * 0x2000}, 1));
+  }
+  inline_vector<paddr_type, 2> allocated_pages;
+  auto root = codec::encode(input, allocate, map_for_write, allocated_pages);
+  ASSERT_TRUE(root);
+  EXPECT_EQ(root->value, 0x1000u);
+  ASSERT_EQ(allocated_pages.size(), 2u);
+  // Both pages were mapped, and every mapping but the one still held when
+  // encode() returns was released -- i.e. no slot leak across the 2 pages
+  // despite only ever having 1 slot available.
+  EXPECT_EQ(hooks::program_calls, 2);
+  EXPECT_EQ(hooks::unprogram_calls, 2);
+
+  auto map_for_read = [](paddr_type address) -> result<slot_map_ptr<const packed_type, mapper_type>::guard> {
+    auto ptr = slot_map_ptr<const packed_type, mapper_type>::from_paddr(
+        phys_addr<const packed_type, dma_bus_space>{address.value});
+    if (!ptr)
+      return unexpected(ptr.error());
+    return ptr->try_map(page_4k::page_size);
+  };
+
+  sg_list<inline_vector<entry_type, 512>> decoded;
+  ASSERT_TRUE(codec::decode(*root, decoded, map_for_read, 2));
+  ASSERT_EQ(decoded.size(), 512u);
+  EXPECT_EQ(decoded.begin()->addr.value, 0x2100u);
+  EXPECT_EQ(decoded.begin()->length, 1u);
+  EXPECT_EQ(decoded.base().back().addr.value, 0x2100u + 511 * 0x2000u);
+  EXPECT_EQ(hooks::program_calls, 4); // 2 more, for decode()'s own re-mapping
+  EXPECT_EQ(hooks::unprogram_calls, 4);
+}
+
+TEST(TwoLevelSgCodecTest, WorksWithATwoSlotRaiiMapper) {
+  using root_layout = sg_descriptor_layout<uint64_t, pfn_field, void, void, last_field>;
+  using codec = two_level_sg_codec<root_layout, compact_layout, page_4k, dma_bus_space>;
+  using packed_type = codec::l1_packed_type;
+  using paddr_type = codec::paddr_type;
+  using entry_type = sg_entry<dma_bus_space, uint64_t>;
+
+  // 2 slots: one held for the L1 Root Table for the whole call, one for
+  // whichever L2 Leaf page is currently being written/read.
+  using hooks = fake_page_hooks<2, 0x3000>;
+  using mapper_type = slot_map_mapper<2, hooks, dma_bus_space>;
+  hooks::reset_counters();
+
+  uint64_t next_page_address = 0x1000;
+  auto allocate = [&]() -> result<paddr_type> {
+    const auto address = paddr_type{next_page_address};
+    next_page_address += page_4k::page_size;
+    return address;
+  };
+  auto map_page = [](paddr_type address) -> result<slot_map_ptr<packed_type, mapper_type>::guard> {
+    auto ptr =
+        slot_map_ptr<packed_type, mapper_type>::from_paddr(phys_addr<packed_type, dma_bus_space>{address.value});
+    if (!ptr)
+      return unexpected(ptr.error());
+    return ptr->try_map(page_4k::page_size);
+  };
+
+  sg_list<inline_vector<entry_type, 2>> input;
+  ASSERT_TRUE(input.try_push_back(phys_addr<void, dma_bus_space>{0x3450}, 48));
+  inline_vector<paddr_type, 3> allocated_pages;
+  auto root = codec::encode(input, allocate, map_page, allocated_pages);
+  ASSERT_TRUE(root);
+  EXPECT_EQ(root->value, 0x1000u);
+  ASSERT_EQ(allocated_pages.size(), 2u);
+  EXPECT_EQ(hooks::program_calls, 2);
+  EXPECT_EQ(hooks::unprogram_calls, 2);
+
+  sg_list<inline_vector<entry_type, 2>> decoded;
+  ASSERT_TRUE(codec::decode(*root, decoded, map_page, 4));
+  ASSERT_EQ(decoded.size(), 1u);
+  EXPECT_EQ(decoded.begin()->addr.value, 0x3450u);
+  EXPECT_EQ(decoded.begin()->length, 48u);
+  EXPECT_EQ(hooks::program_calls, 4);
+  EXPECT_EQ(hooks::unprogram_calls, 4);
 }
 
 } // namespace

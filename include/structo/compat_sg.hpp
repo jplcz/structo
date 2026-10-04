@@ -246,6 +246,72 @@ public:
   }
 };
 
+// ============================================================================
+// Mapper Handle Support (dmap_ptr::guard / slot_map_ptr::guard interop)
+// ============================================================================
+
+/**
+ * @brief Helpers letting `chained_sg_codec`/`two_level_sg_codec`'s `Mapper`
+ * callable return either a bare pointer (the original, still-supported
+ * contract) or an RAII "mapping handle" -- `dmap_ptr<T, M>::guard` or
+ * `slot_map_ptr<T, M>::guard` (`phys_addr.hpp`/`slot_map_ptr.hpp`), both of
+ * which expose the same `get()`/move-only/`reset()` shape -- so the exact
+ * same codec code works whether pages are permanently direct-mapped or
+ * only dynamically, scope-mapped one (or a handful) at a time.
+ *
+ * `slot_map_mapper` maps exactly one physical page per slot (see its own
+ * docs): its `ArchHooks::slot_size` must be set to the *same*
+ * `PageTraits::page_size` as whichever codec it is paired with below (e.g.
+ * `page_4k`), since every `try_map()` call here requests a full
+ * `PageTraits::page_size`-sized page and `slot_map_mapper::acquire()`
+ * rejects any request that doesn't fit within a single slot.
+ *
+ * @code
+ * // On a target with a permanent direct map:
+ * using dmap = dmap_mapper<...>;
+ * auto mapper = [](paddr_type p) {
+ *   return dmap_ptr<packed_type, dmap>::from_paddr(p.cast_type<packed_type>()).value().try_map();
+ * };
+ *
+ * // On a target without one (e.g. TEE peeking into a handful of REE
+ * // pages at a time), only the `Mapper` changes -- the codec call sites
+ * // (`chained_sg_codec::encode/decode`, `two_level_sg_codec::encode/decode`)
+ * // are identical either way:
+ * using slots = slot_map_mapper<2, ns_peek_hooks, nonsecure_phys_space>;
+ * auto mapper = [](paddr_type p) {
+ *   return slot_map_ptr<packed_type, slots>::from_paddr(p.cast_type<packed_type>())
+ *       .value()
+ *       .try_map(PageTraits::page_size);
+ * };
+ * @endcode
+ */
+namespace sg_mapper_detail {
+
+/** @brief Extracts the raw pointer from either a bare pointer or a `.get()`-style handle. */
+template <typename Handle> [[nodiscard]] constexpr auto *mapped_ptr(Handle &h) noexcept {
+  if constexpr (std::is_pointer_v<std::remove_reference_t<Handle>>) {
+    return h;
+  } else {
+    return h.get();
+  }
+}
+
+/**
+ * @brief Releases a handle's mapping *before* the `Mapper` is asked for the
+ * next one, so a `slot_map_mapper` pool needs only as many concurrently-held
+ * slots as the codec genuinely needs at once (one for `chained_sg_codec`,
+ * two -- root plus leaf -- for `two_level_sg_codec`) rather than one extra
+ * transient slot for the old page while the new one is being acquired.
+ * No-op for bare-pointer handles, which own nothing to release.
+ */
+template <typename Handle> constexpr void release_handle(Handle &h) noexcept {
+  if constexpr (!std::is_pointer_v<std::remove_reference_t<Handle>>) {
+    h.reset();
+  }
+}
+
+} // namespace sg_mapper_detail
+
 /**
  * @brief Encodes and decodes chained SG lists in physical memory.
  *
@@ -273,17 +339,24 @@ public:
    *
    * @param input The plain SGL to encode.
    * @param alloc Callable `result<paddr_type>()`: Allocates a zeroed physical page.
-   * @param mapper Callable `result<packed_type*>(paddr_type)`: Maps a page for CPU access.
+   * @param mapper Callable `result<Handle>(paddr_type)`: Maps a page for CPU
+   * access, where `Handle` is either a bare `packed_type*` or a move-only
+   * RAII handle exposing `.get() -> packed_type*` and `.reset()` -- e.g.
+   * `dmap_ptr<packed_type, M>::guard` or `slot_map_ptr<packed_type, M>::guard`
+   * (`phys_addr.hpp`/`slot_map_ptr.hpp`). Exactly one page is held mapped at
+   * a time (the previous page's handle is released before the next page is
+   * mapped), so a `slot_map_mapper`-backed `Mapper` needs only a single slot.
    * @param allocated_pages Output container populated with every physical page allocated during encoding.
    * @return The physical address of the first page in the chain.
    */
   template <typename InIterable, typename Allocator, typename Mapper, typename OutPageContainer>
   [[nodiscard]] static RELOCO_CONSTEXPR20 result<paddr_type>
   encode(const InIterable &input, Allocator &&alloc, Mapper &&mapper, OutPageContainer &allocated_pages) noexcept {
-    // Descriptor pages are raw hardware/DMA memory returned by `mapper()` as
-    // `packed_type *`, not a bounds-checked span: the safety invariant here
-    // is `entries_per_page`/`header_elements`, enforced manually below,
-    // rather than anything the type system can prove.
+    // Descriptor pages are raw hardware/DMA memory reached through whatever
+    // `mapper()` returns (see sg_mapper_detail::mapped_ptr() above), not a
+    // bounds-checked span: the safety invariant here is
+    // `entries_per_page`/`header_elements`, enforced manually below, rather
+    // than anything the type system can prove.
     RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
     if (input.empty())
       return paddr_type{nullptr};
@@ -305,8 +378,15 @@ public:
       RELOCO_UNLIKELY
     return unexpected(map_res.error());
 
+    // Named, function-scoped handle: kept alive for as long as the current
+    // page is in use, reassigned (not redeclared) on every page transition
+    // below so a move-only RAII `Mapper` handle (slot_map_ptr::guard) is
+    // properly released before the next page's handle replaces it.
+    using page_handle_type = typename decltype(map_res)::value_type;
+    page_handle_type current_page_handle = std::move(*map_res);
+
     // Advance pointer past the header
-    packed_type *current_page_vaddr = (*map_res) + header_elements;
+    packed_type *current_page_vaddr = sg_mapper_detail::mapped_ptr(current_page_handle) + header_elements;
 
     // Prefetch the first cache line of the newly mapped page
 #if defined(__has_builtin) && __has_builtin(__builtin_prefetch)
@@ -348,11 +428,22 @@ public:
 
           // Map the new page and reset the index
           current_page_paddr = *next_page_res;
-          map_res = mapper(current_page_paddr);
-          if (!map_res)
+          // Release the old page's handle before mapping the new one, so a
+          // single-slot slot_map_mapper suffices (see sg_mapper_detail).
+          sg_mapper_detail::release_handle(current_page_handle);
+          // A fresh `auto` declaration (not `map_res = ...`): `expected<T,E>`
+          // has no move-assignment operator when `T` is move-only (e.g. a
+          // `slot_map_ptr::guard`), only an implicit copy-assignment that's
+          // itself deleted in that case -- so reassigning the outer
+          // `expected` would fail to compile. Only `current_page_handle`
+          // (the handle itself, not the `expected` wrapping it) needs
+          // move-assignment, which it has.
+          auto next_map_res = mapper(current_page_paddr);
+          if (!next_map_res)
             RELOCO_UNLIKELY
-          return unexpected(map_res.error());
-          current_page_vaddr = (*map_res) + header_elements;
+          return unexpected(next_map_res.error());
+          current_page_handle = std::move(*next_map_res);
+          current_page_vaddr = sg_mapper_detail::mapped_ptr(current_page_handle) + header_elements;
           current_idx = 0;
         }
 
@@ -416,7 +507,13 @@ public:
    *
    * @param root_page The physical address of the first descriptor page.
    * @param output The sg_list to populate.
-   * @param mapper Callable `result<const packed_type*>(paddr_type)`: Maps a page for CPU read access.
+   * @param mapper Callable `result<Handle>(paddr_type)`: Maps a page for CPU
+   * read access, where `Handle` is either a bare `const packed_type*` or a
+   * move-only RAII handle exposing `.get() -> const packed_type*` (e.g.
+   * `dmap_ptr<const packed_type, M>::guard`/`slot_map_ptr<const packed_type,
+   * M>::guard`). Only one page is ever mapped at a time -- the previous
+   * page's handle is destroyed before the next page is mapped -- so a
+   * `slot_map_mapper`-backed `Mapper` needs only a single slot.
    * @param max_pages The maximum number of pages to traverse (Mitigates cyclic-chain DoS attacks).
    */
   template <typename OutContainer, typename Mapper>
@@ -441,7 +538,11 @@ public:
       if (!map_res)
         RELOCO_UNLIKELY
       return unexpected(map_res.error());
-      const packed_type *current_page_vaddr = (*map_res) + header_elements;
+      // Named (not a bare temporary) so a move-only RAII handle stays
+      // mapped for this iteration's full scope, released automatically at
+      // the closing brace -- i.e. before the next iteration's `mapper()` call.
+      auto current_page_handle = std::move(*map_res);
+      const packed_type *current_page_vaddr = sg_mapper_detail::mapped_ptr(current_page_handle) + header_elements;
 
 #if defined(__has_builtin) && __has_builtin(__builtin_prefetch)
       // rw = 0 -  prepare the prefetch for a read
@@ -561,7 +662,14 @@ public:
    *
    * @param input The plain SGL to encode.
    * @param alloc Allocates zeroed physical pages (used for both L1 and L2).
-   * @param mapper Maps a physical page to a void* for CPU write access.
+   * @param mapper Callable `result<Handle>(paddr_type)` mapping a physical
+   * page for CPU write access, where `Handle` is either a bare pointer
+   * (convertible via `static_cast` to `l1_packed_type*`/`l2_packed_type*`)
+   * or a move-only RAII handle exposing `.get()`/`.reset()` -- e.g.
+   * `dmap_ptr<T, M>::guard`/`slot_map_ptr<T, M>::guard`. Unlike
+   * `chained_sg_codec`, the L1 Root Table stays mapped for the whole call
+   * *concurrently* with one L2 Leaf page, so a `slot_map_mapper`-backed
+   * `Mapper` needs at least 2 slots.
    * @param allocated_pages Output container populated with every physical page allocated during encoding.
    * @return The physical address of the L1 Root Page.
    */
@@ -591,13 +699,22 @@ public:
       RELOCO_UNLIKELY
     return unexpected(l1_map_res.error());
 
-    auto *l1_vaddr = static_cast<l1_packed_type *>(*l1_map_res) + l1_header_elements;
+    // Held for the entire call: the L1 Root Table stays mapped concurrently
+    // with whichever L2 Leaf page is currently being written.
+    auto l1_handle = std::move(*l1_map_res);
+    auto *l1_vaddr = static_cast<l1_packed_type *>(sg_mapper_detail::mapped_ptr(l1_handle)) + l1_header_elements;
 
     size_t l1_idx = 0;
     size_t l2_idx = 0;
 
     paddr_type current_l2_paddr{nullptr};
     l2_packed_type *current_l2_vaddr = nullptr;
+    // Hoisted to function scope (default-constructed = "no L2 page mapped
+    // yet") and reassigned, never redeclared, below: `current_l2_vaddr`
+    // must stay valid across loop iterations until the next reassignment
+    // explicitly replaces/releases it.
+    using l2_handle_type = typename decltype(l1_map_res)::value_type;
+    l2_handle_type current_l2_handle{};
 
     for (const auto &entry : input) {
       auto paddr = entry.addr;
@@ -621,12 +738,18 @@ public:
 
           current_l2_paddr = *l2_page_res;
 
+          // Release the previous L2 page's handle before mapping the new
+          // one, so a slot_map_mapper needs only 2 concurrent slots total
+          // (one L1 + one L2), not 3.
+          sg_mapper_detail::release_handle(current_l2_handle);
           auto l2_map_res = mapper(current_l2_paddr);
           if (!l2_map_res)
             RELOCO_UNLIKELY
           return unexpected(l2_map_res.error());
 
-          current_l2_vaddr = static_cast<l2_packed_type *>(*l2_map_res) + l2_header_elements;
+          current_l2_handle = std::move(*l2_map_res);
+          current_l2_vaddr = static_cast<l2_packed_type *>(sg_mapper_detail::mapped_ptr(current_l2_handle)) +
+                              l2_header_elements;
 
           // Write L1 Entry pointing to the new L2 page
           l1_vaddr[l1_idx].template truncating_set<typename L1Layout::pfn_field>(current_l2_paddr.value >>
@@ -706,7 +829,11 @@ public:
    *
    * @param root_page The physical address of the L1 Root Page.
    * @param output The sg_list to populate.
-   * @param mapper Maps a physical page to a void* for CPU read access.
+   * @param mapper Callable `result<Handle>(paddr_type)` mapping a physical
+   * page for CPU read access; see `encode()`'s docs for the `Handle`
+   * contract. The L1 Root Table stays mapped for the whole call
+   * concurrently with one L2 Leaf page, so a `slot_map_mapper`-backed
+   * `Mapper` needs at least 2 slots.
    * @param l1_entry_limit The maximum number of L1 entries to process (mitigates infinite loops / out-of-bounds).
    */
   template <typename OutContainer, typename Mapper>
@@ -724,7 +851,10 @@ public:
       RELOCO_UNLIKELY
     return unexpected(l1_map_res.error());
 
-    const auto *l1_vaddr = static_cast<const l1_packed_type *>(*l1_map_res) + l1_header_elements;
+    // Held for the entire call, concurrently with each L2 handle below.
+    auto l1_handle = std::move(*l1_map_res);
+    const auto *l1_vaddr =
+        static_cast<const l1_packed_type *>(sg_mapper_detail::mapped_ptr(l1_handle)) + l1_header_elements;
 
 #if defined(__has_builtin) && __has_builtin(__builtin_prefetch)
     // rw = 0 -  prepare the prefetch for a read
@@ -753,7 +883,11 @@ public:
         RELOCO_UNLIKELY
       return unexpected(l2_map_res.error());
 
-      const auto *l2_vaddr = static_cast<const l2_packed_type *>(*l2_map_res) + l2_header_elements;
+      // Scoped to this outer-loop iteration: released (if owning) at the
+      // closing brace below, before the next iteration maps a new L2 page.
+      auto l2_handle = std::move(*l2_map_res);
+      const auto *l2_vaddr =
+          static_cast<const l2_packed_type *>(sg_mapper_detail::mapped_ptr(l2_handle)) + l2_header_elements;
 
 #if defined(__has_builtin) && __has_builtin(__builtin_prefetch)
       // rw = 0 -  prepare the prefetch for a read

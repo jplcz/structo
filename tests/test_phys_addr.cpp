@@ -134,6 +134,36 @@ TEST(DmapPtrTest, FactorySecurityViolations) {
   EXPECT_EQ(v_res.error(), error::out_of_range);
 }
 
+TEST(DmapPtrTest, TryMapMatchesSlotMapPtrGuardApi) {
+  // Same trick as TryGetExplicitUnwrapping: pretend `fake_reg` lives at
+  // VIRT_BASE+0 so the fixed offset mapper resolves it back to itself.
+  hw_register fake_reg{0xDEADBEEF, 0xCAFEBABE};
+  using test_dmap = dmap_mapper<0, PHYS_SIZE, host_phys_space, 0>;
+
+  auto ptr_res = dmap_ptr<hw_register, test_dmap>::from_virt(&fake_reg);
+  ASSERT_TRUE(ptr_res.has_value());
+
+  auto guard_res = ptr_res.value().try_map();
+  ASSERT_TRUE(guard_res.has_value());
+  auto guard = std::move(guard_res.value());
+  ASSERT_TRUE(guard);
+
+  EXPECT_EQ(guard->control, 0xDEADBEEFu);
+  EXPECT_EQ((*guard).status, 0xCAFEBABEu);
+  EXPECT_EQ(guard.get(), &fake_reg);
+
+  // Unlike slot_map_ptr::guard, reset()/destruction is a no-op: the direct
+  // map is permanent, so there is nothing to tear down.
+  guard.reset();
+  EXPECT_TRUE(guard.is_null());
+
+  // Null dmap_ptr -> try_map() fails exactly like try_get() does.
+  dmap_ptr<hw_register, kernel_dmap> null_ptr = nullptr;
+  auto null_res = null_ptr.try_map();
+  EXPECT_FALSE(null_res.has_value());
+  EXPECT_EQ(null_res.error(), error::invalid_argument);
+}
+
 TEST(DmapPtrTest, VoidPointerSupport) {
   // Ensure that void pointers can still be passed around and translated
   dmap_ptr<void, kernel_dmap> void_ptr;
