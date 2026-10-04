@@ -276,10 +276,11 @@ def cpp_struct_x86(name: str, entries_by_width: dict[int, dict]) -> str:
     existing unified `structo/arch/x86/*.hpp` convention."""
     widths = sorted(entries_by_width.keys())
     any_kind = entries_by_width[widths[0]]["encoding"]["kind"]
-    # MSR access is architecturally mode-independent (always a 64-bit value
-    # regardless of whether the code executes in 32-bit or 64-bit mode), so
-    # it is emitted once under a single combined guard instead of per-width.
-    mode_independent = any_kind == "rdmsr_wrmsr"
+    # MSR/XCR access is architecturally mode-independent (always a 64-bit
+    # value regardless of whether the code executes in 32-bit or 64-bit
+    # mode), so it is emitted once under a single combined guard instead of
+    # per-width.
+    mode_independent = any_kind in ("rdmsr_wrmsr", "xgetbv_xsetbv")
 
     all_fields = [f for width in widths for f in entries_by_width[width].get("fields", [])]
     lines = [
@@ -321,14 +322,15 @@ def cpp_struct_x86(name: str, entries_by_width: dict[int, dict]) -> str:
         lines.append("")
 
     if mode_independent:
-        msr = entries_by_width[widths[0]]["encoding"]["msr"]
         if widths == [32]:
             guard = "defined(__i386__)"
         elif widths == [64]:
             guard = "defined(__x86_64__)"
         else:
             guard = "defined(__i386__) || defined(__x86_64__)"
-        body = f"""\
+        if any_kind == "rdmsr_wrmsr":
+            msr = entries_by_width[widths[0]]["encoding"]["msr"]
+            body = f"""\
 #if {guard}
   [[nodiscard]] static {name} read() noexcept {{
     std::uint32_t lo, hi;
@@ -342,13 +344,29 @@ def cpp_struct_x86(name: str, entries_by_width: dict[int, dict]) -> str:
   }}
 #endif // {guard}
 """
+        else:
+            xcr = entries_by_width[widths[0]]["encoding"]["xcr"]
+            body = f"""\
+#if {guard}
+  [[nodiscard]] static {name} read() noexcept {{
+    std::uint32_t lo, hi;
+    asm volatile("xgetbv" : "=a"(lo), "=d"(hi) : "c"({hex(xcr)}));
+    return {name}{{(static_cast<std::uint64_t>(hi) << 32) | lo}};
+  }}
+  void write() const noexcept {{
+    const std::uint32_t lo = static_cast<std::uint32_t>(raw);
+    const std::uint32_t hi = static_cast<std::uint32_t>(raw >> 32);
+    asm volatile("xsetbv" ::"c"({hex(xcr)}), "a"(lo), "d"(hi) : "memory");
+  }}
+#endif // {guard}
+"""
         lines.append(body.rstrip("\n"))
     else:
         for width in widths:
             enc = entries_by_width[width]["encoding"]
             guard = "__x86_64__" if width == 64 else "__i386__"
             kind = enc["kind"]
-            if kind == "mov_cr":
+            if kind in ("mov_cr", "mov_dr"):
                 int_type = "std::uint64_t" if width == 64 else "std::uint32_t"
                 lines.append(_x86_cr_body(name, enc["reg"], int_type, guard).rstrip("\n"))
             elif kind == "pushf_popf":

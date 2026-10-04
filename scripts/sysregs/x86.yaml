@@ -101,3 +101,66 @@ registers:
   - lme:8:1
   - lma:10:1
   - nxe:11:1
+- name: dr0
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: mov_dr
+    reg: dr0
+  fields: []
+- name: dr1
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: mov_dr
+    reg: dr1
+  fields: []
+- name: dr2
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: mov_dr
+    reg: dr2
+  fields: []
+- name: dr3
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: mov_dr
+    reg: dr3
+  fields: []
+- name: dr6
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: mov_dr
+    reg: dr6
+  fields: []
+- name: xcr0
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: xgetbv_xsetbv
+    xcr: 0
+  fields:
+  - x87:0:1
+  - sse:1:1
+  - avx:2:1
+  - bndreg:3:1
+  - bndcsr:4:1
+  - opmask:5:1
+  - zmm_hi256:6:1
+  - hi16_zmm:7:1
+  - pkru:9:1

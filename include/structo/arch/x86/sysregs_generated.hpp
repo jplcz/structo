@@ -293,6 +293,136 @@ struct cr8 {
 #endif // defined(__x86_64__)
 };
 
+/** @brief Raw accessor for the x86 `DR0` register (no named fields yet). */
+struct dr0 {
+#if defined(__x86_64__)
+  std::uint64_t raw{0};
+#else
+  std::uint32_t raw{0};
+#endif
+
+#if defined(__i386__)
+  [[nodiscard]] static dr0 read() noexcept {
+    std::uint32_t value;
+    asm volatile("mov %%dr0, %0" : "=r"(value));
+    return dr0{value};
+  }
+  void write() const noexcept { asm volatile("mov %0, %%dr0" ::"r"(raw) : "memory"); }
+#endif // defined(__i386__)
+#if defined(__x86_64__)
+  [[nodiscard]] static dr0 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mov %%dr0, %0" : "=r"(value));
+    return dr0{value};
+  }
+  void write() const noexcept { asm volatile("mov %0, %%dr0" ::"r"(raw) : "memory"); }
+#endif // defined(__x86_64__)
+};
+
+/** @brief Raw accessor for the x86 `DR1` register (no named fields yet). */
+struct dr1 {
+#if defined(__x86_64__)
+  std::uint64_t raw{0};
+#else
+  std::uint32_t raw{0};
+#endif
+
+#if defined(__i386__)
+  [[nodiscard]] static dr1 read() noexcept {
+    std::uint32_t value;
+    asm volatile("mov %%dr1, %0" : "=r"(value));
+    return dr1{value};
+  }
+  void write() const noexcept { asm volatile("mov %0, %%dr1" ::"r"(raw) : "memory"); }
+#endif // defined(__i386__)
+#if defined(__x86_64__)
+  [[nodiscard]] static dr1 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mov %%dr1, %0" : "=r"(value));
+    return dr1{value};
+  }
+  void write() const noexcept { asm volatile("mov %0, %%dr1" ::"r"(raw) : "memory"); }
+#endif // defined(__x86_64__)
+};
+
+/** @brief Raw accessor for the x86 `DR2` register (no named fields yet). */
+struct dr2 {
+#if defined(__x86_64__)
+  std::uint64_t raw{0};
+#else
+  std::uint32_t raw{0};
+#endif
+
+#if defined(__i386__)
+  [[nodiscard]] static dr2 read() noexcept {
+    std::uint32_t value;
+    asm volatile("mov %%dr2, %0" : "=r"(value));
+    return dr2{value};
+  }
+  void write() const noexcept { asm volatile("mov %0, %%dr2" ::"r"(raw) : "memory"); }
+#endif // defined(__i386__)
+#if defined(__x86_64__)
+  [[nodiscard]] static dr2 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mov %%dr2, %0" : "=r"(value));
+    return dr2{value};
+  }
+  void write() const noexcept { asm volatile("mov %0, %%dr2" ::"r"(raw) : "memory"); }
+#endif // defined(__x86_64__)
+};
+
+/** @brief Raw accessor for the x86 `DR3` register (no named fields yet). */
+struct dr3 {
+#if defined(__x86_64__)
+  std::uint64_t raw{0};
+#else
+  std::uint32_t raw{0};
+#endif
+
+#if defined(__i386__)
+  [[nodiscard]] static dr3 read() noexcept {
+    std::uint32_t value;
+    asm volatile("mov %%dr3, %0" : "=r"(value));
+    return dr3{value};
+  }
+  void write() const noexcept { asm volatile("mov %0, %%dr3" ::"r"(raw) : "memory"); }
+#endif // defined(__i386__)
+#if defined(__x86_64__)
+  [[nodiscard]] static dr3 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mov %%dr3, %0" : "=r"(value));
+    return dr3{value};
+  }
+  void write() const noexcept { asm volatile("mov %0, %%dr3" ::"r"(raw) : "memory"); }
+#endif // defined(__x86_64__)
+};
+
+/** @brief Raw accessor for the x86 `DR6` register (no named fields yet). */
+struct dr6 {
+#if defined(__x86_64__)
+  std::uint64_t raw{0};
+#else
+  std::uint32_t raw{0};
+#endif
+
+#if defined(__i386__)
+  [[nodiscard]] static dr6 read() noexcept {
+    std::uint32_t value;
+    asm volatile("mov %%dr6, %0" : "=r"(value));
+    return dr6{value};
+  }
+  void write() const noexcept { asm volatile("mov %0, %%dr6" ::"r"(raw) : "memory"); }
+#endif // defined(__i386__)
+#if defined(__x86_64__)
+  [[nodiscard]] static dr6 read() noexcept {
+    std::uint64_t value;
+    asm volatile("mov %%dr6, %0" : "=r"(value));
+    return dr6{value};
+  }
+  void write() const noexcept { asm volatile("mov %0, %%dr6" ::"r"(raw) : "memory"); }
+#endif // defined(__x86_64__)
+};
+
 /** @brief Raw accessor for the x86 `EFLAGS` register (17 named field(s)). */
 struct eflags {
   std::uint32_t raw{0};
@@ -521,6 +651,55 @@ struct rflags {
     asm volatile("push %0\n\tpopfq" ::"r"(raw) : "cc", "memory");
   }
 #endif // defined(__x86_64__)
+};
+
+/** @brief Raw accessor for the x86 `XCR0` register (18 named field(s)). */
+struct xcr0 {
+  std::uint64_t raw{0};
+
+  struct bits {
+    using x87 = ::structo::arch::pte_bit_field<0, 1, std::uint64_t>;
+    using sse = ::structo::arch::pte_bit_field<1, 1, std::uint64_t>;
+    using avx = ::structo::arch::pte_bit_field<2, 1, std::uint64_t>;
+    using bndreg = ::structo::arch::pte_bit_field<3, 1, std::uint64_t>;
+    using bndcsr = ::structo::arch::pte_bit_field<4, 1, std::uint64_t>;
+    using opmask = ::structo::arch::pte_bit_field<5, 1, std::uint64_t>;
+    using zmm_hi256 = ::structo::arch::pte_bit_field<6, 1, std::uint64_t>;
+    using hi16_zmm = ::structo::arch::pte_bit_field<7, 1, std::uint64_t>;
+    using pkru = ::structo::arch::pte_bit_field<9, 1, std::uint64_t>;
+  };
+
+  [[nodiscard]] constexpr bool x87() const noexcept { return bits::x87::test(raw); }
+  constexpr auto &set_x87(bool value) noexcept { raw = bits::x87::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool sse() const noexcept { return bits::sse::test(raw); }
+  constexpr auto &set_sse(bool value) noexcept { raw = bits::sse::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool avx() const noexcept { return bits::avx::test(raw); }
+  constexpr auto &set_avx(bool value) noexcept { raw = bits::avx::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool bndreg() const noexcept { return bits::bndreg::test(raw); }
+  constexpr auto &set_bndreg(bool value) noexcept { raw = bits::bndreg::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool bndcsr() const noexcept { return bits::bndcsr::test(raw); }
+  constexpr auto &set_bndcsr(bool value) noexcept { raw = bits::bndcsr::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool opmask() const noexcept { return bits::opmask::test(raw); }
+  constexpr auto &set_opmask(bool value) noexcept { raw = bits::opmask::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool zmm_hi256() const noexcept { return bits::zmm_hi256::test(raw); }
+  constexpr auto &set_zmm_hi256(bool value) noexcept { raw = bits::zmm_hi256::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool hi16_zmm() const noexcept { return bits::hi16_zmm::test(raw); }
+  constexpr auto &set_hi16_zmm(bool value) noexcept { raw = bits::hi16_zmm::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool pkru() const noexcept { return bits::pkru::test(raw); }
+  constexpr auto &set_pkru(bool value) noexcept { raw = bits::pkru::set_bit(raw, value); return *this; }
+
+#if defined(__i386__) || defined(__x86_64__)
+  [[nodiscard]] static xcr0 read() noexcept {
+    std::uint32_t lo, hi;
+    asm volatile("xgetbv" : "=a"(lo), "=d"(hi) : "c"(0x0));
+    return xcr0{(static_cast<std::uint64_t>(hi) << 32) | lo};
+  }
+  void write() const noexcept {
+    const std::uint32_t lo = static_cast<std::uint32_t>(raw);
+    const std::uint32_t hi = static_cast<std::uint32_t>(raw >> 32);
+    asm volatile("xsetbv" ::"c"(0x0), "a"(lo), "d"(hi) : "memory");
+  }
+#endif // defined(__i386__) || defined(__x86_64__)
 };
 
 } // namespace structo::arch::x86::sysreg_raw
