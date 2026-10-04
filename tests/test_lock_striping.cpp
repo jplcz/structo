@@ -159,7 +159,7 @@ TEST_F(LockStripingTest, AlignedKeysDoNotAllCollideOnOneStripe) {
   // allocator alignment) and confirm they are not all forced onto
   // whichever stripe key[0] lands on.
   lock_striping<64> table;
-  alignas(64) int keys[8][16];
+  alignas(64) int keys[8][16]{};
 
   auto guard0 = table.lock_for(&keys[0]);
   int busy_count = 0;

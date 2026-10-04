@@ -92,7 +92,7 @@ public:
   }
 
   /** @brief Fallible variant of `set_level_count`. */
-  constexpr reloco::result<void> try_set_level_count(std::size_t count) noexcept {
+  RELOCO_CONSTEXPR20 reloco::result<void> try_set_level_count(std::size_t count) noexcept {
     if (count > max_levels)
       return reloco::unexpected(reloco::error::out_of_range);
     m_level_count = count;
@@ -111,7 +111,7 @@ public:
   }
 
   /** @brief Fallible variant of `set_level_id`. */
-  constexpr reloco::result<void> try_set_level_id(std::size_t cpu, std::size_t level, LevelId id) noexcept {
+  RELOCO_CONSTEXPR20 reloco::result<void> try_set_level_id(std::size_t cpu, std::size_t level, LevelId id) noexcept {
     if (cpu >= max_cpus || level >= max_levels)
       return reloco::unexpected(reloco::error::out_of_range);
     m_ids[cpu][level] = id;
