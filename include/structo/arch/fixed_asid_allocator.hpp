@@ -180,6 +180,12 @@
  * generation-rollover allocator this header's "never needs to reclaim"
  * case trades away), [`cpu_mask.md`](cpu_mask.md) (the fixed-size,
  * allocation-free bitmask storage convention this header follows).
+ *
+ * @note Refactor candidate: like `asid_allocator.hpp`'s `bitmap_`, the
+ * fixed `std::uint64_t bitmap_[word_count]` array and its
+ * `mark_used`/`clear_bit`/scan helpers below duplicate what
+ * `bitmap_utils.hpp`/`bitmap_ops.hpp`/`fixed_bitmap<N>` now provide
+ * generically. Deferred to a future pass rather than bundled here.
  */
 
 #include <reloco/error.hpp>

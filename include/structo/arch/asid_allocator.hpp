@@ -362,6 +362,14 @@
  *   if constexpr (!arch_has_broadcast_tlbi) { arch_wait_for_shootdown_acks(targets); } // once, for the whole range
  * }
  * @endcode
+ *
+ * @note Refactor candidate: the ASID bitmap below (`bitmap_`,
+ * `test_bit`/`mark_used`/`clear_bit`) is a hand-rolled
+ * `vector<std::uint64_t>` bit-twiddler that predates
+ * `bitmap_utils.hpp`/`bitmap_ops.hpp`/`dynamic_bitmap.hpp`. It could be
+ * rebased onto `dynamic_bitmap` (same `allocator_ref`-backed, runtime-
+ * sized storage) to drop the duplicated bit-scan logic, but that is left
+ * for a future pass rather than bundled into this change.
  */
 
 #include <reloco/allocator.hpp>

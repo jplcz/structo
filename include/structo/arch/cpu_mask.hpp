@@ -128,6 +128,17 @@
  * directly to a single hardware instruction (e.g. `popcnt`/`bsf`/`bsr` or
  * `tzcnt`/`lzcnt` on x86, `rbit`+`clz` on AArch64) on every target this
  * library supports.
+ *
+ * @note Refactor candidate: `bitmap_utils.hpp`/`bitmap_ops.hpp` (added
+ * later) now provide the same tri-tier/atomic bit API generically over
+ * `unsigned long` words. `cpu_mask` predates them and still hand-rolls
+ * its own `std::uint64_t`-word bit-twiddling so it can stay fully
+ * `constexpr`-usable (`bitmap_ops` is not); unifying the two would mean
+ * either making `bitmap_utils` constexpr-friendly or accepting the loss
+ * of `cpu_mask`'s compile-time usability. Left as-is for now -- a future
+ * pass could have `cpu_mask<Tag, MaxCpus>` derive from
+ * `bitmap_ops<cpu_mask<Tag, MaxCpus>>` (on top of a `fixed_bitmap<MaxCpus>`-
+ * shaped backing store) once that tradeoff is revisited.
  */
 
 #include <atomic>
