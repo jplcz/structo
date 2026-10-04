@@ -78,22 +78,37 @@
  * fails deterministically (not merely a transient race) would otherwise
  * be retried forever once the mask resets to the same full snapshot.
  *
+ * ## Two questions per policy: whether to look, and what to accept
+ *
+ * Each policy answers two separate questions, both driven purely by
+ * `local_load` vs. `candidate_load` with no hidden state:
+ *
+ * - `should_attempt_steal(local_load)`: is it even worth walking
+ *   @p siblings at all? Checked once, up front, by
+ *   `find_steal_candidate` itself -- a caller never needs to inline this
+ *   condition before deciding whether to call it.
+ * - `should_steal(local_load, candidate_load)`: given a specific
+ *   candidate reached while walking, is *this one* worth stealing from?
+ *
  * ## The three policies
  *
- * - **`performance_steal_policy`**: steals as soon as a candidate has
- *   more than one extra runnable task compared to the local count --
- *   minimizing latency/idle time is worth the migration cost even for a
- *   small imbalance.
- * - **`power_save_steal_policy`**: steals only when the local CPU is
- *   *completely* idle (`local_load == 0`) and some candidate has
- *   anything runnable at all -- a lightly-loaded-but-not-idle CPU never
- *   bothers a neighbor, and this policy never has any opinion on
- *   *waking* a sleeping/offline CPU to begin with (that's exactly what
- *   @p eligible already excludes); it only decides whether it's worth
- *   reaching out to an already-awake neighbor.
- * - **`always_steal_policy`**: steals whenever a candidate has anything
- *   runnable at all, unconditionally -- the right policy for a
- *   passively-scheduled kernel (e.g. a TEE/TrustZone OS paired with
+ * - **`performance_steal_policy`**: attempts whenever the local CPU
+ *   isn't already comfortably loaded (`local_load <= 1`), and steals as
+ *   soon as a candidate has more than one extra runnable task compared
+ *   to the local count -- minimizing latency/idle time is worth the
+ *   migration cost even for a small imbalance.
+ * - **`power_save_steal_policy`**: only ever attempts once the local CPU
+ *   is *completely* idle (`local_load == 0`), and then steals from the
+ *   first candidate with anything runnable at all -- a
+ *   lightly-loaded-but-not-idle CPU never even looks, let alone bothers
+ *   a neighbor, and this policy never has any opinion on *waking* a
+ *   sleeping/offline CPU to begin with (that's exactly what @p eligible
+ *   already excludes); it only decides whether it's worth reaching out
+ *   to an already-awake neighbor.
+ * - **`always_steal_policy`**: always attempts, regardless of local
+ *   load, and steals from the first candidate with anything runnable at
+ *   all -- the right policy for a passively-scheduled kernel (e.g. a
+ *   TEE/TrustZone OS paired with
  *   `structo::arch::passive_cpu_topology_decoder`, see
  *   `cpu_topology.hpp`) where there is effectively only one shared
  *   runqueue to begin with, so "stealing" is really just "picking up
@@ -110,6 +125,11 @@ namespace structo {
 
 /** @brief Latency-favoring policy: steals as soon as a candidate has more than one extra runnable task. */
 struct performance_steal_policy {
+  /** @brief Worth searching whenever the local CPU isn't already comfortably loaded -- catches "merely busy, could
+   * still use a hand" the same way `should_steal` does, not just the fully-idle case. */
+  [[nodiscard]] static constexpr bool should_attempt_steal(std::size_t local_load) noexcept {
+    return local_load <= 1;
+  }
   [[nodiscard]] static constexpr bool should_steal(std::size_t local_load, std::size_t candidate_load) noexcept {
     return candidate_load > local_load + 1;
   }
@@ -118,6 +138,9 @@ struct performance_steal_policy {
 /** @brief Power-favoring policy: steals only when the local CPU is completely idle. Never wakes a sleeping/offline
  * CPU itself -- see the @file-level docs' `eligible` mask. */
 struct power_save_steal_policy {
+  /** @brief Only ever worth searching once the local CPU has nothing left to run -- mirrors `should_steal`'s own
+   * `local_load == 0` gate, so a lightly-loaded-but-not-idle CPU never even walks the sibling order. */
+  [[nodiscard]] static constexpr bool should_attempt_steal(std::size_t local_load) noexcept { return local_load == 0; }
   [[nodiscard]] static constexpr bool should_steal(std::size_t local_load, std::size_t candidate_load) noexcept {
     return local_load == 0 && candidate_load > 0;
   }
@@ -126,6 +149,8 @@ struct power_save_steal_policy {
 /** @brief Single-shared-runqueue policy for passively-scheduled kernels (e.g. TEE/TrustZone): steals whenever a
  * candidate has anything runnable, unconditionally. */
 struct always_steal_policy {
+  /** @brief Always worth searching, regardless of local load -- matches `should_steal`'s own unconditional accept. */
+  [[nodiscard]] static constexpr bool should_attempt_steal(std::size_t /*local_load*/) noexcept { return true; }
   [[nodiscard]] static constexpr bool should_steal(std::size_t /*local_load*/, std::size_t candidate_load) noexcept {
     return candidate_load > 0;
   }
@@ -136,9 +161,21 @@ struct always_steal_policy {
  * returns the first CPU @p policy accepts as worth stealing from, or an
  * empty `optional` if none qualifies. See the @file-level docs above for
  * the full topology-ordering and eligibility-mask rationale.
+ *
+ * Before looking at any candidate at all, this first asks
+ * @p StealPolicy `should_attempt_steal(local_load)` -- the same
+ * "is this even worth searching for" gate a caller would otherwise have
+ * to duplicate by hand before deciding whether to call this function in
+ * the first place (e.g. `power_save_steal_policy` only ever wants to
+ * search once @p this_cpu is completely idle). Folding that gate in here
+ * means a single policy type fully describes both "when to look"
+ * (`should_attempt_steal`) and "what to accept once looking"
+ * (`should_steal`), and callers that merely want "idle or not" behavior
+ * never need to inline that condition themselves.
  * @tparam StealPolicy One of `performance_steal_policy`/
  * `power_save_steal_policy`/`always_steal_policy` (or any type providing
- * the same `should_steal(local_load, candidate_load)` static method).
+ * the same `should_attempt_steal(local_load)` and
+ * `should_steal(local_load, candidate_load)` static methods).
  * @param siblings   `this_cpu`'s precomputed, closest-first candidate
  * order (see `cpu_sibling_map.hpp`).
  * @param this_cpu   The CPU looking for work.
@@ -148,7 +185,9 @@ struct always_steal_policy {
  * @param load       Invocable as `load(std::size_t cpu) -> std::size_t`,
  * returning `cpu`'s current stealable load (e.g.
  * `structo::cpu_load::current()`, or a runqueue's own `size()`).
- * Called for `this_cpu` exactly once, then once per examined candidate.
+ * Called for `this_cpu` exactly once -- and only if
+ * `should_attempt_steal` accepts that load -- then once per examined
+ * candidate.
  */
 template <typename StealPolicy, std::size_t MaxCpus, std::size_t MaxLevels, typename LevelId, typename Tag,
           typename LoadFn>
@@ -156,6 +195,8 @@ template <typename StealPolicy, std::size_t MaxCpus, std::size_t MaxLevels, type
 find_steal_candidate(const arch::cpu_sibling_map<MaxCpus, MaxLevels, LevelId> &siblings, std::size_t this_cpu,
                       const arch::cpu_mask<Tag, MaxCpus> &eligible, LoadFn &&load) noexcept {
   const std::size_t local_load = load(this_cpu);
+  if (!StealPolicy::should_attempt_steal(local_load))
+    return reloco::nullopt;
   const std::size_t count = siblings.sibling_count(this_cpu);
   for (std::size_t i = 0; i < count; ++i) {
     const std::size_t candidate = siblings.sibling(this_cpu, i);

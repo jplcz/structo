@@ -141,6 +141,38 @@ TEST_F(WorkStealTest, AlwaysStealPolicyTakesAnyNonemptyCandidateRegardlessOfLoca
   EXPECT_EQ(*victim, 3u);
 }
 
+TEST_F(WorkStealTest, PerformancePolicyAttemptsWhenLocalLoadLow) {
+  EXPECT_TRUE(performance_steal_policy::should_attempt_steal(0));
+  EXPECT_TRUE(performance_steal_policy::should_attempt_steal(1));
+  EXPECT_FALSE(performance_steal_policy::should_attempt_steal(2));
+}
+
+TEST_F(WorkStealTest, PowerSavePolicyOnlyAttemptsWhenFullyIdle) {
+  EXPECT_TRUE(power_save_steal_policy::should_attempt_steal(0));
+  EXPECT_FALSE(power_save_steal_policy::should_attempt_steal(1));
+}
+
+TEST_F(WorkStealTest, AlwaysStealPolicyAlwaysAttemptsRegardlessOfLocalLoad) {
+  EXPECT_TRUE(always_steal_policy::should_attempt_steal(0));
+  EXPECT_TRUE(always_steal_policy::should_attempt_steal(42));
+}
+
+TEST_F(WorkStealTest, FindStealCandidateSkipsSearchWhenPolicyDeclinesToAttempt) {
+  auto topo = make_two_cluster_topology();
+  auto siblings = make_siblings(topo);
+  std::size_t load[4] = {1, 0, 0, 5}; // local isn't idle; power_save shouldn't even look
+  auto eligible = mask4::filled();
+  bool candidate_load_queried = false;
+
+  auto victim = find_steal_candidate<power_save_steal_policy>(siblings, 0, eligible, [&](std::size_t cpu) {
+    if (cpu != 0)
+      candidate_load_queried = true;
+    return load[cpu];
+  });
+  EXPECT_FALSE(victim.has_value());
+  EXPECT_FALSE(candidate_load_queried); // confirms the early-exit, not merely "no candidate qualified"
+}
+
 TEST_F(WorkStealTest, NoCandidateQualifiesReturnsEmpty) {
   auto topo = make_two_cluster_topology();
   auto siblings = make_siblings(topo);

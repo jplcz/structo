@@ -76,22 +76,37 @@ changed the online set mid-search, but without a cap a candidate that
 fails deterministically (not merely a transient race) would otherwise be
 retried forever once the mask resets to the same full snapshot.
 
+## Two questions per policy: whether to look, and what to accept
+
+Each policy answers two separate questions, both driven purely by
+`local_load` vs. `candidate_load` with no hidden state:
+
+- `should_attempt_steal(local_load)`: is it even worth walking the
+  sibling map at all? Checked once, up front, by `find_steal_candidate`
+  itself -- a caller never needs to inline this condition before
+  deciding whether to call it.
+- `should_steal(local_load, candidate_load)`: given a specific candidate
+  reached while walking, is *this one* worth stealing from?
+
 ## The three policies
 
-- **`performance_steal_policy`**: steals as soon as a candidate has more
-  than one extra runnable task compared to the local count --
-  minimizing latency/idle time is worth the migration cost even for a
-  small imbalance.
-- **`power_save_steal_policy`**: steals only when the local CPU is
-  *completely* idle (`local_load == 0`) and some candidate has anything
-  runnable at all -- a lightly-loaded-but-not-idle CPU never bothers a
+- **`performance_steal_policy`**: attempts whenever the local CPU isn't
+  already comfortably loaded (`local_load <= 1`), and steals as soon as
+  a candidate has more than one extra runnable task compared to the
+  local count -- minimizing latency/idle time is worth the migration
+  cost even for a small imbalance.
+- **`power_save_steal_policy`**: only ever attempts once the local CPU
+  is *completely* idle (`local_load == 0`), and then steals from the
+  first candidate with anything runnable at all -- a
+  lightly-loaded-but-not-idle CPU never even looks, let alone bothers a
   neighbor, and this policy never has any opinion on *waking* a
   sleeping/offline CPU to begin with (that's exactly what `eligible`
   already excludes); it only decides whether it's worth reaching out to
   an already-awake neighbor.
-- **`always_steal_policy`**: steals whenever a candidate has anything
-  runnable at all, unconditionally -- the right policy for a
-  passively-scheduled kernel (e.g. a TEE/TrustZone OS paired with
+- **`always_steal_policy`**: always attempts, regardless of local load,
+  and steals from the first candidate with anything runnable at all --
+  the right policy for a passively-scheduled kernel (e.g. a
+  TEE/TrustZone OS paired with
   [`passive_cpu_topology_decoder`](cpu_topology.md)) where there is
   effectively only one shared runqueue to begin with, so "stealing" is
   really just "picking up whatever's there" rather than a true
