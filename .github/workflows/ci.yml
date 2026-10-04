@@ -1,0 +1,88 @@
+# SPDX-FileCopyrightText: 2026 Jarosław Pelczar <jarek@jpelczar.com>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+
+name: CI
+
+on:
+  push:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - converted_to_draft
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect build changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      build: ${{ steps.filter.outputs.build }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Classify changed files
+        id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            build:
+              - ".github/workflows/ci.yml"
+              - "CMakeLists.txt"
+              - "cmake/**"
+              - "include/**"
+              - "tests/**"
+              - "scripts/run-native-ci.sh"
+
+  build:
+    needs: changes
+    if: >-
+      (github.event_name == 'workflow_dispatch' ||
+       needs.changes.outputs.build == 'true') &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.draft == false)
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux GCC
+            os: ubuntu-latest
+            compiler: g++
+          - name: Linux Clang
+            os: ubuntu-latest
+            compiler: clang++
+          - name: macOS AppleClang
+            os: macos-latest
+            compiler: clang++
+          - name: Windows MSVC
+            os: windows-latest
+            compiler: cl
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Enable the MSVC environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build, test, and check public headers
+        shell: bash
+        run: >-
+          ./scripts/run-native-ci.sh build Release
+          -DCMAKE_CXX_COMPILER=${{ matrix.compiler }}

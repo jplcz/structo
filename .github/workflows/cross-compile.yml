@@ -1,0 +1,91 @@
+# SPDX-FileCopyrightText: 2026 Jarosław Pelczar <jarek@jpelczar.com>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+
+name: Cross-compile
+
+on:
+  push:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - converted_to_draft
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: cross-compile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect cross-build changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      build: ${{ steps.filter.outputs.build }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Classify changed files
+        id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            build:
+              - ".github/workflows/cross-compile.yml"
+              - "CMakeLists.txt"
+              - "cmake/**"
+              - "include/**"
+              - "tests/**"
+              - "scripts/build-matrix.sh"
+              - "scripts/sysregs/**"
+
+  build:
+    needs: changes
+    if: >-
+      (github.event_name == 'workflow_dispatch' ||
+       needs.changes.outputs.build == 'true') &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.draft == false)
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: x86_64
+            target: x86_64-gcc
+            packages: ccache
+          - name: arm32
+            target: arm32-gcc
+            packages: ccache g++-arm-linux-gnueabihf
+          - name: aarch64
+            target: aarch64-gcc
+            packages: ccache g++-aarch64-linux-gnu
+          - name: riscv64
+            target: riscv64-gcc
+            packages: ccache g++-riscv64-linux-gnu
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install compiler support
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ${{ matrix.packages }}
+
+      - name: Build matrix target
+        env:
+          JPLCZ_STRUCTO_BUILD_TARGETS: ${{ matrix.target }}
+          JPLCZ_STRUCTO_BUILD_TYPES: Release
+          JPLCZ_STRUCTO_MATRIX_BUILD_ROOT: ${{ github.workspace }}/build/matrix
+        run: ./scripts/build-matrix.sh
