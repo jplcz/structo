@@ -385,7 +385,8 @@ public:
     return {};
   }
 
-  /** @brief Sets every bit in `[start, stop]` without range-checking; UB if `start > stop` or the range doesn't fit in `words`. */
+  /** @brief Sets every bit in `[start, stop]` without range-checking; UB if `start > stop` or the range doesn't fit in
+   * `words`. */
   RELOCO_UNSAFE_BUFFER_USAGE static void unsafe_set_range(span<unsigned long> words, std::size_t start,
                                                           std::size_t stop) noexcept {
     const std::size_t first_word = start / bits_per_word;
@@ -402,8 +403,7 @@ public:
   }
 
   /** @brief Clears every bit in `[start, stop]`. Traps if `start > stop` or `stop >= nbits`. */
-  static void clear_range(span<unsigned long> words, std::size_t nbits, std::size_t start,
-                          std::size_t stop) noexcept {
+  static void clear_range(span<unsigned long> words, std::size_t nbits, std::size_t start, std::size_t stop) noexcept {
     RELOCO_ASSERT(start <= stop && stop < nbits, "bitmap_utils: clear_range() range out of bounds");
     unsafe_clear_range(words, start, stop);
   }
@@ -418,7 +418,8 @@ public:
     return {};
   }
 
-  /** @brief Clears every bit in `[start, stop]` without range-checking; UB if `start > stop` or the range doesn't fit in `words`. */
+  /** @brief Clears every bit in `[start, stop]` without range-checking; UB if `start > stop` or the range doesn't fit
+   * in `words`. */
   RELOCO_UNSAFE_BUFFER_USAGE static void unsafe_clear_range(span<unsigned long> words, std::size_t start,
                                                             std::size_t stop) noexcept {
     const std::size_t first_word = start / bits_per_word;
@@ -464,8 +465,8 @@ public:
     for (std::size_t w = first_word + 1; w < last_word; ++w) {
       total += static_cast<std::size_t>(__builtin_popcountl(words.unsafe_at(w)));
     }
-    total +=
-        static_cast<std::size_t>(__builtin_popcountl(words.unsafe_at(last_word) & range_mask_(0, stop % bits_per_word)));
+    total += static_cast<std::size_t>(
+        __builtin_popcountl(words.unsafe_at(last_word) & range_mask_(0, stop % bits_per_word)));
     return total;
   }
 
@@ -521,9 +522,9 @@ public:
    * `size == 0` request trivially matches at `start` itself (if
    * `start <= nbits`).
    */
-  [[nodiscard]] static reloco::optional<std::size_t>
-  lowest_clear_run_from(span<const unsigned long> words, std::size_t nbits, std::size_t start,
-                        std::size_t size) noexcept {
+  [[nodiscard]] static reloco::optional<std::size_t> lowest_clear_run_from(span<const unsigned long> words,
+                                                                           std::size_t nbits, std::size_t start,
+                                                                           std::size_t size) noexcept {
     if (size == 0) {
       return start <= nbits ? reloco::optional<std::size_t>(start) : reloco::nullopt;
     }
@@ -555,9 +556,9 @@ public:
    * bits begin, if any -- the inverse of `lowest_clear_run_from()`
    * (`bit_ffs_area_at()`).
    */
-  [[nodiscard]] static reloco::optional<std::size_t>
-  lowest_set_run_from(span<const unsigned long> words, std::size_t nbits, std::size_t start,
-                      std::size_t size) noexcept {
+  [[nodiscard]] static reloco::optional<std::size_t> lowest_set_run_from(span<const unsigned long> words,
+                                                                         std::size_t nbits, std::size_t start,
+                                                                         std::size_t size) noexcept {
     if (size == 0) {
       return start <= nbits ? reloco::optional<std::size_t>(start) : reloco::nullopt;
     }
@@ -587,9 +588,8 @@ public:
    * counterpart to `find_and_set_from()`, for callers already holding
    * whatever lock protects `words`.
    */
-  [[nodiscard]] static reloco::optional<std::size_t> find_and_set_run_from(span<unsigned long> words,
-                                                                           std::size_t nbits, std::size_t start,
-                                                                           std::size_t size) noexcept {
+  [[nodiscard]] static reloco::optional<std::size_t>
+  find_and_set_run_from(span<unsigned long> words, std::size_t nbits, std::size_t start, std::size_t size) noexcept {
     auto pos = lowest_clear_run_from(words, nbits, start, size);
     if (pos.has_value() && size > 0) {
       unsafe_set_range(words, pos.value(), pos.value() + size - 1);
@@ -953,8 +953,7 @@ private:
    * compose across multiple words, mirroring `<sys/bitstring.h>`'s own
    * `_bit_make_mask()`.
    */
-  [[nodiscard]] static constexpr unsigned long range_mask_(std::size_t start_offset,
-                                                           std::size_t stop_offset) noexcept {
+  [[nodiscard]] static constexpr unsigned long range_mask_(std::size_t start_offset, std::size_t stop_offset) noexcept {
     const unsigned long low = ~0ul << start_offset;
     const unsigned long high = (stop_offset + 1 == bits_per_word) ? ~0ul : ((1ul << (stop_offset + 1)) - 1);
     return low & high;

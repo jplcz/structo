@@ -150,7 +150,9 @@ TEST_F(QueueSpinLockTest, DestroyingHeldLockTraps) {
 }
 
 TEST_F(QueueSpinLockTest, DestroyingUnlockedLockIsFine) {
-  { test_lock lock; }
+  {
+    test_lock lock;
+  }
   SUCCEED();
 }
 

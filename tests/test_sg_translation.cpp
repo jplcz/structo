@@ -533,8 +533,7 @@ TEST(ChainedSgCodecTest, WorksWithASingleSlotRaiiMapper) {
     return address;
   };
   auto map_for_write = [](paddr_type address) -> result<slot_map_ptr<packed_type, mapper_type>::guard> {
-    auto ptr = slot_map_ptr<packed_type, mapper_type>::from_paddr(
-        phys_addr<packed_type, dma_bus_space>{address.value});
+    auto ptr = slot_map_ptr<packed_type, mapper_type>::from_paddr(phys_addr<packed_type, dma_bus_space>{address.value});
     if (!ptr)
       return unexpected(ptr.error());
     return ptr->try_map(page_4k::page_size);
@@ -593,8 +592,7 @@ TEST(TwoLevelSgCodecTest, WorksWithATwoSlotRaiiMapper) {
     return address;
   };
   auto map_page = [](paddr_type address) -> result<slot_map_ptr<packed_type, mapper_type>::guard> {
-    auto ptr =
-        slot_map_ptr<packed_type, mapper_type>::from_paddr(phys_addr<packed_type, dma_bus_space>{address.value});
+    auto ptr = slot_map_ptr<packed_type, mapper_type>::from_paddr(phys_addr<packed_type, dma_bus_space>{address.value});
     if (!ptr)
       return unexpected(ptr.error());
     return ptr->try_map(page_4k::page_size);

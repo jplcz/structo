@@ -94,9 +94,9 @@ public:
    * about to disappear -- both worth trapping on immediately.
    */
   ~ticket_spin_lock() noexcept {
-    STRUCTO_SYNC_LOCK_ASSERT(Traits, *this,
-                              now_serving_.load(std::memory_order_relaxed) == next_ticket_.load(std::memory_order_relaxed),
-                              "ticket_spin_lock: destroyed while still held or while a waiter is queued");
+    STRUCTO_SYNC_LOCK_ASSERT(
+        Traits, *this, now_serving_.load(std::memory_order_relaxed) == next_ticket_.load(std::memory_order_relaxed),
+        "ticket_spin_lock: destroyed while still held or while a waiter is queued");
   }
 
   ticket_spin_lock(const ticket_spin_lock &) = delete;
@@ -111,8 +111,9 @@ public:
    * ticket behind one's own would otherwise self-deadlock forever.
    */
   void lock() & noexcept {
-    STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, !is_locked_by_current(),
-                              "ticket_spin_lock: lock() called while already held by the calling context (self-deadlock)");
+    STRUCTO_SYNC_LOCK_ASSERT(
+        Traits, *this, !is_locked_by_current(),
+        "ticket_spin_lock: lock() called while already held by the calling context (self-deadlock)");
 
     const ticket_type my_ticket = next_ticket_.fetch_add(1, std::memory_order_relaxed);
 
@@ -135,7 +136,8 @@ public:
    */
   [[nodiscard]] bool try_lock() & noexcept {
     ticket_type ticket = now_serving_.load(std::memory_order_relaxed);
-    if (!next_ticket_.compare_exchange_strong(ticket, ticket + 1, std::memory_order_acquire, std::memory_order_relaxed)) {
+    if (!next_ticket_.compare_exchange_strong(ticket, ticket + 1, std::memory_order_acquire,
+                                              std::memory_order_relaxed)) {
       return false;
     }
     owner_.store(owner_value(), std::memory_order_relaxed);
@@ -150,7 +152,7 @@ public:
    */
   void unlock() & noexcept {
     STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, owner_.load(std::memory_order_relaxed) == owner_value(),
-                              "ticket_spin_lock: unlock() by non-owner (or already unlocked)");
+                             "ticket_spin_lock: unlock() by non-owner (or already unlocked)");
     owner_.store(0, std::memory_order_relaxed);
     now_serving_.fetch_add(1, std::memory_order_release);
   }

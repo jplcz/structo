@@ -134,7 +134,7 @@ template <> struct structo::arch::tlb_flush_traits<fake_arch> {
 // `false` for callers to branch on.
 namespace {
 struct fake_local_only_arch {};
-}
+} // namespace
 
 template <> struct structo::arch::tlb_flush_traits<fake_local_only_arch> {
   static constexpr bool supports_broadcast = false;
@@ -148,10 +148,10 @@ template <> struct structo::arch::tlb_flush_traits<fake_local_only_arch> {
 // tag/all-space flush documented at file scope.
 namespace {
 struct fake_arch_range_limited {};
-}
+} // namespace
 
 template <> struct structo::arch::tlb_flush_traits<fake_arch_range_limited> {
-  static constexpr bool supports_broadcast = true;
+  [[maybe_unused]] static constexpr bool supports_broadcast = true;
   static constexpr std::uint64_t max_range_bytes = 0x1000;
 
   template <typename Space> static void flush_all() noexcept { counts().flush_all++; }
@@ -190,8 +190,7 @@ template <> struct structo::arch::tlb_flush_traits<fake_arch_range_limited> {
   }
 
   template <typename Space>
-  static void flush_range_tag_broadcast(std::uint64_t addr_begin, std::uint64_t addr_end,
-                                         std::uint64_t tag) noexcept {
+  static void flush_range_tag_broadcast(std::uint64_t addr_begin, std::uint64_t addr_end, std::uint64_t tag) noexcept {
     counts().flush_range_tag_broadcast++;
     args().addr_begin = addr_begin;
     args().addr_end = addr_end;

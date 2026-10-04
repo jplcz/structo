@@ -116,8 +116,7 @@ template <typename Rep = std::uint32_t, unsigned FracBits = 11> class load_avera
   // wider than 64 bits to stay correct; load_average's own precision need is far smaller than
   // fixed_point/fixed_int's own general-purpose one, so this is not a meaningful restriction in practice --
   // construct a plain fixed_point<Rep, FracBits> directly (without load_average) if a wider Rep is ever needed.
-  static_assert(sizeof(Rep) <= sizeof(std::uint64_t),
-                "load_average<Rep, FracBits> requires Rep no wider than 64 bits");
+  static_assert(sizeof(Rep) <= sizeof(std::uint64_t), "load_average<Rep, FracBits> requires Rep no wider than 64 bits");
 
 public:
   using fixed = reloco::fixed_point<Rep, FracBits>;

@@ -150,7 +150,7 @@ private:
   public:
     void write_bits(std::uint32_t value, std::uint8_t length) {
       for (int i = length - 1; i >= 0; --i) {
-        cur_ = static_cast<std::uint8_t>((cur_ << 1) | ((value >> i) & 1u));
+        cur_ = static_cast<std::uint8_t>(static_cast<std::uint8_t>(cur_ << 1) | ((value >> i) & 1u));
         if (++nbits_ == 8) {
           out.push_back(static_cast<std::byte>(cur_));
           cur_ = 0;
@@ -208,11 +208,11 @@ private:
     blob[off + 1] = static_cast<std::byte>((v >> 8) & 0xFF);
   }
   static void put32(vector<std::byte> &blob, std::size_t off, std::uint32_t v) {
-    for (int i = 0; i < 4; ++i)
+    for (size_t i = 0; i < 4; ++i)
       blob[off + i] = static_cast<std::byte>((v >> (8 * i)) & 0xFF);
   }
   static void put64(vector<std::byte> &blob, std::size_t off, std::uint64_t v) {
-    for (int i = 0; i < 8; ++i)
+    for (size_t i = 0; i < 8; ++i)
       blob[off + i] = static_cast<std::byte>((v >> (8 * i)) & 0xFF);
   }
 
@@ -561,8 +561,7 @@ TEST(DebugSymtabHuffmanTest, TryCreateRejectsLengthCountsNotSummingToSymbolCount
 
   // Corrupt length_counts[1] (the single byte right after max_code_len
   // at huffman_table_offset) so it no longer sums to huffman_symbol_count.
-  const auto huffman_table_offset =
-      fmt::load_le32(blob.data() + fmt::header_offset::huffman_table_offset);
+  const auto huffman_table_offset = fmt::load_le32(blob.data() + fmt::header_offset::huffman_table_offset);
   blob[huffman_table_offset + 1] = std::byte{1};
   auto view = debug_symtab_view::try_create(span<const std::byte>(blob.data(), blob.size()), /*verify_crc=*/false);
   EXPECT_FALSE(view.has_value());
@@ -573,8 +572,7 @@ TEST(DebugSymtabHuffmanTest, TryCreateRejectsZeroMaxCodeLen) {
   b.begin_group(0x1000, "abba").end_group();
   auto blob = b.build();
 
-  const auto huffman_table_offset =
-      fmt::load_le32(blob.data() + fmt::header_offset::huffman_table_offset);
+  const auto huffman_table_offset = fmt::load_le32(blob.data() + fmt::header_offset::huffman_table_offset);
   blob[huffman_table_offset] = std::byte{0};
   auto view = debug_symtab_view::try_create(span<const std::byte>(blob.data(), blob.size()), /*verify_crc=*/false);
   EXPECT_FALSE(view.has_value());

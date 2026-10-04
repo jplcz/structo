@@ -138,8 +138,7 @@ struct slot_map_mapper {
   };
 
   /** @brief No fixed window to bound-check against; `ArchHooks::program()` is authoritative. */
-  template <typename T>
-  [[nodiscard]] static bool validate_phys(phys_addr<T, ExpectedSpace, PhysInt> /*p*/) noexcept {
+  template <typename T> [[nodiscard]] static bool validate_phys(phys_addr<T, ExpectedSpace, PhysInt> /*p*/) noexcept {
     return true;
   }
 
@@ -152,7 +151,7 @@ struct slot_map_mapper {
    * own error.
    */
   [[nodiscard]] static result<mapped_slot> acquire(phys_addr<void, ExpectedSpace, PhysInt> phys,
-                                                    std::size_t size) noexcept {
+                                                   std::size_t size) noexcept {
     if (size == 0 || size > ArchHooks::slot_size)
       return unexpected(error::out_of_range);
 
@@ -335,8 +334,7 @@ struct shared_slot_map_mapper {
   };
 
   /** @brief No fixed window to bound-check against; `ArchHooks::program()` is authoritative. */
-  template <typename T>
-  [[nodiscard]] static bool validate_phys(phys_addr<T, ExpectedSpace, PhysInt> /*p*/) noexcept {
+  template <typename T> [[nodiscard]] static bool validate_phys(phys_addr<T, ExpectedSpace, PhysInt> /*p*/) noexcept {
     return true;
   }
 
@@ -375,7 +373,7 @@ struct shared_slot_map_mapper {
    * by a distinct physical page, or `ArchHooks::program`'s own error.
    */
   [[nodiscard]] static result<mapped_slot> acquire(phys_addr<void, ExpectedSpace, PhysInt> phys,
-                                                    std::size_t size) noexcept {
+                                                   std::size_t size) noexcept {
     if (size == 0 || size > ArchHooks::slot_size)
       return unexpected(error::out_of_range);
 
@@ -490,7 +488,8 @@ private:
     std::size_t free_hint = 0;
   };
 
-  /** @brief `Lock` paired directly with the data it guards, so `WaitPolicy::wait()` can unlock/relock it by reference. */
+  /** @brief `Lock` paired directly with the data it guards, so `WaitPolicy::wait()` can unlock/relock it by reference.
+   */
   struct locked_state {
     Lock lock;
     state data;

@@ -71,15 +71,15 @@ namespace structo::sync::detail {
 template <typename Traits, typename Self, typename = void> struct has_lock_name : std::false_type {};
 
 template <typename Traits, typename Self>
-struct has_lock_name<Traits, Self, std::void_t<decltype(Traits::name(std::declval<const Self &>()))>>
-    : std::true_type {};
+struct has_lock_name<Traits, Self, std::void_t<decltype(Traits::name(std::declval<const Self &>()))>> : std::true_type {
+};
 
 /** @brief True if `Traits::panic(reason, name)` is callable. */
 template <typename Traits, typename = void> struct has_lock_panic : std::false_type {};
 
 template <typename Traits>
-struct has_lock_panic<
-    Traits, std::void_t<decltype(Traits::panic(std::declval<const char *>(), std::declval<const char *>()))>>
+struct has_lock_panic<Traits,
+                      std::void_t<decltype(Traits::panic(std::declval<const char *>(), std::declval<const char *>()))>>
     : std::true_type {};
 
 /**
@@ -110,14 +110,14 @@ template <typename Traits, typename Self> [[nodiscard]] const char *lock_name(co
  * @param reason Fixed, human-readable failure description.
  */
 #define STRUCTO_SYNC_LOCK_ASSERT(Traits, self, cond, reason)                                                           \
-  do {                                                                                                                  \
-    if constexpr (::structo::sync::detail::has_lock_panic<Traits>::value) {                                             \
-      if (!(cond))                                                                                                      \
-        RELOCO_UNLIKELY {                                                                                               \
-          Traits::panic((reason), ::structo::sync::detail::lock_name<Traits>(self));                                    \
-          RELOCO_TRAP();                                                                                                \
-        }                                                                                                                \
-    } else {                                                                                                            \
-      RELOCO_ASSERT(cond, reason);                                                                                      \
-    }                                                                                                                    \
+  do {                                                                                                                 \
+    if constexpr (::structo::sync::detail::has_lock_panic<Traits>::value) {                                            \
+      if (!(cond))                                                                                                     \
+        RELOCO_UNLIKELY {                                                                                              \
+          Traits::panic((reason), ::structo::sync::detail::lock_name<Traits>(self));                                   \
+          RELOCO_TRAP();                                                                                               \
+        }                                                                                                              \
+    } else {                                                                                                           \
+      RELOCO_ASSERT(cond, reason);                                                                                     \
+    }                                                                                                                  \
   } while (0)

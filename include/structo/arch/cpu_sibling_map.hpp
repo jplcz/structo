@@ -160,7 +160,8 @@ public:
   }
 
   /** @brief Fallible variant of `sibling`. */
-  [[nodiscard]] constexpr reloco::result<std::size_t> try_sibling(std::size_t cpu, std::size_t index) const noexcept {
+  [[nodiscard]] RELOCO_CONSTEXPR20 reloco::result<std::size_t> try_sibling(std::size_t cpu,
+                                                                           std::size_t index) const noexcept {
     if (cpu >= MaxCpus || index >= count_[cpu])
       return reloco::unexpected(reloco::error::out_of_range);
     return order_[cpu][index];
@@ -170,8 +171,8 @@ private:
   // A CPU with no level shared with `cpu` at all (disjoint subtree, or an
   // unpopulated table) is given a distance one past the last real level,
   // so it always sorts after every CPU that *does* share some level.
-  [[nodiscard]] static constexpr std::size_t
-  distance_of(const cpu_topology<MaxCpus, MaxLevels, LevelId> &topo, std::size_t cpu, std::size_t other) noexcept {
+  [[nodiscard]] static RELOCO_CONSTEXPR20 std::size_t distance_of(const cpu_topology<MaxCpus, MaxLevels, LevelId> &topo,
+                                                                  std::size_t cpu, std::size_t other) noexcept {
     reloco::optional<std::size_t> level = topo.lowest_shared_level(cpu, other);
     return level.has_value() ? *level : topo.level_count();
   }
@@ -197,8 +198,8 @@ private:
   // Whether `existing` (already placed) must sort strictly after
   // `candidate` -- i.e. whether `candidate` needs to move earlier than
   // `existing`'s current slot.
-  [[nodiscard]] static constexpr bool is_after(const cpu_topology<MaxCpus, MaxLevels, LevelId> &topo,
-                                               std::size_t cpu, std::size_t existing, std::size_t candidate,
+  [[nodiscard]] static constexpr bool is_after(const cpu_topology<MaxCpus, MaxLevels, LevelId> &topo, std::size_t cpu,
+                                               std::size_t existing, std::size_t candidate,
                                                std::size_t candidate_distance) noexcept {
     const std::size_t existing_distance = distance_of(topo, cpu, existing);
     if (existing_distance != candidate_distance)

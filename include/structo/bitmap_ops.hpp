@@ -84,7 +84,8 @@ public:
   /** @brief Constructs a past-the-end-like, empty iterator; only meaningful once assigned a real one. */
   bitmap_bit_iterator() noexcept = default;
 
-  /** @brief Constructs an iterator positioned at `pos` over `words`/`nbits`. Typically obtained via `bitmap_ops::begin()`/`end()`, not called directly. */
+  /** @brief Constructs an iterator positioned at `pos` over `words`/`nbits`. Typically obtained via
+   * `bitmap_ops::begin()`/`end()`, not called directly. */
   bitmap_bit_iterator(span<const unsigned long> words, std::size_t nbits, std::size_t pos) noexcept
       : words_(words), nbits_(nbits), pos_(pos) {}
 
@@ -166,7 +167,8 @@ public:
     return bitmap_utils::try_test(derived().words(), derived().nbits(), index);
   }
 
-  /** @brief Returns whether bit `index` is set, without range-checking; UB if `index` doesn't fit in the backing words. */
+  /** @brief Returns whether bit `index` is set, without range-checking; UB if `index` doesn't fit in the backing words.
+   */
   [[nodiscard]] RELOCO_UNSAFE_BUFFER_USAGE bool unsafe_test(std::size_t index) const noexcept {
     return bitmap_utils::unsafe_test(derived().words(), index);
   }
@@ -291,7 +293,7 @@ public:
 
   /** @brief `count_range()` without range-checking; UB if `start > stop` or the range doesn't fit. */
   [[nodiscard]] RELOCO_UNSAFE_BUFFER_USAGE std::size_t unsafe_count_range(std::size_t start,
-                                                                         std::size_t stop) const noexcept {
+                                                                          std::size_t stop) const noexcept {
     return bitmap_utils::unsafe_count_range(derived().words(), start, stop);
   }
 
@@ -307,7 +309,7 @@ public:
 
   /** @brief `all_set_in_range()` without range-checking; UB if `start > stop` or the range doesn't fit. */
   [[nodiscard]] RELOCO_UNSAFE_BUFFER_USAGE bool unsafe_all_set_in_range(std::size_t start,
-                                                                       std::size_t stop) const noexcept {
+                                                                        std::size_t stop) const noexcept {
     return bitmap_utils::unsafe_all_set_in_range(derived().words(), start, stop);
   }
 
@@ -323,12 +325,13 @@ public:
 
   /** @brief `all_clear_in_range()` without range-checking; UB if `start > stop` or the range doesn't fit. */
   [[nodiscard]] RELOCO_UNSAFE_BUFFER_USAGE bool unsafe_all_clear_in_range(std::size_t start,
-                                                                         std::size_t stop) const noexcept {
+                                                                          std::size_t stop) const noexcept {
     return bitmap_utils::unsafe_all_clear_in_range(derived().words(), start, stop);
   }
 
   /** @brief Lowest index at or after `start` where `size` consecutive CLEAR bits begin, if any. */
-  [[nodiscard]] reloco::optional<std::size_t> lowest_clear_run_from(std::size_t start, std::size_t size) const noexcept {
+  [[nodiscard]] reloco::optional<std::size_t> lowest_clear_run_from(std::size_t start,
+                                                                    std::size_t size) const noexcept {
     return bitmap_utils::lowest_clear_run_from(derived().words(), derived().nbits(), start, size);
   }
 
@@ -366,7 +369,8 @@ public:
   // ---------------------------------------------------------------------------
 
   /** @brief Atomically returns whether bit `index` is set. Traps if `index >= size()`. */
-  [[nodiscard]] bool atomic_test(std::size_t index, std::memory_order order = std::memory_order_seq_cst) const noexcept {
+  [[nodiscard]] bool atomic_test(std::size_t index,
+                                 std::memory_order order = std::memory_order_seq_cst) const noexcept {
     return bitmap_utils::atomic_test(derived().words(), derived().nbits(), index, order);
   }
 
@@ -430,19 +434,22 @@ public:
     bitmap_utils::unsafe_atomic_toggle(derived().words(), index, order);
   }
 
-  /** @brief Atomically sets bit `index`, returning its PREVIOUS value. UB if `index` doesn't fit in the backing words. */
+  /** @brief Atomically sets bit `index`, returning its PREVIOUS value. UB if `index` doesn't fit in the backing words.
+   */
   RELOCO_UNSAFE_BUFFER_USAGE bool
   unsafe_atomic_test_and_set(std::size_t index, std::memory_order order = std::memory_order_seq_cst) noexcept {
     return bitmap_utils::unsafe_atomic_test_and_set(derived().words(), index, order);
   }
 
-  /** @brief Atomically clears bit `index`, returning its PREVIOUS value. UB if `index` doesn't fit in the backing words. */
+  /** @brief Atomically clears bit `index`, returning its PREVIOUS value. UB if `index` doesn't fit in the backing
+   * words. */
   RELOCO_UNSAFE_BUFFER_USAGE bool
   unsafe_atomic_test_and_clear(std::size_t index, std::memory_order order = std::memory_order_seq_cst) noexcept {
     return bitmap_utils::unsafe_atomic_test_and_clear(derived().words(), index, order);
   }
 
-  /** @brief Atomically flips bit `index`, returning its PREVIOUS value. UB if `index` doesn't fit in the backing words. */
+  /** @brief Atomically flips bit `index`, returning its PREVIOUS value. UB if `index` doesn't fit in the backing words.
+   */
   RELOCO_UNSAFE_BUFFER_USAGE bool
   unsafe_atomic_test_and_toggle(std::size_t index, std::memory_order order = std::memory_order_seq_cst) noexcept {
     return bitmap_utils::unsafe_atomic_test_and_toggle(derived().words(), index, order);

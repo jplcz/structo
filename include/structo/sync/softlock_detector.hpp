@@ -89,9 +89,7 @@ public:
    * override via `set_default_limit()` once at boot with a value
    * derived from the platform's actual CPU cycle rate.
    */
-  [[nodiscard]] static counter_type default_limit() noexcept {
-    return default_limit_.load(std::memory_order_relaxed);
-  }
+  [[nodiscard]] static counter_type default_limit() noexcept { return default_limit_.load(std::memory_order_relaxed); }
 
   /**
    * @brief Overrides the process/kernel-wide default tick limit
@@ -99,9 +97,7 @@ public:
    * boot (before any contended spin loop can observe the old value),
    * with a value derived from the platform's measured CPU cycle rate.
    */
-  static void set_default_limit(counter_type limit) noexcept {
-    default_limit_.store(limit, std::memory_order_relaxed);
-  }
+  static void set_default_limit(counter_type limit) noexcept { default_limit_.store(limit, std::memory_order_relaxed); }
 
   /** @param limit Number of `tick()` calls this instance tolerates before trapping. */
   explicit softlock_detector(counter_type limit = default_limit()) noexcept : limit_(limit) {}
@@ -146,8 +142,7 @@ template <typename Traits, typename = void> struct softlock_limit_for {
   static softlock_detector::counter_type value() noexcept { return softlock_detector::default_limit(); }
 };
 
-template <typename Traits>
-struct softlock_limit_for<Traits, std::void_t<decltype(Traits::softlock_limit)>> {
+template <typename Traits> struct softlock_limit_for<Traits, std::void_t<decltype(Traits::softlock_limit)>> {
   static constexpr softlock_detector::counter_type value() noexcept {
     return static_cast<softlock_detector::counter_type>(Traits::softlock_limit);
   }

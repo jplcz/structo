@@ -57,7 +57,7 @@ template <> struct symbol_resolver_traits<structo::debug_symtab_resolver_tag> {
   using context_type = structo::debug_symtab_view;
 
   static bool resolve(reloco::value_ref<const context_type> view, uintptr_t addr, span<char> scratch,
-                     raw_resolved_symbol &out_raw) noexcept {
+                      raw_resolved_symbol &out_raw) noexcept {
     auto resolved = view.get()->try_resolve(static_cast<std::uint64_t>(addr), scratch);
     if (!resolved.has_value())
       return false;

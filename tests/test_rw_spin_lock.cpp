@@ -190,7 +190,9 @@ TEST_F(RwSpinLockTest, DestroyingReadHeldLockTraps) {
 }
 
 TEST_F(RwSpinLockTest, DestroyingUnlockedLockIsFine) {
-  { test_lock lock; }
+  {
+    test_lock lock;
+  }
   SUCCEED();
 }
 

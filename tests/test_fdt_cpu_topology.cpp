@@ -135,8 +135,7 @@ result<span<const std::byte>> build_tree_without_cpus(span<std::byte> storage) {
 using index_type = fdt_index<external_vector>;
 
 result<index_type> build_index(const fdt_reader &reader, array<fdt_index_node, 32> &nodes,
-                               array<fdt_index_phandle_entry, 32> &phandles,
-                               array<fdt_index_build_frame, 32> &stack) {
+                               array<fdt_index_phandle_entry, 32> &phandles, array<fdt_index_build_frame, 32> &stack) {
   return index_type::try_build(
       reader, external_vector<fdt_index_node>(span<fdt_index_node>(nodes.data(), nodes.size())),
       external_vector<fdt_index_phandle_entry>(span<fdt_index_phandle_entry>(phandles.data(), phandles.size())),
@@ -167,9 +166,9 @@ TEST_F(FdtCpuTopologyTest, DecodesSmtSiblingsAsSharingFinestLevel) {
   EXPECT_EQ(*count, 2u);
   // socket/cluster/core/thread: 3 ancestor levels above each thread leaf.
   EXPECT_EQ(topo.level_count(), 3u);
-  EXPECT_TRUE(topo.shares_level(0, 1, 0));  // same core (SMT siblings)
-  EXPECT_TRUE(topo.shares_level(0, 1, 1));  // same cluster
-  EXPECT_TRUE(topo.shares_level(0, 1, 2));  // same socket
+  EXPECT_TRUE(topo.shares_level(0, 1, 0)); // same core (SMT siblings)
+  EXPECT_TRUE(topo.shares_level(0, 1, 1)); // same cluster
+  EXPECT_TRUE(topo.shares_level(0, 1, 2)); // same socket
 }
 
 TEST_F(FdtCpuTopologyTest, FailsWithNotFoundWhenNoCpuMapNode) {

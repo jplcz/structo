@@ -393,9 +393,7 @@ public:
    * sequence prefix, so it is the same value across every reallocation
    * of the same task's slot.
    */
-  [[nodiscard]] constexpr raw_type slot_of(context_id id) const noexcept {
-    return id.raw() & slot_mask_;
-  }
+  [[nodiscard]] constexpr raw_type slot_of(context_id id) const noexcept { return id.raw() & slot_mask_; }
 
 private:
   explicit fixed_asid_allocator(std::size_t asid_bits) noexcept : asid_bits_(asid_bits) {}

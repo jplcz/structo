@@ -138,10 +138,12 @@
 
 namespace structo::arch::arm {
 
-/** @brief `tlb_flush_traits<arm::tlb_tag>`'s `Arch` tag -- local-only CP15 `TLBI*` ops, every ARMv7-A/AArch32 core. See the @file docs. */
+/** @brief `tlb_flush_traits<arm::tlb_tag>`'s `Arch` tag -- local-only CP15 `TLBI*` ops, every ARMv7-A/AArch32 core. See
+ * the @file docs. */
 struct tlb_tag {};
 
-/** @brief `tlb_flush_traits<arm::tlb_tag_mp>`'s `Arch` tag -- adds the Inner-Shareable `...IS` broadcast ops. Requires the Multiprocessing Extensions. See the @file docs. */
+/** @brief `tlb_flush_traits<arm::tlb_tag_mp>`'s `Arch` tag -- adds the Inner-Shareable `...IS` broadcast ops. Requires
+ * the Multiprocessing Extensions. See the @file docs. */
 struct tlb_tag_mp {};
 
 } // namespace structo::arch::arm
@@ -155,7 +157,8 @@ template <> struct structo::arch::tlb_flush_traits<structo::arch::arm::tlb_tag> 
 
   // --- process_tlb_space: TLBIALL / TLBIASID / TLBIMVA / TLBIMVAA ---------
 
-  template <typename Space> static auto flush_all() noexcept -> std::enable_if_t<std::is_same_v<Space, process_tlb_space>> {
+  template <typename Space>
+  static auto flush_all() noexcept -> std::enable_if_t<std::is_same_v<Space, process_tlb_space>> {
     std::uint32_t rt = 0;
     asm volatile("mcr p15, 0, %0, c8, c7, 0" ::"r"(rt) : "memory"); // TLBIALL
   }
@@ -204,7 +207,7 @@ template <> struct structo::arch::tlb_flush_traits<structo::arch::arm::tlb_tag> 
 
   template <typename Space>
   static auto flush_page(std::uint64_t ipa) noexcept -> std::enable_if_t<std::is_same_v<Space, guest_tlb_space>> {
-    std::uint32_t rt = static_cast<std::uint32_t>(ipa >> 12); // IPA[39:12]
+    std::uint32_t rt = static_cast<std::uint32_t>(ipa >> 12);       // IPA[39:12]
     asm volatile("mcr p15, 4, %0, c8, c4, 1" ::"r"(rt) : "memory"); // TLBIIPAS2
   }
 };
@@ -218,7 +221,8 @@ template <> struct structo::arch::tlb_flush_traits<structo::arch::arm::tlb_tag_m
 
   // --- Local: identical to arm::tlb_tag -----------------------------------
 
-  template <typename Space> static auto flush_all() noexcept -> std::enable_if_t<std::is_same_v<Space, process_tlb_space>> {
+  template <typename Space>
+  static auto flush_all() noexcept -> std::enable_if_t<std::is_same_v<Space, process_tlb_space>> {
     tlb_flush_traits<arm::tlb_tag>::flush_all<process_tlb_space>();
   }
 

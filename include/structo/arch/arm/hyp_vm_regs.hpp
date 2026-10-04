@@ -291,7 +291,8 @@ struct vm_banked_spsrs {
   }
 };
 
-/** @brief Full per-VM sysreg set: guest state, this VM's Hyp-mode virtualization controls, and the guest's banked SPSRs. */
+/** @brief Full per-VM sysreg set: guest state, this VM's Hyp-mode virtualization controls, and the guest's banked
+ * SPSRs. */
 struct vm_sysreg_state {
   vm_guest_state guest{};
   vm_hyp_control_state hyp{};

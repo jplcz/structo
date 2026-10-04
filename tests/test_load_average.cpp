@@ -85,7 +85,7 @@ TEST(UnixLoadAverageTest, SampleUpdatesAllThreeWindows) {
 TEST(UnixLoadAverageTest, ShorterWindowDecaysFasterThanLonger) {
   unix_load_average<> avg;
   avg.sample(reloco::duration::from_secs(1'000'000), 10U); // seed all three at 10
-  avg.sample(reloco::duration::from_secs(60), 0U);               // one time constant for the 1-minute window only
+  avg.sample(reloco::duration::from_secs(60), 0U);         // one time constant for the 1-minute window only
   // The 1-minute window has decayed a full time constant (down toward ~10/e); the 5- and 15-minute windows have
   // barely moved (60s is only 1/5 and 1/15 of their own time constants) -- so ordering is one < five < fifteen.
   EXPECT_LT(avg.one_minute().raw(), avg.five_minute().raw());

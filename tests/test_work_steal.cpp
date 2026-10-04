@@ -6,12 +6,12 @@
 #include <structo/work_steal.hpp>
 
 using structo::always_steal_policy;
-using structo::arch::cpu_mask;
-using structo::arch::cpu_sibling_map;
-using structo::arch::cpu_topology;
 using structo::find_steal_candidate;
 using structo::performance_steal_policy;
 using structo::power_save_steal_policy;
+using structo::arch::cpu_mask;
+using structo::arch::cpu_sibling_map;
+using structo::arch::cpu_topology;
 
 namespace {
 
@@ -59,8 +59,8 @@ TEST_F(WorkStealTest, PerformancePolicyPrefersClosestCandidateOverBusiestOverall
   std::size_t load[4] = {0, 2, 0, 10};
   auto eligible = mask4::filled();
 
-  auto victim = find_steal_candidate<performance_steal_policy>(siblings, 0, eligible,
-                                                                 [&](std::size_t cpu) { return load[cpu]; });
+  auto victim =
+      find_steal_candidate<performance_steal_policy>(siblings, 0, eligible, [&](std::size_t cpu) { return load[cpu]; });
   ASSERT_TRUE(victim.has_value());
   EXPECT_EQ(*victim, 1u); // closest acceptable candidate, not the globally busiest one
 }
@@ -71,8 +71,8 @@ TEST_F(WorkStealTest, PerformancePolicyRequiresMoreThanOneExtraTask) {
   std::size_t load[4] = {0, 1, 0, 0}; // only one extra task anywhere -- not worth it
   auto eligible = mask4::filled();
 
-  auto victim = find_steal_candidate<performance_steal_policy>(siblings, 0, eligible,
-                                                                 [&](std::size_t cpu) { return load[cpu]; });
+  auto victim =
+      find_steal_candidate<performance_steal_policy>(siblings, 0, eligible, [&](std::size_t cpu) { return load[cpu]; });
   EXPECT_FALSE(victim.has_value());
 }
 
@@ -82,8 +82,8 @@ TEST_F(WorkStealTest, PowerSavePolicyOnlyStealsWhenLocallyIdle) {
   std::size_t load[4] = {1, 0, 0, 5}; // cpu0 itself has one task -- not idle
   auto eligible = mask4::filled();
 
-  auto victim = find_steal_candidate<power_save_steal_policy>(siblings, 0, eligible,
-                                                                [&](std::size_t cpu) { return load[cpu]; });
+  auto victim =
+      find_steal_candidate<power_save_steal_policy>(siblings, 0, eligible, [&](std::size_t cpu) { return load[cpu]; });
   EXPECT_FALSE(victim.has_value());
 }
 
@@ -93,8 +93,8 @@ TEST_F(WorkStealTest, PowerSavePolicyStealsFromAnyBusyNeighborWhenIdle) {
   std::size_t load[4] = {0, 0, 0, 3};
   auto eligible = mask4::filled();
 
-  auto victim = find_steal_candidate<power_save_steal_policy>(siblings, 0, eligible,
-                                                                [&](std::size_t cpu) { return load[cpu]; });
+  auto victim =
+      find_steal_candidate<power_save_steal_policy>(siblings, 0, eligible, [&](std::size_t cpu) { return load[cpu]; });
   ASSERT_TRUE(victim.has_value());
   EXPECT_EQ(*victim, 3u);
 }
@@ -106,8 +106,8 @@ TEST_F(WorkStealTest, EligibleMaskExcludesOfflineOrAlreadyTriedCpus) {
   auto eligible = mask4::filled();
   eligible.clear(3); // e.g. offline, or already tried and failed this round
 
-  auto victim = find_steal_candidate<power_save_steal_policy>(siblings, 0, eligible,
-                                                                [&](std::size_t cpu) { return load[cpu]; });
+  auto victim =
+      find_steal_candidate<power_save_steal_policy>(siblings, 0, eligible, [&](std::size_t cpu) { return load[cpu]; });
   EXPECT_FALSE(victim.has_value());
 }
 
@@ -117,14 +117,14 @@ TEST_F(WorkStealTest, RetryByClearingFailedCandidateFindsNextClosest) {
   std::size_t load[4] = {0, 4, 0, 4}; // cpu1 (closer) and cpu3 both qualify for performance_steal_policy
   auto eligible = mask4::filled();
 
-  auto first = find_steal_candidate<performance_steal_policy>(siblings, 0, eligible,
-                                                                [&](std::size_t cpu) { return load[cpu]; });
+  auto first =
+      find_steal_candidate<performance_steal_policy>(siblings, 0, eligible, [&](std::size_t cpu) { return load[cpu]; });
   ASSERT_TRUE(first.has_value());
   EXPECT_EQ(*first, 1u);
 
   eligible.clear(*first); // simulate: stealing from cpu1 failed (queue emptied concurrently)
-  auto second = find_steal_candidate<performance_steal_policy>(siblings, 0, eligible,
-                                                                 [&](std::size_t cpu) { return load[cpu]; });
+  auto second =
+      find_steal_candidate<performance_steal_policy>(siblings, 0, eligible, [&](std::size_t cpu) { return load[cpu]; });
   ASSERT_TRUE(second.has_value());
   EXPECT_EQ(*second, 3u);
 }
@@ -135,8 +135,8 @@ TEST_F(WorkStealTest, AlwaysStealPolicyTakesAnyNonemptyCandidateRegardlessOfLoca
   std::size_t load[4] = {7, 0, 0, 1}; // local cpu already has plenty of work
   auto eligible = mask4::filled();
 
-  auto victim = find_steal_candidate<always_steal_policy>(siblings, 0, eligible,
-                                                            [&](std::size_t cpu) { return load[cpu]; });
+  auto victim =
+      find_steal_candidate<always_steal_policy>(siblings, 0, eligible, [&](std::size_t cpu) { return load[cpu]; });
   ASSERT_TRUE(victim.has_value());
   EXPECT_EQ(*victim, 3u);
 }
@@ -179,7 +179,7 @@ TEST_F(WorkStealTest, NoCandidateQualifiesReturnsEmpty) {
   std::size_t load[4] = {0, 0, 0, 0};
   auto eligible = mask4::filled();
 
-  auto victim = find_steal_candidate<always_steal_policy>(siblings, 0, eligible,
-                                                            [&](std::size_t cpu) { return load[cpu]; });
+  auto victim =
+      find_steal_candidate<always_steal_policy>(siblings, 0, eligible, [&](std::size_t cpu) { return load[cpu]; });
   EXPECT_FALSE(victim.has_value());
 }

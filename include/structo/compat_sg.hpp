@@ -335,9 +335,8 @@ public:
       // falls within *this* page rather than assuming it is entirely
       // contained in page 0.
       const size_t page_start_entry = page_idx * entries_per_page;
-      const size_t start_i = (header_elements > page_start_entry)
-                                  ? std::min(header_elements - page_start_entry, entries_per_page)
-                                  : 0;
+      const size_t start_i =
+          (header_elements > page_start_entry) ? std::min(header_elements - page_start_entry, entries_per_page) : 0;
       for (size_t i = start_i; i < entries_per_page; ++i) {
         // TOCTOU mitigation: always copy before reading. Doubly important
         // here versus the span overload above: `mapper()` may expose
@@ -365,7 +364,7 @@ private:
    */
   template <typename OutContainer>
   [[nodiscard]] static RELOCO_CONSTEXPR20 result<bool> decode_descriptor(const packed_type &desc,
-                                                                          sg_list<OutContainer> &output) noexcept {
+                                                                         sg_list<OutContainer> &output) noexcept {
     uint64_t pfn_val = desc.template get<typename Layout::pfn_field>();
 
     uint64_t offset = 0;
@@ -858,8 +857,8 @@ public:
           return unexpected(l2_map_res.error());
 
           current_l2_handle = std::move(*l2_map_res);
-          current_l2_vaddr = static_cast<l2_packed_type *>(sg_mapper_detail::mapped_ptr(current_l2_handle)) +
-                              l2_header_elements;
+          current_l2_vaddr =
+              static_cast<l2_packed_type *>(sg_mapper_detail::mapped_ptr(current_l2_handle)) + l2_header_elements;
 
           // Write L1 Entry pointing to the new L2 page
           l1_vaddr[l1_idx].template truncating_set<typename L1Layout::pfn_field>(current_l2_paddr.value >>

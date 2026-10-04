@@ -64,10 +64,20 @@ namespace detail {
  * dependency surface to `fdt_index.hpp`/`cpu_topology.hpp` alone. Used to
  * tell an actual `/cpus/cpu@N` child apart from its `cpu-map` sibling,
  * which `/cpus` also has but which isn't itself a CPU. */
+
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-stack-address"
+#endif
+
 [[nodiscard]] inline reloco::string_view fdt_cpu_topology_base_node_name(reloco::string_view name) noexcept {
   const std::size_t at = name.find('@');
   return (at == reloco::string_view::npos) ? name : name.substr(0, at);
 }
+
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 
 /** @brief Scratch state threaded through `fdt_cpu_topology_decoder`'s
  * recursive `cpu-map` subtree walk -- never stored in the finished
@@ -106,10 +116,10 @@ fdt_cpu_topology_logical_cpu(const fdt_cpu_topology_scratch<MaxCpus, MaxLevels> 
  * Bounded to `MaxLevels` levels of `cpu-map` nesting below its direct
  * children; deeper trees fail with `error::capacity_exceeded`. */
 template <template <typename T> class Container, std::size_t MaxCpus, std::size_t MaxLevels, typename LevelId>
-[[nodiscard]] reloco::result<void>
-fdt_cpu_topology_walk(const fdt::fdt_index<Container> &index, std::size_t node, std::size_t depth,
-                      fdt_cpu_topology_scratch<MaxCpus, MaxLevels> &scratch,
-                      cpu_topology<MaxCpus, MaxLevels, LevelId> &topo) noexcept {
+[[nodiscard]] reloco::result<void> fdt_cpu_topology_walk(const fdt::fdt_index<Container> &index, std::size_t node,
+                                                         std::size_t depth,
+                                                         fdt_cpu_topology_scratch<MaxCpus, MaxLevels> &scratch,
+                                                         cpu_topology<MaxCpus, MaxLevels, LevelId> &topo) noexcept {
   if (depth > MaxLevels)
     return reloco::unexpected(reloco::error::capacity_exceeded);
 
@@ -181,7 +191,7 @@ struct fdt_cpu_topology_decoder {
    */
   template <template <typename T> class Container, std::size_t MaxCpus, std::size_t MaxLevels, typename LevelId>
   [[nodiscard]] static reloco::result<std::size_t> decode(const fdt::fdt_index<Container> &index,
-                                                           cpu_topology<MaxCpus, MaxLevels, LevelId> &topo) noexcept {
+                                                          cpu_topology<MaxCpus, MaxLevels, LevelId> &topo) noexcept {
     auto cpus = index.find_by_path("/cpus");
     if (!cpus)
       return reloco::unexpected(cpus.error());

@@ -17,7 +17,8 @@ using structo::arch::vmid_tag;
 
 namespace {
 
-/** @brief Fixture for `fixed_asid_allocator` tests; each test builds the allocator with the asid_bits/Capacity it needs. */
+/** @brief Fixture for `fixed_asid_allocator` tests; each test builds the allocator with the asid_bits/Capacity it
+ * needs. */
 class FixedAsidAllocatorTest : public ::testing::Test {};
 
 using proc4 = fixed_asid_allocator<process_asid_tag, 4>;
@@ -173,7 +174,7 @@ TEST_F(FixedAsidAllocatorTest, MoveConstructionTransfersState) {
 
 TEST_F(FixedAsidAllocatorTest, FixedAsidTypesAreDistinctAcrossTags) {
   static_assert(!std::is_same_v<fixed_asid_allocator<process_asid_tag, 4>::context_id,
-                                 fixed_asid_allocator<vmid_tag, 4>::context_id>,
+                                fixed_asid_allocator<vmid_tag, 4>::context_id>,
                 "process_asid_tag and vmid_tag context_ids must be distinct types");
   static_assert(!std::is_same_v<fixed_asid<process_asid_tag>, fixed_asid<vmid_tag>>,
                 "fixed_asid<Tag> must be distinct per Tag");

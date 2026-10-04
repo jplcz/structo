@@ -110,7 +110,7 @@ public:
    * mismatch).
    */
   [[nodiscard]] static reloco::result<debug_symtab_view> try_create(reloco::span<const std::byte> blob,
-                                                                     bool verify_crc = true) noexcept {
+                                                                    bool verify_crc = true) noexcept {
     namespace fmt = debug_symtab::detail;
 
     if (blob.size() < fmt::header_size)
@@ -147,8 +147,7 @@ public:
     const std::size_t checkpoint_table_bytes = static_cast<std::size_t>(checkpoint_count) * checkpoint_record_size;
 
     if (!fits(checkpoint_table_offset, checkpoint_table_bytes, blob_size) ||
-        !fits(entry_stream_offset, entry_stream_size, blob_size) ||
-        !fits(build_id_offset, build_id_size, blob_size) ||
+        !fits(entry_stream_offset, entry_stream_size, blob_size) || !fits(build_id_offset, build_id_size, blob_size) ||
         !fits(huffman_table_offset, huffman_table_size, blob_size))
       return reloco::unexpected(reloco::error::invalid_argument);
 
@@ -257,8 +256,7 @@ public:
    * entry stream is malformed past the point a partial match could
    * already be recovered.
    */
-  [[nodiscard]] reloco::optional<resolved> try_resolve(std::uint64_t addr,
-                                                       reloco::span<char> scratch) const noexcept {
+  [[nodiscard]] reloco::optional<resolved> try_resolve(std::uint64_t addr, reloco::span<char> scratch) const noexcept {
     if (!valid() || symbol_count_ == 0)
       return reloco::nullopt;
 
@@ -270,8 +268,7 @@ public:
     std::size_t hi = checkpoint_count_;
     while (lo < hi) {
       const std::size_t mid = lo + (hi - lo) / 2;
-      const std::uint64_t mid_addr =
-          debug_symtab::detail::load_le_addr(checkpoints + mid * record_size, addr_width_);
+      const std::uint64_t mid_addr = debug_symtab::detail::load_le_addr(checkpoints + mid * record_size, addr_width_);
       if (mid_addr <= addr)
         lo = mid + 1;
       else
@@ -283,8 +280,7 @@ public:
 
     const std::byte *checkpoint_record = checkpoints + checkpoint_index * record_size;
     const std::uint64_t group_start_addr = debug_symtab::detail::load_le_addr(checkpoint_record, addr_width_);
-    const std::uint32_t group_stream_offset =
-        debug_symtab::detail::load_le32(checkpoint_record + addr_width_);
+    const std::uint32_t group_stream_offset = debug_symtab::detail::load_le32(checkpoint_record + addr_width_);
 
     const std::uint32_t entries_in_group =
         (checkpoint_index + 1 == checkpoint_count_)
@@ -409,7 +405,7 @@ private:
       debug_symtab::detail::bit_reader reader{stream, pos, 0};
       for (std::uint8_t i = 0; i < length; ++i) {
         auto symbol = debug_symtab::detail::decode_huffman_symbol(reader, huffman_length_counts_,
-                                                                   huffman_sorted_symbols_, huffman_max_code_len_);
+                                                                  huffman_sorted_symbols_, huffman_max_code_len_);
         if (!symbol)
           return reloco::nullopt;
         name_buffer[i] = static_cast<std::byte>(symbol.value());
@@ -420,8 +416,8 @@ private:
     }
 
     last_name = decoded;
-    last_name_truncated = length > 0 && length == max_name_len_ &&
-                           static_cast<std::uint8_t>(decoded[length - 1]) == truncation_marker_;
+    last_name_truncated =
+        length > 0 && length == max_name_len_ && static_cast<std::uint8_t>(decoded[length - 1]) == truncation_marker_;
     last_name_valid = true;
     return name_record{decoded, last_name_truncated};
   }

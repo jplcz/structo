@@ -138,7 +138,8 @@
 
 namespace structo::arch::arm64 {
 
-/** @brief `tlb_flush_traits<arm64::tlb_tag>`'s `Arch` tag -- CP15-successor `TLBI` ops, every AArch64 core. Broadcast is mandatory baseline A64, always available. See the @file docs. */
+/** @brief `tlb_flush_traits<arm64::tlb_tag>`'s `Arch` tag -- CP15-successor `TLBI` ops, every AArch64 core. Broadcast
+ * is mandatory baseline A64, always available. See the @file docs. */
 struct tlb_tag {};
 
 } // namespace structo::arch::arm64
@@ -148,7 +149,8 @@ template <> struct structo::arch::tlb_flush_traits<structo::arch::arm64::tlb_tag
 
   // --- process_tlb_space: VMALLE1 / ASIDE1 / VAAE1 / VAE1 -----------------
 
-  template <typename Space> static auto flush_all() noexcept -> std::enable_if_t<std::is_same_v<Space, process_tlb_space>> {
+  template <typename Space>
+  static auto flush_all() noexcept -> std::enable_if_t<std::is_same_v<Space, process_tlb_space>> {
     asm volatile("tlbi vmalle1" ::: "memory");
   }
 

@@ -32,12 +32,23 @@
  *
  * | `Cell` | Backs onto | Model |
  * |---|---|---|
- * | `embedded_mutex_cell<T, MutexT = reloco::mutex>` (default) | `reloco::guarded_mutex<T *, MutexT>` | Exclusive-only: `Mutex<Option<*mut T>>`. One lock per `backref_ptr` instance. |
- * | `embedded_rw_cell<T, SharedMutexT = reloco::shared_mutex>` | `reloco::rw_lock<T *, SharedMutexT>` | `RwLock<Option<*mut T>>`: any number of concurrent `shared_lock()` readers, or one exclusive `lock()` writer to reassign/detach. One lock per instance. |
- * | `embedded_seqlock_cell<T>` | `reloco::guarded_seqlock<T *>` | Lock-free `read_unlocked()` (optimistic, retried internally); `lock()`/`try_lock()` still serialize writers. **Only validates the pointer field itself** -- does not pin `*T`'s lifetime, so only safe to dereference the returned `T*` if paired with an external reclamation scheme (RCU/epoch/hazard pointers) that guarantees `T` outlives the read. |
- * | `striped_mutex_cell<T, N, LockT = reloco::spin_lock, Tag = T>` | `structo::sync::lock_striping<N, LockT>` | Exclusive-only, like `embedded_mutex_cell`, but the lock itself lives in a shared static table hashed by this `backref_ptr`'s own address instead of inside the instance -- zero lock bytes per instance, for dense arrays (e.g. a `struct page[]`). |
- * | `striped_rw_cell<T, N, SharedLockT = reloco::shared_mutex, Tag = T>` | `structo::sync::lock_striping<N, SharedLockT>` | `embedded_rw_cell`'s shared-readers/exclusive-writer model, but struck from the same shared static table as `striped_mutex_cell` instead of an embedded lock. |
- * | `striped_seqlock_cell<T, N, LockT = reloco::spin_lock, Tag = T>` | `structo::sync::lock_striping<N, LockT>` | `embedded_seqlock_cell`'s lock-free `read_unlocked()`, but validated against a shared static table's per-stripe sequence counter instead of an embedded one -- shares both `embedded_seqlock_cell`'s lifetime caveat and `striped_mutex_cell`'s cross-key collision trade-off. |
+ * | `embedded_mutex_cell<T, MutexT = reloco::mutex>` (default) | `reloco::guarded_mutex<T *, MutexT>` | Exclusive-only:
+ * `Mutex<Option<*mut T>>`. One lock per `backref_ptr` instance. | | `embedded_rw_cell<T, SharedMutexT =
+ * reloco::shared_mutex>` | `reloco::rw_lock<T *, SharedMutexT>` | `RwLock<Option<*mut T>>`: any number of concurrent
+ * `shared_lock()` readers, or one exclusive `lock()` writer to reassign/detach. One lock per instance. | |
+ * `embedded_seqlock_cell<T>` | `reloco::guarded_seqlock<T *>` | Lock-free `read_unlocked()` (optimistic, retried
+ * internally); `lock()`/`try_lock()` still serialize writers. **Only validates the pointer field itself** -- does not
+ * pin `*T`'s lifetime, so only safe to dereference the returned `T*` if paired with an external reclamation scheme
+ * (RCU/epoch/hazard pointers) that guarantees `T` outlives the read. | | `striped_mutex_cell<T, N, LockT =
+ * reloco::spin_lock, Tag = T>` | `structo::sync::lock_striping<N, LockT>` | Exclusive-only, like `embedded_mutex_cell`,
+ * but the lock itself lives in a shared static table hashed by this `backref_ptr`'s own address instead of inside the
+ * instance -- zero lock bytes per instance, for dense arrays (e.g. a `struct page[]`). | | `striped_rw_cell<T, N,
+ * SharedLockT = reloco::shared_mutex, Tag = T>` | `structo::sync::lock_striping<N, SharedLockT>` | `embedded_rw_cell`'s
+ * shared-readers/exclusive-writer model, but struck from the same shared static table as `striped_mutex_cell` instead
+ * of an embedded lock. | | `striped_seqlock_cell<T, N, LockT = reloco::spin_lock, Tag = T>` |
+ * `structo::sync::lock_striping<N, LockT>` | `embedded_seqlock_cell`'s lock-free `read_unlocked()`, but validated
+ * against a shared static table's per-stripe sequence counter instead of an embedded one -- shares both
+ * `embedded_seqlock_cell`'s lifetime caveat and `striped_mutex_cell`'s cross-key collision trade-off. |
  *
  * `embedded_mutex_cell`/`striped_mutex_cell` are the right default for the
  * common case (one owner at a time, readers and writers equally rare);
@@ -234,9 +245,7 @@ template <typename T, typename SharedMutexT = reloco::shared_mutex> struct embed
     return guard(std::move(r.value()));
   }
 
-  [[nodiscard]] static read_guard shared_lock(state &s, const void * /*self*/) noexcept {
-    return read_guard(s.read());
-  }
+  [[nodiscard]] static read_guard shared_lock(state &s, const void * /*self*/) noexcept { return read_guard(s.read()); }
 
   [[nodiscard]] static reloco::result<read_guard> try_shared_lock(state &s, const void * /*self*/) noexcept {
     auto r = s.try_read();
@@ -315,7 +324,7 @@ template <typename T> struct embedded_seqlock_cell {
  * `striped_seqlock_cell` below. */
 template <typename T, std::size_t N, typename LockT = reloco::spin_lock, typename Tag = T> struct striped_mutex_cell {
   using state = T *; // Plain pointer: every access is already serialized by
-                      // whichever stripe `table()` hands out below.
+                     // whichever stripe `table()` hands out below.
 
   /** @brief Proof that this instance's stripe is held. */
   class [[nodiscard]] guard {

@@ -156,9 +156,9 @@ template <typename SpaceTag> struct space_domain_of_impl {
   static constexpr execution_domain value = execution_domain::unspecified;
 };
 
-#define STRUCTO_DETAIL_DOMAIN_SPACE_OF(space_tag, domain)                                                            \
-  template <> struct space_domain_of_impl<space_tag> {                                                               \
-    static constexpr execution_domain value = domain;                                                                \
+#define STRUCTO_DETAIL_DOMAIN_SPACE_OF(space_tag, domain)                                                              \
+  template <> struct space_domain_of_impl<space_tag> {                                                                 \
+    static constexpr execution_domain value = domain;                                                                  \
   }
 
 STRUCTO_DETAIL_DOMAIN_SPACE_OF(secure_tlb_space, execution_domain::secure);
@@ -211,7 +211,7 @@ inline constexpr execution_domain space_domain_of = detail::space_domain_of_impl
  * metric merely for being the same type.
  */
 template <typename TagA, typename TagB>
-inline constexpr bool same_domain_v = space_domain_of<TagA> == space_domain_of<TagB> &&
-                                       space_domain_of<TagA> != execution_domain::unspecified;
+inline constexpr bool same_domain_v =
+    space_domain_of<TagA> == space_domain_of<TagB> && space_domain_of<TagA> != execution_domain::unspecified;
 
 } // namespace structo::arch

@@ -137,7 +137,9 @@ TEST_F(KernelSpinLockTest, DestroyingHeldLockTraps) {
 }
 
 TEST_F(KernelSpinLockTest, DestroyingUnlockedLockIsFine) {
-  { test_lock lock; }
+  {
+    test_lock lock;
+  }
   SUCCEED();
 }
 

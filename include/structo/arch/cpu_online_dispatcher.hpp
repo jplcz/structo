@@ -147,13 +147,10 @@ public:
    * @tparam Compute Invocable as `Compute(const mask_type &, U)`.
    */
   template <typename Preprocess, typename Compute>
-  [[nodiscard]] auto with_online_mask(Preprocess &&preprocess, Compute &&compute) const
-      noexcept(std::is_nothrow_invocable_v<Preprocess, const mask_type &> &&
-               std::is_nothrow_invocable_v<
-                   Compute, const mask_type &,
-                   std::invoke_result_t<Preprocess, const mask_type &>>)
-          -> std::invoke_result_t<Compute, const mask_type &,
-                                   std::invoke_result_t<Preprocess, const mask_type &>> {
+  [[nodiscard]] auto with_online_mask(Preprocess &&preprocess, Compute &&compute) const noexcept(
+      std::is_nothrow_invocable_v<Preprocess, const mask_type &> &&
+      std::is_nothrow_invocable_v<Compute, const mask_type &, std::invoke_result_t<Preprocess, const mask_type &>>)
+      -> std::invoke_result_t<Compute, const mask_type &, std::invoke_result_t<Preprocess, const mask_type &>> {
     for (;;) {
       read_tx tx(lock_);
       const mask_type mask = tx.extract(); // try get mask (speculative, may be stale/torn)
@@ -179,8 +176,9 @@ public:
    * @tparam OnOnline Invocable as `OnOnline(std::size_t cpu, const mask_type &mask)`.
    */
   template <typename OnOnline>
-  void mark_online(std::size_t cpu, OnOnline &&on_online) noexcept(
-      std::is_nothrow_invocable_v<OnOnline, std::size_t, const mask_type &>) {
+  void
+  mark_online(std::size_t cpu,
+              OnOnline &&on_online) noexcept(std::is_nothrow_invocable_v<OnOnline, std::size_t, const mask_type &>) {
     auto guard = lock_.write_lock();
     on_online(cpu, static_cast<const mask_type &>(*guard));
     guard->set(cpu);

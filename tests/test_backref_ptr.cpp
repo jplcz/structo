@@ -13,12 +13,11 @@ struct owner {
 
 template <typename Cell> class BackrefPtrTest : public ::testing::Test {};
 
-using CellTypes =
-    ::testing::Types<structo::embedded_mutex_cell<owner>, structo::embedded_rw_cell<owner>,
-                      structo::embedded_seqlock_cell<owner>, structo::striped_mutex_cell<owner, 4>,
-                      structo::striped_rw_cell<owner, 4>, structo::striped_seqlock_cell<owner, 4>>;
+using CellTypes = ::testing::Types<structo::embedded_mutex_cell<owner>, structo::embedded_rw_cell<owner>,
+                                   structo::embedded_seqlock_cell<owner>, structo::striped_mutex_cell<owner, 4>,
+                                   structo::striped_rw_cell<owner, 4>, structo::striped_seqlock_cell<owner, 4>>;
 
-TYPED_TEST_SUITE(BackrefPtrTest, CellTypes);
+TYPED_TEST_SUITE(BackrefPtrTest, CellTypes, ::testing::internal::DefaultNameGenerator);
 
 TYPED_TEST(BackrefPtrTest, DefaultConstructedPointsAtNothing) {
   structo::backref_ptr<owner, TypeParam> ref;

@@ -26,5 +26,5 @@ struct multiboot_image {
 
 } // namespace
 
-extern "C" __attribute__((section(".multiboot"), used)) alignas(8) constexpr multiboot_image g_multiboot_image =
-    make_image();
+extern "C"
+    __attribute__((section(".multiboot"), used)) alignas(8) constexpr multiboot_image g_multiboot_image = make_image();

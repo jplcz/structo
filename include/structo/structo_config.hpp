@@ -79,8 +79,8 @@
 //     nonsecure_tlb_space/secure_tlb_space, which are only architecturally
 //     valid to target from specific privilege modes) are even
 //     instantiable for a given build.
-#if defined(STRUCTO_DOMAIN_SECURE) + defined(STRUCTO_DOMAIN_NONSECURE) + defined(STRUCTO_DOMAIN_MONITOR) +           \
-        defined(STRUCTO_DOMAIN_HYPERVISOR) + defined(STRUCTO_DOMAIN_SECURE_HYPERVISOR) >                             \
+#if defined(STRUCTO_DOMAIN_SECURE) + defined(STRUCTO_DOMAIN_NONSECURE) + defined(STRUCTO_DOMAIN_MONITOR) +             \
+        defined(STRUCTO_DOMAIN_HYPERVISOR) + defined(STRUCTO_DOMAIN_SECURE_HYPERVISOR) >                               \
     1
 #error "structo_config.hpp: define at most one of STRUCTO_DOMAIN_SECURE/STRUCTO_DOMAIN_NONSECURE/" \
        "STRUCTO_DOMAIN_MONITOR/STRUCTO_DOMAIN_HYPERVISOR/STRUCTO_DOMAIN_SECURE_HYPERVISOR"

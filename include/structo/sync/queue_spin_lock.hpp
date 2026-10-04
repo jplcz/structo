@@ -124,7 +124,7 @@ public:
    */
   ~queue_spin_lock() noexcept {
     STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, tail_.load(std::memory_order_relaxed) == nullptr,
-                              "queue_spin_lock: destroyed while still held or while a waiter is queued");
+                             "queue_spin_lock: destroyed while still held or while a waiter is queued");
   }
 
   queue_spin_lock(const queue_spin_lock &) = delete;
@@ -140,8 +140,9 @@ public:
    * own already-held lock would otherwise self-deadlock forever.
    */
   void lock(node &n) & noexcept {
-    STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, !is_locked_by_current(),
-                              "queue_spin_lock: lock() called while already held by the calling context (self-deadlock)");
+    STRUCTO_SYNC_LOCK_ASSERT(
+        Traits, *this, !is_locked_by_current(),
+        "queue_spin_lock: lock() called while already held by the calling context (self-deadlock)");
 
     n.next_.store(nullptr, std::memory_order_relaxed);
     n.waiting_.store(true, std::memory_order_relaxed);
@@ -191,7 +192,7 @@ public:
    */
   void unlock(node &n) & noexcept {
     STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, owner_.load(std::memory_order_relaxed) == owner_value(),
-                              "queue_spin_lock: unlock() by non-owner (or already unlocked)");
+                             "queue_spin_lock: unlock() by non-owner (or already unlocked)");
     owner_.store(0, std::memory_order_relaxed);
 
     node *expected = &n;

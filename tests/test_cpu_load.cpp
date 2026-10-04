@@ -39,5 +39,5 @@ TEST(CpuLoadTest, CurrentAndAverageAnswerDifferentQuestions) {
     load.sample(reloco::duration::from_secs(10), 4U);
   load.sample(reloco::duration::from_secs(1), 0U); // a brief, transient dip
   EXPECT_EQ(load.current(), 0U);                   // "nothing stealable right now"
-  EXPECT_GT(load.average().to_int(), 0U);           // "but it's been consistently busy"
+  EXPECT_GT(load.average().to_int(), 0U);          // "but it's been consistently busy"
 }

@@ -131,8 +131,8 @@ template <typename Backend, typename = void> struct has_block_device_traits : st
 
 template <typename Backend>
 struct has_block_device_traits<Backend, std::void_t<decltype(block_device_traits<Backend>::block_size),
-                                                     decltype(block_device_traits<Backend>::block_count),
-                                                     decltype(block_device_traits<Backend>::try_read_blocks)>>
+                                                    decltype(block_device_traits<Backend>::block_count),
+                                                    decltype(block_device_traits<Backend>::try_read_blocks)>>
     : std::true_type {};
 
 // Detects the optional Traits::try_write_blocks probe.

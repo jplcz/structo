@@ -224,7 +224,7 @@ public:
   }
 
   /** @brief Fallible variant of `single()`. */
-  [[nodiscard]] static constexpr result<cpu_mask> try_single(std::size_t cpu) noexcept {
+  [[nodiscard]] static RELOCO_CONSTEXPR20 result<cpu_mask> try_single(std::size_t cpu) noexcept {
     if (cpu >= MaxCpus) {
       return unexpected(error::out_of_range);
     }
@@ -244,7 +244,7 @@ public:
   }
 
   /** @brief Fallible variant of `set()`. */
-  constexpr result<void> try_set(std::size_t cpu) noexcept {
+  RELOCO_CONSTEXPR20 result<void> try_set(std::size_t cpu) noexcept {
     if (cpu >= MaxCpus) {
       return unexpected(error::out_of_range);
     }
@@ -264,7 +264,7 @@ public:
   }
 
   /** @brief Fallible variant of `clear()`. */
-  constexpr result<void> try_clear(std::size_t cpu) noexcept {
+  RELOCO_CONSTEXPR20 result<void> try_clear(std::size_t cpu) noexcept {
     if (cpu >= MaxCpus) {
       return unexpected(error::out_of_range);
     }
@@ -284,7 +284,7 @@ public:
   }
 
   /** @brief Fallible variant of `test()`. */
-  [[nodiscard]] constexpr result<bool> try_test(std::size_t cpu) const noexcept {
+  [[nodiscard]] RELOCO_CONSTEXPR20 result<bool> try_test(std::size_t cpu) const noexcept {
     if (cpu >= MaxCpus) {
       return unexpected(error::out_of_range);
     }
@@ -303,7 +303,7 @@ public:
   }
 
   /** @brief Fallible variant of `toggle()`. */
-  constexpr result<void> try_toggle(std::size_t cpu) noexcept {
+  RELOCO_CONSTEXPR20 result<void> try_toggle(std::size_t cpu) noexcept {
     if (cpu >= MaxCpus) {
       return unexpected(error::out_of_range);
     }
@@ -323,7 +323,7 @@ public:
   }
 
   /** @brief Fallible variant of `word()`. */
-  [[nodiscard]] constexpr result<std::uint64_t> try_word(std::size_t index) const noexcept {
+  [[nodiscard]] RELOCO_CONSTEXPR20 result<std::uint64_t> try_word(std::size_t index) const noexcept {
     if (index >= word_count) {
       return unexpected(error::out_of_range);
     }
@@ -703,7 +703,7 @@ public:
   [[nodiscard]] constexpr bool all() const noexcept { return *this == filled(); }
 
   /** @brief Lowest set CPU index at or after `start`, if any. */
-  [[nodiscard]] constexpr reloco::optional<std::size_t> lowest_set_from(std::size_t start) const noexcept {
+  [[nodiscard]] RELOCO_CONSTEXPR20 reloco::optional<std::size_t> lowest_set_from(std::size_t start) const noexcept {
     if (start >= MaxCpus) {
       return reloco::nullopt;
     }
@@ -723,10 +723,12 @@ public:
   }
 
   /** @brief Lowest set CPU index, if any. */
-  [[nodiscard]] constexpr reloco::optional<std::size_t> lowest_set() const noexcept { return lowest_set_from(0); }
+  [[nodiscard]] RELOCO_CONSTEXPR20 reloco::optional<std::size_t> lowest_set() const noexcept {
+    return lowest_set_from(0);
+  }
 
   /** @brief Highest set CPU index, if any. */
-  [[nodiscard]] constexpr reloco::optional<std::size_t> highest_set() const noexcept {
+  [[nodiscard]] RELOCO_CONSTEXPR20 reloco::optional<std::size_t> highest_set() const noexcept {
     for (std::size_t word_idx = word_count; word_idx-- > 0;) {
       std::uint64_t w = words_[word_idx];
       if (w == 0) {

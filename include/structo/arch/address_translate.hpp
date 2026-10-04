@@ -90,7 +90,8 @@
 
 namespace structo::arch {
 
-/** @brief Which kind of access to simulate -- the CPU's permission check (readable/writable, privilege level, etc.) depends on this, exactly as it would for a real load or store. */
+/** @brief Which kind of access to simulate -- the CPU's permission check (readable/writable, privilege level, etc.)
+ * depends on this, exactly as it would for a real load or store. */
 enum class translate_access : std::uint8_t {
   read,
   write,
@@ -105,11 +106,15 @@ enum class translate_access : std::uint8_t {
  * if a byte-exact physical address is required.
  */
 struct translated_address {
-  /** @brief Output address (page-aligned), in whichever physical/intermediate-physical space `Space` translates into (see `tlb_flush.hpp`'s own `Space` docs). */
+  /** @brief Output address (page-aligned), in whichever physical/intermediate-physical space `Space` translates into
+   * (see `tlb_flush.hpp`'s own `Space` docs). */
   std::uint64_t physical_address = 0;
-  /** @brief Raw `MAIR_ELx`-encoded memory-attribute byte for the output address (same encoding as a `page_table_entry_traits` `MemAttr` index target), best-effort decoded -- see the backend header for which bits of the raw register this comes from. */
+  /** @brief Raw `MAIR_ELx`-encoded memory-attribute byte for the output address (same encoding as a
+   * `page_table_entry_traits` `MemAttr` index target), best-effort decoded -- see the backend header for which bits of
+   * the raw register this comes from. */
   std::uint8_t mem_attr = 0;
-  /** @brief Shareability of the output address: `0` = Non-shareable, `2` = Outer Shareable, `3` = Inner Shareable (`1` is reserved/never produced). */
+  /** @brief Shareability of the output address: `0` = Non-shareable, `2` = Outer Shareable, `3` = Inner Shareable (`1`
+   * is reserved/never produced). */
   std::uint8_t shareability = 0;
   /**
    * @brief Best-effort decode of the translation's `NS` (Non-secure) bit.
@@ -237,9 +242,8 @@ namespace detail {
 template <typename, typename, typename = void> struct at_has_translate : std::false_type {};
 template <typename Traits, typename Space>
 struct at_has_translate<Traits, Space,
-                         std::void_t<decltype(Traits::template translate<Space>(std::declval<std::uint64_t>(),
-                                                                                 std::declval<translate_access>()))>>
-    : std::true_type {};
+                        std::void_t<decltype(Traits::template translate<Space>(
+                            std::declval<std::uint64_t>(), std::declval<translate_access>()))>> : std::true_type {};
 
 } // namespace detail
 
@@ -251,7 +255,7 @@ struct at_has_translate<Traits, Space,
 template <typename Arch> struct address_translator {
   template <typename Space>
   [[nodiscard]] static reloco::result<translated_address> translate(std::uint64_t vaddr,
-                                                                      translate_access access) noexcept {
+                                                                    translate_access access) noexcept {
     static_assert(detail::at_has_translate<address_translate_traits<Arch>, Space>::value,
                   "address_translate_traits<Arch> does not implement translate<Space>() -- there is no coarser "
                   "fallback for a hardware translation query, unlike tlb_flush_traits's precision chain.");

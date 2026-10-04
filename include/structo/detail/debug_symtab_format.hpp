@@ -59,26 +59,26 @@ inline constexpr std::uint8_t huffman_max_code_len_limit = 15;
 /** @brief Byte offsets of every header field, matching
  * `docs/debug_symtab_format.md`'s header table exactly. */
 namespace header_offset {
-inline constexpr std::size_t magic = 0;                      // u32
-inline constexpr std::size_t addr_width = 4;                 // u8
-inline constexpr std::size_t max_name_len = 5;                // u8
-inline constexpr std::size_t truncation_marker = 6;           // u8
-inline constexpr std::size_t reserved0 = 7;                   // u8
-inline constexpr std::size_t group_size = 8;                  // u16
-inline constexpr std::size_t reserved1 = 10;                  // u16
-inline constexpr std::size_t symbol_count = 12;               // u32
-inline constexpr std::size_t checkpoint_count = 16;           // u32
-inline constexpr std::size_t checkpoint_table_offset = 20;    // u32
-inline constexpr std::size_t entry_stream_offset = 24;        // u32
-inline constexpr std::size_t entry_stream_size = 28;          // u32
-inline constexpr std::size_t build_id_offset = 32;            // u32
-inline constexpr std::size_t build_id_size = 36;               // u8
-inline constexpr std::size_t reserved2 = 37;                   // u8[3]
-inline constexpr std::size_t payload_crc32 = 40;                // u32
-inline constexpr std::size_t huffman_table_offset = 44;         // u32
-inline constexpr std::size_t huffman_table_size = 48;           // u32
-inline constexpr std::size_t huffman_symbol_count = 52;         // u16
-inline constexpr std::size_t reserved3 = 54;                    // u16
+inline constexpr std::size_t magic = 0;                    // u32
+inline constexpr std::size_t addr_width = 4;               // u8
+inline constexpr std::size_t max_name_len = 5;             // u8
+inline constexpr std::size_t truncation_marker = 6;        // u8
+inline constexpr std::size_t reserved0 = 7;                // u8
+inline constexpr std::size_t group_size = 8;               // u16
+inline constexpr std::size_t reserved1 = 10;               // u16
+inline constexpr std::size_t symbol_count = 12;            // u32
+inline constexpr std::size_t checkpoint_count = 16;        // u32
+inline constexpr std::size_t checkpoint_table_offset = 20; // u32
+inline constexpr std::size_t entry_stream_offset = 24;     // u32
+inline constexpr std::size_t entry_stream_size = 28;       // u32
+inline constexpr std::size_t build_id_offset = 32;         // u32
+inline constexpr std::size_t build_id_size = 36;           // u8
+inline constexpr std::size_t reserved2 = 37;               // u8[3]
+inline constexpr std::size_t payload_crc32 = 40;           // u32
+inline constexpr std::size_t huffman_table_offset = 44;    // u32
+inline constexpr std::size_t huffman_table_size = 48;      // u32
+inline constexpr std::size_t huffman_symbol_count = 52;    // u16
+inline constexpr std::size_t reserved3 = 54;               // u16
 } // namespace header_offset
 
 /** @brief Per-checkpoint-record field offsets, relative to the start of

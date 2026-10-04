@@ -264,7 +264,8 @@ namespace detail {
  * `BackrefField` non-type template parameter must have. */
 template <typename M> struct backref_member_traits;
 
-template <typename Owner, typename Cell, typename Holder> struct backref_member_traits<backref_ptr<Owner, Cell> Holder::*> {
+template <typename Owner, typename Cell, typename Holder>
+struct backref_member_traits<backref_ptr<Owner, Cell> Holder::*> {
   using owner_type = Owner;
   using cell_type = Cell;
   using holder_type = Holder;
@@ -298,7 +299,7 @@ public:
    * is still attached -- call `detach_all()` first. */
   ~backref_owner() noexcept {
     RELOCO_ASSERT(container_.empty(), "structo::backref_owner: destroyed with holders still attached; call "
-                                       "detach_all() first");
+                                      "detach_all() first");
   }
 
   /**
@@ -368,8 +369,7 @@ public:
    */
   void detach_all() & noexcept {
     lock_.lock();
-    container_.clear_and_dispose(
-        [](holder_type &holder) noexcept { (holder.*BackrefField).lock().reset(nullptr); });
+    container_.clear_and_dispose([](holder_type &holder) noexcept { (holder.*BackrefField).lock().reset(nullptr); });
     lock_.unlock();
   }
 
@@ -402,7 +402,7 @@ public:
   template <typename Pred> void detach_if(Pred &&pred) & noexcept {
     lock_.lock();
     container_.remove_if(std::forward<Pred>(pred),
-                          [](holder_type &holder) noexcept { (holder.*BackrefField).lock().reset(nullptr); });
+                         [](holder_type &holder) noexcept { (holder.*BackrefField).lock().reset(nullptr); });
     lock_.unlock();
   }
 

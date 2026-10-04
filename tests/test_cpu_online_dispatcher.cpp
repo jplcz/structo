@@ -116,8 +116,8 @@ TEST_F(CpuOnlineDispatcherTest, WithOnlineMaskSingleCallbackReturnValuePropagate
   dispatcher d;
   d.mark_online(0, no_op);
 
-  std::string label = d.with_online_mask(
-      [](const mask_type &mask) { return std::string("online=") + std::to_string(mask.count()); });
+  std::string label =
+      d.with_online_mask([](const mask_type &mask) { return std::string("online=") + std::to_string(mask.count()); });
   EXPECT_EQ(label, "online=1");
 }
 
@@ -127,9 +127,9 @@ TEST_F(CpuOnlineDispatcherTest, WithOnlineMaskTwoCallbackFormPassesPreprocessedV
   d.mark_online(2, no_op);
   d.mark_online(3, no_op);
 
-  auto result = d.with_online_mask(
-      [](const mask_type &mask) { return mask.count() * 10; },
-      [](const mask_type &mask, std::size_t preprocessed) { return preprocessed + mask.count(); });
+  auto result =
+      d.with_online_mask([](const mask_type &mask) { return mask.count() * 10; },
+                         [](const mask_type &mask, std::size_t preprocessed) { return preprocessed + mask.count(); });
 
   EXPECT_EQ(result, 33u); // preprocess: 3 * 10 == 30, compute: 30 + 3 == 33
 }
@@ -139,12 +139,11 @@ TEST_F(CpuOnlineDispatcherTest, WithOnlineMaskTwoCallbackFormPreprocessSeesSameM
   d.mark_online(7, no_op);
 
   bool masks_matched = false;
-  int unused = d.with_online_mask(
-      [](const mask_type &mask) { return mask; },
-      [&](const mask_type &mask, const mask_type &preprocessed) {
-        masks_matched = (mask == preprocessed);
-        return 0;
-      });
+  int unused = d.with_online_mask([](const mask_type &mask) { return mask; },
+                                  [&](const mask_type &mask, const mask_type &preprocessed) {
+                                    masks_matched = (mask == preprocessed);
+                                    return 0;
+                                  });
   (void)unused;
 
   EXPECT_TRUE(masks_matched);

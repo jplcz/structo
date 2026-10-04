@@ -158,8 +158,6 @@ TEST_F(NoopSchedTest, EnqueueOnAPinnedEntryReleasesTheStalePinInsteadOfDoubleLin
   EXPECT_EQ(noop::pick_next(), nullptr);
 }
 
-
-
 struct fixed_task {
   struct {
     fixed_task *next = nullptr;
@@ -511,7 +509,7 @@ TEST_F(SchedUleTest, RemoveOnAPinnedEntryReleasesThePinWithoutTouchingEitherQueu
 
 TEST_F(SchedUleTest, EnqueueOnAPinnedEntryReleasesTheStalePinInsteadOfDoubleLinking) {
   ule_task a{{}, 0, {}, 1};
-  ule::force_next(a);   // pinned, not linked
+  ule::force_next(a);     // pinned, not linked
   ule::enqueue(a, at(0)); // must not double-link a stale-pinned entry
   EXPECT_EQ(ule::size(), 1u);
   EXPECT_EQ(ule::pick_next(at(1))->id, 1);

@@ -93,9 +93,9 @@
  *   template <typename Space> static void flush_tag_broadcast(std::uint64_t tag) noexcept;
  *   template <typename Space> static void flush_page_broadcast(std::uint64_t addr) noexcept;
  *   template <typename Space> static void flush_page_tag_broadcast(std::uint64_t addr, std::uint64_t tag) noexcept;
- *   template <typename Space> static void flush_range_broadcast(std::uint64_t addr_begin, std::uint64_t addr_end) noexcept;
- *   template <typename Space> static void flush_range_tag_broadcast(std::uint64_t addr_begin, std::uint64_t addr_end,
- *                                                                    std::uint64_t tag) noexcept;
+ *   template <typename Space> static void flush_range_broadcast(std::uint64_t addr_begin, std::uint64_t addr_end)
+ * noexcept; template <typename Space> static void flush_range_tag_broadcast(std::uint64_t addr_begin, std::uint64_t
+ * addr_end, std::uint64_t tag) noexcept;
  * };
  * @endcode
  *
@@ -221,7 +221,8 @@ struct nonsecure_tlb_space {};
 /** @brief ARM Realm Management Extension (RME) Root world (EL3 monitor) translations -- untagged. */
 struct root_tlb_space {};
 
-/** @brief ARM RME Realm world translations -- ASID-tagged, like @ref process_tlb_space, but in the isolated Realm world. */
+/** @brief ARM RME Realm world translations -- ASID-tagged, like @ref process_tlb_space, but in the isolated Realm
+ * world. */
 struct realm_tlb_space {};
 
 /** @brief ARM RME Granule Protection Table cache -- PA-addressed, untagged, EL3/RMM-only. */
@@ -244,45 +245,43 @@ namespace detail {
 
 template <typename, typename, typename = void> struct tlb_has_flush_all : std::false_type {};
 template <typename Traits, typename Space>
-struct tlb_has_flush_all<Traits, Space, std::void_t<decltype(Traits::template flush_all<Space>())>>
-    : std::true_type {};
+struct tlb_has_flush_all<Traits, Space, std::void_t<decltype(Traits::template flush_all<Space>())>> : std::true_type {};
 
 template <typename, typename, typename = void> struct tlb_has_flush_tag : std::false_type {};
 template <typename Traits, typename Space>
 struct tlb_has_flush_tag<Traits, Space,
-                          std::void_t<decltype(Traits::template flush_tag<Space>(std::declval<std::uint64_t>()))>>
+                         std::void_t<decltype(Traits::template flush_tag<Space>(std::declval<std::uint64_t>()))>>
     : std::true_type {};
 
 template <typename, typename, typename = void> struct tlb_has_flush_page : std::false_type {};
 template <typename Traits, typename Space>
 struct tlb_has_flush_page<Traits, Space,
-                           std::void_t<decltype(Traits::template flush_page<Space>(std::declval<std::uint64_t>()))>>
+                          std::void_t<decltype(Traits::template flush_page<Space>(std::declval<std::uint64_t>()))>>
     : std::true_type {};
 
 template <typename, typename, typename = void> struct tlb_has_flush_page_tag : std::false_type {};
 template <typename Traits, typename Space>
 struct tlb_has_flush_page_tag<Traits, Space,
-                               std::void_t<decltype(Traits::template flush_page_tag<Space>(
-                                   std::declval<std::uint64_t>(), std::declval<std::uint64_t>()))>> : std::true_type {
-};
+                              std::void_t<decltype(Traits::template flush_page_tag<Space>(
+                                  std::declval<std::uint64_t>(), std::declval<std::uint64_t>()))>> : std::true_type {};
 
 template <typename, typename, typename = void> struct tlb_has_flush_range : std::false_type {};
 template <typename Traits, typename Space>
 struct tlb_has_flush_range<Traits, Space,
-                            std::void_t<decltype(Traits::template flush_range<Space>(
-                                std::declval<std::uint64_t>(), std::declval<std::uint64_t>()))>> : std::true_type {};
+                           std::void_t<decltype(Traits::template flush_range<Space>(
+                               std::declval<std::uint64_t>(), std::declval<std::uint64_t>()))>> : std::true_type {};
 
 template <typename, typename, typename = void> struct tlb_has_flush_range_tag : std::false_type {};
 template <typename Traits, typename Space>
-struct tlb_has_flush_range_tag<Traits, Space,
-                                std::void_t<decltype(Traits::template flush_range_tag<Space>(
-                                    std::declval<std::uint64_t>(), std::declval<std::uint64_t>(),
-                                    std::declval<std::uint64_t>()))>> : std::true_type {};
+struct tlb_has_flush_range_tag<
+    Traits, Space,
+    std::void_t<decltype(Traits::template flush_range_tag<Space>(
+        std::declval<std::uint64_t>(), std::declval<std::uint64_t>(), std::declval<std::uint64_t>()))>>
+    : std::true_type {};
 
 template <typename, typename, typename = void> struct tlb_has_flush_all_broadcast : std::false_type {};
 template <typename Traits, typename Space>
-struct tlb_has_flush_all_broadcast<Traits, Space,
-                                    std::void_t<decltype(Traits::template flush_all_broadcast<Space>())>>
+struct tlb_has_flush_all_broadcast<Traits, Space, std::void_t<decltype(Traits::template flush_all_broadcast<Space>())>>
     : std::true_type {};
 
 template <typename, typename, typename = void> struct tlb_has_flush_tag_broadcast : std::false_type {};
@@ -294,22 +293,21 @@ struct tlb_has_flush_tag_broadcast<
 template <typename, typename, typename = void> struct tlb_has_flush_page_broadcast : std::false_type {};
 template <typename Traits, typename Space>
 struct tlb_has_flush_page_broadcast<
-    Traits, Space,
-    std::void_t<decltype(Traits::template flush_page_broadcast<Space>(std::declval<std::uint64_t>()))>>
+    Traits, Space, std::void_t<decltype(Traits::template flush_page_broadcast<Space>(std::declval<std::uint64_t>()))>>
     : std::true_type {};
 
 template <typename, typename, typename = void> struct tlb_has_flush_page_tag_broadcast : std::false_type {};
 template <typename Traits, typename Space>
 struct tlb_has_flush_page_tag_broadcast<Traits, Space,
-                                         std::void_t<decltype(Traits::template flush_page_tag_broadcast<Space>(
-                                             std::declval<std::uint64_t>(), std::declval<std::uint64_t>()))>>
+                                        std::void_t<decltype(Traits::template flush_page_tag_broadcast<Space>(
+                                            std::declval<std::uint64_t>(), std::declval<std::uint64_t>()))>>
     : std::true_type {};
 
 template <typename, typename, typename = void> struct tlb_has_flush_range_broadcast : std::false_type {};
 template <typename Traits, typename Space>
 struct tlb_has_flush_range_broadcast<Traits, Space,
-                                      std::void_t<decltype(Traits::template flush_range_broadcast<Space>(
-                                          std::declval<std::uint64_t>(), std::declval<std::uint64_t>()))>>
+                                     std::void_t<decltype(Traits::template flush_range_broadcast<Space>(
+                                         std::declval<std::uint64_t>(), std::declval<std::uint64_t>()))>>
     : std::true_type {};
 
 template <typename, typename, typename = void> struct tlb_has_flush_range_tag_broadcast : std::false_type {};
@@ -339,7 +337,8 @@ struct tlb_has_max_range_bytes<Traits, std::void_t<decltype(Traits::max_range_by
 template <typename Arch> struct tlb_flusher {
   using traits = tlb_flush_traits<Arch>;
 
-  /** @brief Whether `Arch` can broadcast a flush to its whole shareability domain in hardware. Purely informational -- see "Broadcast" in the @file docs. */
+  /** @brief Whether `Arch` can broadcast a flush to its whole shareability domain in hardware. Purely informational --
+   * see "Broadcast" in the @file docs. */
   static constexpr bool supports_broadcast = traits::supports_broadcast;
 
   // --- Local (this core only) ---------------------------------------------
@@ -353,7 +352,8 @@ template <typename Arch> struct tlb_flusher {
     }
   }
 
-  /** @brief Invalidates every entry tagged `tag` in `Space`, local core only. Falls back to @ref flush_all if `Space` has no tagged flush. */
+  /** @brief Invalidates every entry tagged `tag` in `Space`, local core only. Falls back to @ref flush_all if `Space`
+   * has no tagged flush. */
   template <typename Space> static void flush_tag(std::uint64_t tag) noexcept {
     if constexpr (detail::tlb_has_flush_tag<traits, Space>::value) {
       traits::template flush_tag<Space>(tag);
@@ -362,7 +362,8 @@ template <typename Arch> struct tlb_flusher {
     }
   }
 
-  /** @brief Invalidates `addr` in `Space`, every tag, local core only. Falls back to @ref flush_all if `Space` has no by-address flush. */
+  /** @brief Invalidates `addr` in `Space`, every tag, local core only. Falls back to @ref flush_all if `Space` has no
+   * by-address flush. */
   template <typename Space> static void flush_page(std::uint64_t addr) noexcept {
     if constexpr (detail::tlb_has_flush_page<traits, Space>::value) {
       traits::template flush_page<Space>(addr);
@@ -447,7 +448,8 @@ template <typename Arch> struct tlb_flusher {
   // @file docs. A `Space` with no broadcast operation defined at all is a
   // static_assert, pointing the caller at its own IPI-driven shootdown.
 
-  /** @brief Broadcast twin of @ref flush_all. Requires `Space` to define a broadcast flush (directly or via its own fallback chain). */
+  /** @brief Broadcast twin of @ref flush_all. Requires `Space` to define a broadcast flush (directly or via its own
+   * fallback chain). */
   template <typename Space> static void flush_all_broadcast() noexcept {
     static_assert(detail::tlb_has_flush_all_broadcast<traits, Space>::value,
                   "tlb_flush_traits<Arch> has no broadcast flush for this Space -- "
@@ -475,7 +477,8 @@ template <typename Arch> struct tlb_flusher {
     }
   }
 
-  /** @brief Broadcast twin of @ref flush_page_tag. Falls back to @ref flush_tag_broadcast, then @ref flush_page_broadcast, then @ref flush_all_broadcast; never to a local-only flush. */
+  /** @brief Broadcast twin of @ref flush_page_tag. Falls back to @ref flush_tag_broadcast, then @ref
+   * flush_page_broadcast, then @ref flush_all_broadcast; never to a local-only flush. */
   template <typename Space> static void flush_page_tag_broadcast(std::uint64_t addr, std::uint64_t tag) noexcept {
     if constexpr (detail::tlb_has_flush_page_tag_broadcast<traits, Space>::value) {
       traits::template flush_page_tag_broadcast<Space>(addr, tag);

@@ -33,8 +33,8 @@ TEST(RamDiskTest, ReadWriteRoundTrip) {
 }
 
 TEST(RamDiskTest, BlockSizeOneIsByteAddressable) {
-  std::array<std::byte, 7> storage{std::byte{'a'}, std::byte{'b'}, std::byte{'c'},
-                                    std::byte{'d'}, std::byte{'e'}, std::byte{'f'}, std::byte{'g'}};
+  std::array<std::byte, 7> storage{std::byte{'a'}, std::byte{'b'}, std::byte{'c'}, std::byte{'d'},
+                                   std::byte{'e'}, std::byte{'f'}, std::byte{'g'}};
   ram_disk disk(storage, 1);
   block_device_ref ref(disk);
 

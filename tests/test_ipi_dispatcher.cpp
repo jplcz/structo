@@ -217,16 +217,15 @@ TEST_F(IpiDispatcherTest, CallSyncLocalOnlyRunsInlineWithoutTouchingQueue) {
   dispatcher::on_cpu_online(0, mask_type{});
   dispatcher::message_type msg;
   bool ran = false;
-  auto result = dispatcher::call_sync(0, mask_type::single(0), msg, 7,
-                                       [&ran](std::size_t cpu) noexcept {
-                                         ran = true;
-                                         EXPECT_EQ(cpu, 0u);
-                                       });
+  auto result = dispatcher::call_sync(0, mask_type::single(0), msg, 7, [&ran](std::size_t cpu) noexcept {
+    ran = true;
+    EXPECT_EQ(cpu, 0u);
+  });
 
   ASSERT_TRUE(result.has_value());
   EXPECT_TRUE(ran);
   EXPECT_TRUE(g_sent_ipis.empty()); // purely local: no remote targets, no hardware IPI needed
-  EXPECT_TRUE(msg.is_done());      // never pushed anywhere, so its ref-count was never touched
+  EXPECT_TRUE(msg.is_done());       // never pushed anywhere, so its ref-count was never touched
 }
 
 TEST_F(IpiDispatcherTest, OnCpuOfflineAbortsUnicastMessageWithoutRunningCallback) {

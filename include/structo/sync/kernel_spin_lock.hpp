@@ -83,7 +83,6 @@
 
 namespace structo::sync {
 
-
 /**
  * @brief Busy-wait lock that stamps the lock with whichever owner
  * `Traits::current_owner()` reports, rather than a bare `bool`.
@@ -109,7 +108,7 @@ public:
    */
   ~kernel_spin_lock() noexcept {
     STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, owner_.load(std::memory_order_relaxed) == 0,
-                              "kernel_spin_lock: destroyed while still held");
+                             "kernel_spin_lock: destroyed while still held");
   }
 
   kernel_spin_lock(const kernel_spin_lock &) = delete;
@@ -125,8 +124,9 @@ public:
    */
   void lock() & noexcept {
     const std::uintptr_t self = owner_value();
-    STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, owner_.load(std::memory_order_relaxed) != self,
-                              "kernel_spin_lock: lock() called while already held by the calling context (self-deadlock)");
+    STRUCTO_SYNC_LOCK_ASSERT(
+        Traits, *this, owner_.load(std::memory_order_relaxed) != self,
+        "kernel_spin_lock: lock() called while already held by the calling context (self-deadlock)");
 
     backoff bo;
     softlock_detector lockup(detail::softlock_limit_for<Traits>::value());
@@ -150,7 +150,8 @@ public:
   /** @brief Attempts to acquire the lock without spinning; returns whether it succeeded. */
   [[nodiscard]] bool try_lock() & noexcept {
     std::uintptr_t expected = 0;
-    return owner_.compare_exchange_strong(expected, owner_value(), std::memory_order_acquire, std::memory_order_relaxed);
+    return owner_.compare_exchange_strong(expected, owner_value(), std::memory_order_acquire,
+                                          std::memory_order_relaxed);
   }
 
   /**
@@ -160,7 +161,7 @@ public:
    */
   void unlock() & noexcept {
     STRUCTO_SYNC_LOCK_ASSERT(Traits, *this, owner_.load(std::memory_order_relaxed) == owner_value(),
-                              "kernel_spin_lock: unlock() by non-owner (or already unlocked)");
+                             "kernel_spin_lock: unlock() by non-owner (or already unlocked)");
     owner_.store(0, std::memory_order_release);
   }
 

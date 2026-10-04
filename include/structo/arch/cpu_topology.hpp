@@ -155,8 +155,8 @@ public:
    * table).
    * Traps (`RELOCO_ASSERT`) if either cpu index is out of range.
    */
-  [[nodiscard]] constexpr reloco::optional<std::size_t> lowest_shared_level(std::size_t cpu_a,
-                                                                            std::size_t cpu_b) const noexcept {
+  [[nodiscard]] RELOCO_CONSTEXPR20 reloco::optional<std::size_t> lowest_shared_level(std::size_t cpu_a,
+                                                                                     std::size_t cpu_b) const noexcept {
     RELOCO_ASSERT(cpu_a < max_cpus && cpu_b < max_cpus, "cpu_topology: cpu index out of range");
     for (std::size_t level = 0; level < m_level_count; ++level) {
       if (m_ids[cpu_a][level] == m_ids[cpu_b][level])
@@ -186,8 +186,7 @@ struct flat_cpu_topology_decoder {
    * @return The number of CPUs actually recorded.
    */
   template <std::size_t MaxCpus, std::size_t MaxLevels, typename LevelId>
-  static constexpr std::size_t decode(cpu_topology<MaxCpus, MaxLevels, LevelId> &topo,
-                                      std::size_t cpu_count) noexcept {
+  static constexpr std::size_t decode(cpu_topology<MaxCpus, MaxLevels, LevelId> &topo, std::size_t cpu_count) noexcept {
     const std::size_t count = (cpu_count < MaxCpus) ? cpu_count : MaxCpus;
     topo.clear();
     topo.set_level_count(1);
@@ -224,8 +223,7 @@ struct passive_cpu_topology_decoder {
    * @return The number of CPUs actually recorded.
    */
   template <std::size_t MaxCpus, std::size_t MaxLevels, typename LevelId>
-  static constexpr std::size_t decode(cpu_topology<MaxCpus, MaxLevels, LevelId> &topo,
-                                      std::size_t cpu_count) noexcept {
+  static constexpr std::size_t decode(cpu_topology<MaxCpus, MaxLevels, LevelId> &topo, std::size_t cpu_count) noexcept {
     const std::size_t count = (cpu_count < MaxCpus) ? cpu_count : MaxCpus;
     topo.clear();
     topo.set_level_count(1);

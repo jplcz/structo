@@ -37,7 +37,7 @@ void put_line(std::size_t row, const char *text) noexcept {
   std::size_t col = 0;
   for (; col < vga_columns && col < len; ++col)
     cell[col] = static_cast<std::uint16_t>(static_cast<unsigned char>(text[col])) |
-               (static_cast<std::uint16_t>(panic_attribute) << 8);
+                (static_cast<std::uint16_t>(panic_attribute) << 8);
   for (; col < vga_columns; ++col)
     cell[col] = static_cast<std::uint16_t>(' ') | (static_cast<std::uint16_t>(panic_attribute) << 8);
 }

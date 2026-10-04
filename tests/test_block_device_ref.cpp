@@ -36,8 +36,7 @@ template <> struct structo::hw::block_device_traits<fake_disk> {
   static std::size_t block_size(fake_disk &) noexcept { return kBlockSize; }
   static std::uint64_t block_count(fake_disk &) noexcept { return kBlockCount; }
 
-  static reloco::result<void> try_read_blocks(fake_disk &b, std::uint64_t lba,
-                                              reloco::span<std::byte> dst) noexcept {
+  static reloco::result<void> try_read_blocks(fake_disk &b, std::uint64_t lba, reloco::span<std::byte> dst) noexcept {
     if (b.next_read_fails)
       return reloco::unexpected(reloco::error::io_error);
     std::memcpy(dst.data(), b.mem.data() + lba * kBlockSize, dst.size());
@@ -70,8 +69,7 @@ struct bare_disk {
 template <> struct structo::hw::block_device_traits<bare_disk> {
   static std::size_t block_size(bare_disk &) noexcept { return kBlockSize; }
   static std::uint64_t block_count(bare_disk &) noexcept { return kBlockCount; }
-  static reloco::result<void> try_read_blocks(bare_disk &b, std::uint64_t lba,
-                                              reloco::span<std::byte> dst) noexcept {
+  static reloco::result<void> try_read_blocks(bare_disk &b, std::uint64_t lba, reloco::span<std::byte> dst) noexcept {
     std::memcpy(dst.data(), b.mem.data() + lba * kBlockSize, dst.size());
     return {};
   }

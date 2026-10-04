@@ -99,12 +99,14 @@
 
 namespace structo::arch::arm64 {
 
-/** @brief `address_translate_traits<arm64::at_tag>`'s `Arch` tag -- `AT <op>, Xt` + `PAR_EL1`, every AArch64 core. See the @file docs. */
+/** @brief `address_translate_traits<arm64::at_tag>`'s `Arch` tag -- `AT <op>, Xt` + `PAR_EL1`, every AArch64 core. See
+ * the @file docs. */
 struct at_tag {};
 
 namespace detail {
 
-/** @brief Decodes `PAR_EL1` (already read into `par`) into `translated_address` or a `reloco::error`, per the @file docs' best-effort field mapping. */
+/** @brief Decodes `PAR_EL1` (already read into `par`) into `translated_address` or a `reloco::error`, per the @file
+ * docs' best-effort field mapping. */
 [[nodiscard]] inline reloco::result<translated_address> decode_par_el1(std::uint64_t par) noexcept {
   if ((par & 0x1u) != 0) { // F == 1: translation aborted.
     unsigned fst = static_cast<unsigned>((par >> 1) & 0x3fu);

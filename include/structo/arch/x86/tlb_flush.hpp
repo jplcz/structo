@@ -91,24 +91,29 @@
 
 namespace structo::arch::x86 {
 
-/** @brief `tlb_flush_traits<x86::tlb_tag>`'s `Arch` tag -- plain `INVLPG`/`CR4.PGE`, every x86/x86-64 CPU. See the @file docs. */
+/** @brief `tlb_flush_traits<x86::tlb_tag>`'s `Arch` tag -- plain `INVLPG`/`CR4.PGE`, every x86/x86-64 CPU. See the
+ * @file docs. */
 struct tlb_tag {};
 
-/** @brief `tlb_flush_traits<x86::pcid_tlb_tag>`'s `Arch` tag -- `INVPCID`. Requires `CPUID` support and `CR4.PCIDE=1`. See the @file docs. */
+/** @brief `tlb_flush_traits<x86::pcid_tlb_tag>`'s `Arch` tag -- `INVPCID`. Requires `CPUID` support and `CR4.PCIDE=1`.
+ * See the @file docs. */
 struct pcid_tlb_tag {};
 
-/** @brief `tlb_flush_traits<x86::vpid_tlb_tag>`'s `Arch` tag -- `INVVPID`. Requires VMX operation with VPID enabled. See the @file docs. */
+/** @brief `tlb_flush_traits<x86::vpid_tlb_tag>`'s `Arch` tag -- `INVVPID`. Requires VMX operation with VPID enabled.
+ * See the @file docs. */
 struct vpid_tlb_tag {};
 
-/** @brief `tlb_flush_traits<x86::eptp_tlb_tag>`'s `Arch` tag -- `INVEPT`. Requires VMX operation with EPT enabled. See the @file docs. */
+/** @brief `tlb_flush_traits<x86::eptp_tlb_tag>`'s `Arch` tag -- `INVEPT`. Requires VMX operation with EPT enabled. See
+ * the @file docs. */
 struct eptp_tlb_tag {};
 
 namespace detail {
 
-/** @brief A 128-bit, 16-byte-aligned `{pcid, address}`/`{vpid, reserved, address}`/`{eptp, reserved}` descriptor, exactly as `INVPCID`/`INVVPID`/`INVEPT` require their memory operand shaped. */
+/** @brief A 128-bit, 16-byte-aligned `{pcid, address}`/`{vpid, reserved, address}`/`{eptp, reserved}` descriptor,
+ * exactly as `INVPCID`/`INVVPID`/`INVEPT` require their memory operand shaped. */
 struct alignas(16) invpcid_descriptor {
   std::uint64_t context_id; // PCID (bits [11:0]) or VPID (bits [15:0]) or EPTP, rest reserved/0
-  std::uint64_t address; // linear address (INVPCID/INVVPID individual-address type) or reserved/0
+  std::uint64_t address;    // linear address (INVPCID/INVVPID individual-address type) or reserved/0
 };
 
 } // namespace detail
@@ -163,7 +168,8 @@ template <> struct structo::arch::tlb_flush_traits<structo::arch::x86::pcid_tlb_
     asm volatile("invpcid %1, %0" ::"r"(std::uint64_t{1}), "m"(desc) : "memory");
   }
 
-  /** @brief `INVLPG`, untagged by PCID -- always invalidates for the current PCID regardless of whether PCID is enabled. */
+  /** @brief `INVLPG`, untagged by PCID -- always invalidates for the current PCID regardless of whether PCID is
+   * enabled. */
   template <typename Space>
   static auto flush_page(std::uint64_t vaddr) noexcept -> std::enable_if_t<std::is_same_v<Space, process_tlb_space>> {
     asm volatile("invlpg (%0)" ::"r"(static_cast<std::uintptr_t>(vaddr)) : "memory");

@@ -139,7 +139,9 @@ TEST_F(TicketSpinLockTest, DestroyingHeldLockTraps) {
 }
 
 TEST_F(TicketSpinLockTest, DestroyingUnlockedLockIsFine) {
-  { test_lock lock; }
+  {
+    test_lock lock;
+  }
   SUCCEED();
 }
 

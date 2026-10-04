@@ -34,7 +34,8 @@ namespace structo::arch {
  * family for how a caller sets this.
  */
 enum class execution_domain {
-  /** @brief No `STRUCTO_DOMAIN_*` macro was defined -- the default, and the only value this library itself ever assumes. */
+  /** @brief No `STRUCTO_DOMAIN_*` macro was defined -- the default, and the only value this library itself ever
+     assumes. */
   unspecified,
   /** @brief ARM TrustZone Secure world, PL1/EL1. */
   secure,

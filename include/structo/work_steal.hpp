@@ -127,9 +127,7 @@ namespace structo {
 struct performance_steal_policy {
   /** @brief Worth searching whenever the local CPU isn't already comfortably loaded -- catches "merely busy, could
    * still use a hand" the same way `should_steal` does, not just the fully-idle case. */
-  [[nodiscard]] static constexpr bool should_attempt_steal(std::size_t local_load) noexcept {
-    return local_load <= 1;
-  }
+  [[nodiscard]] static constexpr bool should_attempt_steal(std::size_t local_load) noexcept { return local_load <= 1; }
   [[nodiscard]] static constexpr bool should_steal(std::size_t local_load, std::size_t candidate_load) noexcept {
     return candidate_load > local_load + 1;
   }
@@ -191,9 +189,9 @@ struct always_steal_policy {
  */
 template <typename StealPolicy, std::size_t MaxCpus, std::size_t MaxLevels, typename LevelId, typename Tag,
           typename LoadFn>
-[[nodiscard]] constexpr reloco::optional<std::size_t>
+[[nodiscard]] RELOCO_CONSTEXPR20 reloco::optional<std::size_t>
 find_steal_candidate(const arch::cpu_sibling_map<MaxCpus, MaxLevels, LevelId> &siblings, std::size_t this_cpu,
-                      const arch::cpu_mask<Tag, MaxCpus> &eligible, LoadFn &&load) noexcept {
+                     const arch::cpu_mask<Tag, MaxCpus> &eligible, LoadFn &&load) noexcept {
   const std::size_t local_load = load(this_cpu);
   if (!StealPolicy::should_attempt_steal(local_load))
     return reloco::nullopt;

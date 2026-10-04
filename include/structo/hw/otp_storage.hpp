@@ -364,8 +364,7 @@ private:
     return otp_storage_traits<Backend>::try_program(*static_cast<Backend *>(ctx), offset, bits);
   }
 
-  template <typename Backend>
-  static bool is_locked_entry(void *ctx, std::size_t offset, std::size_t len) noexcept {
+  template <typename Backend> static bool is_locked_entry(void *ctx, std::size_t offset, std::size_t len) noexcept {
     using traits = otp_storage_traits<Backend>;
     if constexpr (detail::otp_storage_has_is_locked<traits>::value) {
       return traits::is_locked(*static_cast<Backend *>(ctx), offset, len);
@@ -401,8 +400,8 @@ private:
   }
 
   template <typename Backend>
-  static constexpr vtable s_vtbl{&size_bytes_entry<Backend>, &read_entry<Backend>,       &program_entry<Backend>,
-                                 &is_locked_entry<Backend>,  &try_lock_entry<Backend>,   &is_available_entry<Backend>};
+  static constexpr vtable s_vtbl{&size_bytes_entry<Backend>, &read_entry<Backend>,     &program_entry<Backend>,
+                                 &is_locked_entry<Backend>,  &try_lock_entry<Backend>, &is_available_entry<Backend>};
 
   void *ctx_ = nullptr;
   const vtable *vtbl_ = nullptr;

@@ -102,12 +102,14 @@
 
 namespace structo::arch::arm {
 
-/** @brief `address_translate_traits<arm::at_tag>`'s `Arch` tag -- CP15 `ATS1*`/`ATS12NSO*` ops + 64-bit `PAR` (LPAE format), every ARMv7-A/AArch32 core. See the @file docs. */
+/** @brief `address_translate_traits<arm::at_tag>`'s `Arch` tag -- CP15 `ATS1*`/`ATS12NSO*` ops + 64-bit `PAR` (LPAE
+ * format), every ARMv7-A/AArch32 core. See the @file docs. */
 struct at_tag {};
 
 namespace detail {
 
-/** @brief Decodes a 64-bit LPAE-format `PAR` (already read into `par`) into `translated_address` or a `reloco::error` -- identical layout/logic to `arm64::detail::decode_par_el1`, see the @file docs. */
+/** @brief Decodes a 64-bit LPAE-format `PAR` (already read into `par`) into `translated_address` or a `reloco::error`
+ * -- identical layout/logic to `arm64::detail::decode_par_el1`, see the @file docs. */
 [[nodiscard]] inline reloco::result<translated_address> decode_par(std::uint64_t par) noexcept {
   if ((par & 0x1u) != 0) { // F == 1: translation aborted.
     unsigned fst = static_cast<unsigned>((par >> 1) & 0x3fu);
@@ -165,7 +167,7 @@ template <> struct structo::arch::address_translate_traits<structo::arch::arm::a
   template <typename Space>
   static auto translate(std::uint64_t vaddr, translate_access access) noexcept
       -> std::enable_if_t<std::is_same_v<Space, guest_tlb_space> || std::is_same_v<Space, nonsecure_tlb_space>,
-                           reloco::result<translated_address>> {
+                          reloco::result<translated_address>> {
     std::uint32_t ia = static_cast<std::uint32_t>(vaddr);
     if (access == translate_access::read) {
       asm volatile("mcr p15, 0, %0, c7, c8, 4" ::"r"(ia)); // ATS12NSOPR
