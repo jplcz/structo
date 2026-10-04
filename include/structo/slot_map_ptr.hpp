@@ -39,9 +39,10 @@
  * - `static void release(std::size_t slot) noexcept;`
  *
  * `structo::slot_map_mapper<SlotCount, ArchHooks, ExpectedSpace, PhysInt>` is
- * a ready-made `Mapper`: it implements the slot bookkeeping (lock-free
- * acquire/release over a fixed-size pool of `SlotCount` slots) on top of an
- * architecture-supplied `ArchHooks` policy, which must provide:
+ * a ready-made `Mapper`: it implements the slot bookkeeping (plain,
+ * non-atomic acquire/release over a fixed-size pool of `SlotCount` slots --
+ * sound only for strictly per-CPU use with IRQs disabled, see its own docs)
+ * on top of an architecture-supplied `ArchHooks` policy, which must provide:
  * - `static constexpr std::size_t slot_size;` (bytes per slot)
  * - `static void *slot_base(std::size_t slot) noexcept;` (fixed VA of a slot)
  * - `static result<void> program(std::size_t slot, PhysInt phys_aligned) noexcept;`
@@ -88,9 +89,9 @@
  * @endcode
  */
 
+#include "fixed_bitmap.hpp"
 #include "phys_addr.hpp"
 
-#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <reloco/detail/assert.hpp>
@@ -111,9 +112,17 @@ using namespace reloco;
 
 /**
  * @brief Ready-made `Mapper` for `slot_map_ptr`: a fixed-size pool of
- * `SlotCount` virtual-address slots, lock-free acquired/released by this
- * class, with the actual page-table programming delegated to `ArchHooks`.
- * See the @file-level docs for `ArchHooks`'s contract.
+ * `SlotCount` virtual-address slots, acquired/released by this class, with
+ * the actual page-table programming delegated to `ArchHooks`. See the
+ * @file-level docs for `ArchHooks`'s contract.
+ *
+ * @note Not thread-safe, and deliberately so: the pool's `busy` tracking
+ * is a plain (non-atomic) `fixed_bitmap<SlotCount>`. The only sound way to
+ * use this `Mapper` is per-CPU, with IRQs disabled around `acquire()`/
+ * `release()` -- mirroring Linux's `kmap_atomic()` (strictly CPU-local,
+ * preempt/IRQ-off) rather than a globally shared pool. If a slot pool
+ * needs to be shared across cores/contexts, use `shared_slot_map_mapper`
+ * instead, which is explicitly `Lock`-protected.
  */
 template <std::size_t SlotCount, typename ArchHooks, typename ExpectedSpace = default_phys_space,
           typename PhysInt = std::uint64_t>
@@ -153,35 +162,34 @@ struct slot_map_mapper {
     if (page_offset + size > ArchHooks::slot_size)
       return unexpected(error::out_of_range); // Crosses a slot-sized boundary.
 
-    for (std::size_t i = 0; i < SlotCount; ++i) {
-      bool expected = false;
-      if (busy_table()[i].compare_exchange_strong(expected, true, std::memory_order_acquire)) {
-        auto res = ArchHooks::program(i, phys_aligned);
-        if (!res) {
-          busy_table()[i].store(false, std::memory_order_release);
-          return unexpected(res.error());
-        }
-        RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
-        void *vaddr = static_cast<std::byte *>(ArchHooks::slot_base(i)) + page_offset;
-        RELOCO_END_UNSAFE_BUFFER_USAGE
-        return mapped_slot{i, vaddr};
-      }
-    }
-    return unexpected(error::busy);
+    auto free_slot = busy_table().lowest_clear();
+    if (!free_slot.has_value())
+      return unexpected(error::busy);
+    const std::size_t i = *free_slot;
+    auto res = ArchHooks::program(i, phys_aligned);
+    if (!res)
+      return unexpected(res.error());
+    busy_table().set(i);
+    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+    void *vaddr = static_cast<std::byte *>(ArchHooks::slot_base(i)) + page_offset;
+    RELOCO_END_UNSAFE_BUFFER_USAGE
+    return mapped_slot{i, vaddr};
   }
 
   /** @brief Tears down and returns slot `slot` to the free pool. */
   static void release(std::size_t slot) noexcept {
     ArchHooks::unprogram(slot);
-    busy_table()[slot].store(false, std::memory_order_release);
+    busy_table().clear(slot);
   }
 
 private:
   // Function-local static: avoids a separate out-of-line definition for the
   // pool's storage while still giving every instantiation of this template
   // its own pool (one per distinct <SlotCount, ArchHooks, ExpectedSpace, PhysInt>).
-  [[nodiscard]] static std::atomic<bool> *busy_table() noexcept {
-    static std::atomic<bool> table[SlotCount]{};
+  // Plain (non-atomic) tracking: see the @class-level note above -- this
+  // `Mapper` is only sound for per-CPU use with IRQs disabled.
+  [[nodiscard]] static fixed_bitmap<SlotCount> &busy_table() noexcept {
+    static fixed_bitmap<SlotCount> table{};
     return table;
   }
 };
@@ -394,15 +402,11 @@ struct shared_slot_map_mapper {
         return mapped_slot{e.slot, vaddr};
       }
 
-      std::size_t free_slot = EntryCount;
-      for (std::size_t i = 0; i < EntryCount; ++i) {
-        if (!ls.data.busy[i]) {
-          free_slot = i;
-          break;
-        }
-      }
+      auto free_slot_opt = ls.data.busy.lowest_clear_from(ls.data.free_hint);
+      if (!free_slot_opt.has_value())
+        free_slot_opt = ls.data.busy.lowest_clear(); // hint overshot the end; wrap around and rescan from 0.
 
-      if (free_slot == EntryCount) {
+      if (!free_slot_opt.has_value()) {
         // WaitPolicy::wait() either fails without touching ls.lock (the
         // default policy) -- in which case it is still held here and must
         // be unlocked before returning -- or unlocks/blocks/relocks it
@@ -414,6 +418,7 @@ struct shared_slot_map_mapper {
         }
         continue; // Re-scan: the set of free rows may have changed.
       }
+      const std::size_t free_slot = *free_slot_opt;
 
       auto prog_res = ArchHooks::program(free_slot, phys_aligned);
       if (!prog_res) {
@@ -427,7 +432,8 @@ struct shared_slot_map_mapper {
         ls.lock.unlock();
         return unexpected(ins_res.error());
       }
-      ls.data.busy[free_slot] = true;
+      ls.data.busy.set(free_slot);
+      ls.data.free_hint = free_slot + 1; // Next acquire() resumes just past this one.
 
       RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
       void *vaddr = static_cast<std::byte *>(ArchHooks::slot_base(free_slot)) + page_offset;
@@ -456,7 +462,9 @@ struct shared_slot_map_mapper {
     if (--e.refcount == 0) {
       static_cast<void>(ls.data.by_phys.try_remove(phys_aligned));
       ArchHooks::unprogram(slot);
-      ls.data.busy[slot] = false;
+      ls.data.busy.clear(slot);
+      if (slot < ls.data.free_hint)
+        ls.data.free_hint = slot; // Prefer reusing the lowest now-free slot next.
       freed = true;
     }
     if (freed)
@@ -473,7 +481,13 @@ private:
 
   struct state {
     flat_hash_map<PhysInt, entry> by_phys{};
-    bool busy[EntryCount]{};
+    fixed_bitmap<EntryCount> busy{};
+    // Lowest slot index not yet known to be busy as of the last scan --
+    // `acquire()` resumes its search here instead of always rescanning
+    // from 0, and `release()` pulls it back down whenever it frees a
+    // lower-indexed slot, so the next acquire() reuses that slot right
+    // away instead of continuing to skip over it.
+    std::size_t free_hint = 0;
   };
 
   /** @brief `Lock` paired directly with the data it guards, so `WaitPolicy::wait()` can unlock/relock it by reference. */
