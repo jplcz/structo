@@ -149,6 +149,28 @@ TEST_F(LockStripingTest, ValidateForFailsWhileAWriterIsStillActive) {
   EXPECT_FALSE(table.validate_for(&key, start));
 }
 
+TEST_F(LockStripingTest, AlignedKeysDoNotAllCollideOnOneStripe) {
+  // Regression test: `std::hash<const void*>` performs no bit-mixing on
+  // either libstdc++ or libc++ (it is the identity function), so
+  // heap-aligned pointers' always-zero low bits would, without an
+  // internal avalanche step, all reduce to the same stripe whenever `N`
+  // is a power of two -- collapsing the whole table down to one lock.
+  // Simulate several distinct, 64-byte-aligned addresses (a realistic
+  // allocator alignment) and confirm they are not all forced onto
+  // whichever stripe key[0] lands on.
+  lock_striping<64> table;
+  alignas(64) int keys[8][16];
+
+  auto guard0 = table.lock_for(&keys[0]);
+  int busy_count = 0;
+  for (int i = 1; i < 8; ++i) {
+    auto r = table.try_lock_for(&keys[i]);
+    if (!r.has_value())
+      ++busy_count;
+  }
+  EXPECT_LT(busy_count, 7);
+}
+
 TEST_F(LockStripingTest, DistinctKeysCanHashToDifferentStripesAndLockConcurrently) {
   // With enough stripes, two distinct addresses are very likely to land
   // on different ones; run both lock acquisitions on separate threads

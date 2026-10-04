@@ -59,7 +59,6 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <reloco/array.hpp>
 #include <reloco/error.hpp>
 #include <reloco/expected.hpp>
@@ -252,14 +251,44 @@ public:
   }
 
 private:
-  [[nodiscard]] stripe &stripe_for(const void *key) noexcept {
-    const std::size_t h = std::hash<const void *>{}(key);
-    return stripes_[h % N];
+  /**
+   * @brief Avalanches a pointer's bits before reducing mod `N`.
+   *
+   * `std::hash<const void*>` is the identity function on both libstdc++
+   * and libc++ -- it performs no bit-mixing at all, just a
+   * `reinterpret_cast<size_t>`. Heap allocations are always aligned
+   * (typically to 16 bytes, sometimes more), so their low, always-zero
+   * bits would otherwise dominate `% N` whenever `N` is a power of two
+   * (a very likely choice): e.g. with `N <= 16`, *every* 16-byte-aligned
+   * pointer would hash to stripe 0, collapsing the whole table down to
+   * one lock.
+   *
+   * The key is first shifted right by 6 bits -- dividing out a typical
+   * 64-byte cache-line size -- since those low bits carry no useful
+   * entropy for picking a stripe (they are either always zero from
+   * alignment, or merely distinguish *offsets within the same cache
+   * line*, which should not scatter across stripes anyway). The
+   * remaining bits are then avalanched with Murmur3's `fmix32` finalizer
+   * rather than a 64-bit mixer such as splitmix64: it needs only 32-bit
+   * multiplies, which are a single `MUL` instruction on both AArch32 and
+   * AArch64, whereas a 64-bit multiply costs a `UMULL`/`UMULH` pair on
+   * AArch32 (and is still pricier than a 32-bit `MUL` on AArch64). The
+   * truncation to 32 bits discards only high address bits, which in
+   * practice vary far less often (between unrelated mappings) than the
+   * mid-range bits retained here.
+   */
+  [[nodiscard]] static std::size_t mix(const void *key) noexcept {
+    auto x = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(key) >> 6);
+    x ^= x >> 16;
+    x *= 0x85ebca6bU;
+    x ^= x >> 13;
+    x *= 0xc2b2ae35U;
+    x ^= x >> 16;
+    return static_cast<std::size_t>(x);
   }
-  [[nodiscard]] const stripe &stripe_for(const void *key) const noexcept {
-    const std::size_t h = std::hash<const void *>{}(key);
-    return stripes_[h % N];
-  }
+
+  [[nodiscard]] stripe &stripe_for(const void *key) noexcept { return stripes_[mix(key) % N]; }
+  [[nodiscard]] const stripe &stripe_for(const void *key) const noexcept { return stripes_[mix(key) % N]; }
 
   reloco::array<stripe, N> stripes_{};
 };
