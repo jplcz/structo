@@ -356,6 +356,9 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_world_switch_guard.cpp
         tests/test_backref_ptr.cpp
         tests/test_backref_owner.cpp
+        tests/test_vcpu_state_guard.cpp
+        tests/test_vm_exit_dispatcher.cpp
+        tests/test_hypercall_dispatcher.cpp
     )
     target_link_libraries(jplcz_structo_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)
@@ -381,7 +384,7 @@ if(JPLCZ_STRUCTO_BUILD_EXAMPLES)
 endif()
 
 if(JPLCZ_STRUCTO_BUILD_HEADER_CHECKS)
-    # Recurse into every public subdirectory (arch/, sync/, hw/, ...)
+    # Recurse into every public subdirectory (arch/, sync/, hw/, hypervisor/, ...)
     # alongside the top-level headers; include/structo/detail/ is
     # deliberately excluded -- it holds private implementation headers,
     # never included directly by consumers, and is not part of the public
@@ -399,6 +402,7 @@ if(JPLCZ_STRUCTO_BUILD_HEADER_CHECKS)
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/sync/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/hw/*.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/hypervisor/*.hpp"
     )
     list(APPEND JPLCZ_STRUCTO_PUBLIC_HEADERS ${JPLCZ_STRUCTO_ARCH_HEADERS})
 

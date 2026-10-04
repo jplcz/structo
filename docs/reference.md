@@ -26,6 +26,7 @@ have a linked, standalone page going into more depth.
 - [Architecture control registers & hardware RNG](#architecture-control-registers-hardware-rng)
 - [Debugging utilities](#debugging-utilities)
 - [Synchronization & interrupt/preemption guards](#synchronization-interruptpreemption-guards)
+- [Hypervisor: vCPU state & trap/hypercall dispatch](#hypervisor-vcpu-state-traphypercall-dispatch)
 
 ## Boot & devicetree discovery
 
@@ -184,4 +185,12 @@ have a linked, standalone page going into more depth.
 | [`sync/lock_striping.hpp`](lock_striping.md) | `lock_striping<N, LockT>` | FreeBSD-`pa_lock[]`-style shared, fixed-size array of `N` locks selected by hashing an address, so many protected objects can share a small pool of locks instead of each embedding its own; exclusive (`lock_for`/`try_lock_for`), shared (`shared_lock_for`/`try_shared_lock_for`, requires `LockT::lock_shared`), and seqlock-style optimistic-read (`sequence_for`/`validate_for`) access to the same stripe table |
 | [`backref_ptr.hpp`](backref_ptr.md) | `backref_ptr<T, Cell>`, `embedded_mutex_cell<T, MutexT>`, `embedded_rw_cell<T, SharedMutexT>`, `embedded_seqlock_cell<T>`, `striped_mutex_cell<T, N, LockT, Tag>`, `striped_rw_cell<T, N, SharedLockT, Tag>`, `striped_seqlock_cell<T, N, LockT, Tag>` | Non-owning, safely-invalidated backpointer (e.g. FreeBSD's `vm_page->object`); the pointer is only ever read/written through a `guard` returned by `lock()`/`try_lock()`/`shared_lock()`/`read_unlocked()`, which composes one of `reloco`'s existing `guarded_mutex`/`rw_lock`/`guarded_seqlock` types (embedded per instance) or `lock_striping` (looked up in a shared static table, zero lock bytes per instance) |
 | [`backref_owner.hpp`](backref_owner.md) | `backref_owner<BackrefField, Container, LockT>` | Owner-side registry pairing a `backref_ptr` holder's `Cell`-protected pointer with insertion/removal from a caller-supplied `Container` adapter (e.g. an intrusive tail queue or splay tree), so `attach()`/`detach()` keep both in lock-step, `migrate_to()` moves a holder to another owner (e.g. FreeBSD's `vm_object_collapse` reparenting a page) without ever observing it detached, `detach_all()` clears every still-attached holder's pointer in one call (e.g. FreeBSD's `vm_object_terminate()` walking `memq`), and `for_each()`/`detach_if()`/`try_find()` round out `vm_object`-style management (read-only walk, range-based eviction like `vm_object_page_remove()`, and keyed lookup like `vm_page_lookup()`) |
+
+## Hypervisor: vCPU state & trap/hypercall dispatch
+
+| Header | Type(s) | One-line summary |
+|---|---|---|
+| [`hypervisor/vcpu_state_guard.hpp`](vcpu_state_guard.md) | `vcpu_entry_guard<Traits>`, `with_vcpu_entry` | RAII guard bracketing a VM-entry/VM-exit pair: loads a persistent, caller-owned vCPU register snapshot on entry, saves the live registers back into it and restores the host's own registers on exit -- the asymmetric, two-snapshot counterpart to `world_switch_guard`'s single symmetric snapshot |
+| [`hypervisor/vm_exit_dispatcher.hpp`](vm_exit_dispatcher.md) | `vm_exit_dispatcher<Handlers, MaxReasons>` | Thin VM-exit trap dispatcher forwarding to a compile-time-resolved `Handlers::invoke(reason, ctx)` trait (no runtime registration table, mirroring `ipi_dispatcher`'s philosophy), plus optional lock-free per-exit-reason counters (`count()`/`try_count()`) |
+| [`hypervisor/hypercall_dispatcher.hpp`](hypercall_dispatcher.md) | `hypercall_dispatcher<Handlers, MaxCalls>` | Same shape as `vm_exit_dispatcher` for guest-initiated hypercalls (SMCCC/KVM/SBI-style `std::uint64_t` call numbers), with an explicit bounds-check/`static_cast` guard instead of relying on implicit `uint64_t -> size_t` narrowing |
 
