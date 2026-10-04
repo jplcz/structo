@@ -103,9 +103,62 @@ TEST_F(NoopSchedTest, UniformInterfaceMethodsAllBehaveAsEnqueue) {
   EXPECT_TRUE(noop::is_linked(a));
 }
 
-// --------------------------------------------------------------------
-// fixed_priority_sched
-// --------------------------------------------------------------------
+TEST_F(NoopSchedTest, ForceNextOverridesNormalOrderAndWorksOnLinkedOrBlockedEntry) {
+  noop_task a{{}, 1};
+  noop_task b{{}, 2};
+  noop_task c{{}, 3};
+  noop::enqueue(a);
+  noop::enqueue(b);
+  noop::force_next(c); // c was never enqueued (as if freshly on_block'ed) -- still accepted
+  EXPECT_EQ(noop::size(), 3u);
+  EXPECT_EQ(noop::pick_next()->id, 3); // pinned entry wins regardless of queue order
+  EXPECT_EQ(noop::pick_next()->id, 1); // normal FIFO order resumes afterward
+  EXPECT_EQ(noop::pick_next()->id, 2);
+
+  noop::enqueue(a);
+  noop::force_next(a); // a is linked -- force_next unlinks it first
+  EXPECT_EQ(noop::size(), 1u);
+  EXPECT_EQ(noop::pick_next()->id, 1);
+  EXPECT_EQ(noop::pick_next(), nullptr);
+}
+
+TEST_F(NoopSchedTest, ForceNextCalledTwiceReEnqueuesThePreviousPin) {
+  noop_task a{{}, 1};
+  noop_task b{{}, 2};
+  noop::force_next(a);
+  noop::force_next(b); // a wasn't consumed yet -- must not be lost
+  EXPECT_EQ(noop::pick_next()->id, 2);
+  EXPECT_EQ(noop::pick_next()->id, 1);
+}
+
+TEST_F(NoopSchedTest, OnBlockClearsAStalePinBeforeItsEverDispatched) {
+  noop_task a{{}, 1};
+  noop::force_next(a); // pinned, but never consumed by pick_next
+  noop::on_block(a);   // blocks before ever being dispatched -- must clear the stale pin
+  EXPECT_EQ(noop::pick_next(), nullptr);
+}
+
+TEST_F(NoopSchedTest, RemoveOnAPinnedEntryReleasesThePinWithoutTouchingTheQueue) {
+  noop_task a{{}, 1};
+  noop_task b{{}, 2};
+  noop::enqueue(b);
+  noop::force_next(a); // pinned, not linked -- remove must not treat it as a queue member
+  noop::remove(a);
+  EXPECT_EQ(noop::size(), 1u);
+  EXPECT_EQ(noop::pick_next()->id, 2);
+  EXPECT_EQ(noop::pick_next(), nullptr);
+}
+
+TEST_F(NoopSchedTest, EnqueueOnAPinnedEntryReleasesTheStalePinInsteadOfDoubleLinking) {
+  noop_task a{{}, 1};
+  noop::force_next(a); // pinned, not linked
+  noop::enqueue(a);    // must not double-link a stale-pinned entry
+  EXPECT_EQ(noop::size(), 1u);
+  EXPECT_EQ(noop::pick_next()->id, 1);
+  EXPECT_EQ(noop::pick_next(), nullptr);
+}
+
+
 
 struct fixed_task {
   struct {
@@ -192,6 +245,41 @@ TEST_F(FixedPrioritySchedTest, UniformInterfaceMethodsAllBehaveAsEnqueue) {
   EXPECT_TRUE(fixed::is_linked(a));
 }
 
+TEST_F(FixedPrioritySchedTest, ForceNextOverridesPriorityOrder) {
+  fixed_task low{{}, 7, 1};  // low priority (numerically high)
+  fixed_task high{{}, 0, 2}; // high priority (numerically low)
+  fixed::enqueue(high);
+  fixed::force_next(low); // must still win despite high's superior priority
+  EXPECT_EQ(fixed::pick_next()->id, 1);
+  EXPECT_EQ(fixed::pick_next()->id, 2);
+}
+
+TEST_F(FixedPrioritySchedTest, OnBlockClearsAStalePinBeforeItsEverDispatched) {
+  fixed_task a{{}, 0, 1};
+  fixed::force_next(a); // pinned, but never consumed by pick_next
+  fixed::on_block(a);   // blocks before ever being dispatched -- must clear the stale pin
+  EXPECT_EQ(fixed::pick_next(), nullptr);
+}
+
+TEST_F(FixedPrioritySchedTest, RemoveOnAPinnedEntryReleasesThePinWithoutTouchingTheQueue) {
+  fixed_task a{{}, 0, 1};
+  fixed_task b{{}, 0, 2};
+  fixed::enqueue(b);
+  fixed::force_next(a); // pinned, not linked -- remove must not treat it as a queue member
+  fixed::remove(a);
+  EXPECT_EQ(fixed::size(), 1u);
+  EXPECT_EQ(fixed::pick_next()->id, 2);
+}
+
+TEST_F(FixedPrioritySchedTest, EnqueueOnAPinnedEntryReleasesTheStalePinInsteadOfDoubleLinking) {
+  fixed_task a{{}, 0, 1};
+  fixed::force_next(a); // pinned, not linked
+  fixed::enqueue(a);    // must not double-link a stale-pinned entry
+  EXPECT_EQ(fixed::size(), 1u);
+  EXPECT_EQ(fixed::pick_next()->id, 1);
+  EXPECT_EQ(fixed::pick_next(), nullptr);
+}
+
 // --------------------------------------------------------------------
 // edf_sched
 // --------------------------------------------------------------------
@@ -268,6 +356,41 @@ TEST_F(EdfSchedTest, UniformInterfaceMethodsAllBehaveAsEnqueue) {
   dispatched = edf::pick_next();
   edf::requeue(*dispatched); // quantum expired while still runnable
   EXPECT_TRUE(edf::is_linked(a));
+}
+
+TEST_F(EdfSchedTest, ForceNextOverridesDeadlineOrder) {
+  edf_task soon{{}, at(10), 1};
+  edf_task later{{}, at(999), 2};
+  edf::enqueue(soon);
+  edf::force_next(later); // must still win despite soon's earlier deadline
+  EXPECT_EQ(edf::pick_next()->id, 2);
+  EXPECT_EQ(edf::pick_next()->id, 1);
+}
+
+TEST_F(EdfSchedTest, OnBlockClearsAStalePinBeforeItsEverDispatched) {
+  edf_task a{{}, at(10), 1};
+  edf::force_next(a); // pinned, but never consumed by pick_next
+  edf::on_block(a);   // blocks before ever being dispatched -- must clear the stale pin
+  EXPECT_EQ(edf::pick_next(), nullptr);
+}
+
+TEST_F(EdfSchedTest, RemoveOnAPinnedEntryReleasesThePinWithoutTouchingTheQueue) {
+  edf_task a{{}, at(10), 1};
+  edf_task b{{}, at(20), 2};
+  edf::enqueue(b);
+  edf::force_next(a); // pinned, not linked -- remove must not treat it as a queue member
+  edf::remove(a);
+  EXPECT_EQ(edf::size(), 1u);
+  EXPECT_EQ(edf::pick_next()->id, 2);
+}
+
+TEST_F(EdfSchedTest, EnqueueOnAPinnedEntryReleasesTheStalePinInsteadOfDoubleLinking) {
+  edf_task a{{}, at(10), 1};
+  edf::force_next(a); // pinned, not linked
+  edf::enqueue(a);    // must not double-link a stale-pinned entry
+  EXPECT_EQ(edf::size(), 1u);
+  EXPECT_EQ(edf::pick_next()->id, 1);
+  EXPECT_EQ(edf::pick_next(), nullptr);
 }
 
 // --------------------------------------------------------------------
@@ -348,6 +471,51 @@ TEST_F(SchedUleTest, RequeueIsSameOperationAsOnYield) {
   ule::requeue(*dispatched, at(5000)); // quantum expired while still runnable
   EXPECT_TRUE(ule::is_linked(a));
   EXPECT_EQ(ule::size(), 1u);
+}
+
+TEST_F(SchedUleTest, ForceNextOverridesInteractivityScoreAndWorksOnLinkedOrBlockedEntry) {
+  ule_task interactive{{}, 0, {}, 1};
+  ule_task batch{{}, 0, {}, 2};
+  ule::enqueue(interactive, at(0)); // fully interactive, best possible score
+  ule::force_next(batch);           // never enqueued (as if freshly on_block'ed) -- still accepted
+  EXPECT_EQ(ule::size(), 2u);
+  EXPECT_EQ(ule::pick_next(at(1))->id, 2); // pinned entry wins despite worse score
+  EXPECT_EQ(ule::pick_next(at(1))->id, 1);
+}
+
+TEST_F(SchedUleTest, ForceNextCalledTwiceReEnqueuesThePreviousPin) {
+  ule_task a{{}, 0, {}, 1};
+  ule_task b{{}, 0, {}, 2};
+  ule::force_next(a);
+  ule::force_next(b); // a wasn't consumed yet -- must not be lost
+  EXPECT_EQ(ule::pick_next(at(1))->id, 2);
+  EXPECT_EQ(ule::pick_next(at(1))->id, 1);
+}
+
+TEST_F(SchedUleTest, OnBlockClearsAStalePinBeforeItsEverDispatched) {
+  ule_task a{{}, 0, {}, 1};
+  ule::force_next(a);        // pinned, but never consumed by pick_next
+  ule::on_block(a, at(100)); // blocks before ever being dispatched -- must clear the stale pin
+  EXPECT_EQ(ule::pick_next(at(200)), nullptr);
+}
+
+TEST_F(SchedUleTest, RemoveOnAPinnedEntryReleasesThePinWithoutTouchingEitherQueue) {
+  ule_task a{{}, 0, {}, 1};
+  ule_task b{{}, 0, {}, 2};
+  ule::enqueue(b, at(0));
+  ule::force_next(a); // pinned, not linked -- remove must not treat it as a queue member
+  ule::remove(a);
+  EXPECT_EQ(ule::size(), 1u);
+  EXPECT_EQ(ule::pick_next(at(1))->id, 2);
+}
+
+TEST_F(SchedUleTest, EnqueueOnAPinnedEntryReleasesTheStalePinInsteadOfDoubleLinking) {
+  ule_task a{{}, 0, {}, 1};
+  ule::force_next(a);   // pinned, not linked
+  ule::enqueue(a, at(0)); // must not double-link a stale-pinned entry
+  EXPECT_EQ(ule::size(), 1u);
+  EXPECT_EQ(ule::pick_next(at(1))->id, 1);
+  EXPECT_EQ(ule::pick_next(at(2)), nullptr);
 }
 
 // --------------------------------------------------------------------
@@ -439,6 +607,42 @@ TEST_F(Sched4BsdTest, RequeueIsSameOperationAsOnYield) {
   ASSERT_EQ(dispatched, &a);
   bsd::requeue(*dispatched, at(5000)); // quantum expired while still runnable
   EXPECT_TRUE(bsd::is_linked(a));
+}
+
+TEST_F(Sched4BsdTest, ForceNextOverridesPriorityOrder) {
+  bsd_task hog{{}, 0, {}, 1};
+  bsd::enqueue(hog, at(0));
+  bsd::pick_next(at(0));
+  bsd::on_yield(hog, at(5000)); // accumulates estcpu -- worse (higher) priority number
+
+  bsd_task fresh{{}, 0, {}, 2};
+  bsd::force_next(fresh); // never enqueued (as if freshly on_block'ed) -- still wins regardless of priority
+  EXPECT_EQ(bsd::pick_next(at(5000))->id, 2);
+  EXPECT_EQ(bsd::pick_next(at(5000))->id, 1);
+}
+
+TEST_F(Sched4BsdTest, OnBlockClearsAStalePinBeforeItsEverDispatched) {
+  bsd_task a{{}, 0, {}, 1};
+  bsd::force_next(a);        // pinned, but never consumed by pick_next
+  bsd::on_block(a, at(100)); // blocks before ever being dispatched -- must clear the stale pin
+  EXPECT_EQ(bsd::pick_next(at(200)), nullptr);
+}
+
+TEST_F(Sched4BsdTest, RemoveOnAPinnedEntryReleasesThePinWithoutTouchingTheQueue) {
+  bsd_task a{{}, 0, {}, 1};
+  bsd_task b{{}, 0, {}, 2};
+  bsd::enqueue(b, at(0));
+  bsd::force_next(a); // pinned, not linked -- remove must not treat it as a queue member
+  bsd::remove(a);
+  EXPECT_EQ(bsd::pick_next(at(0))->id, 2);
+}
+
+TEST_F(Sched4BsdTest, EnqueueOnAPinnedEntryReleasesTheStalePinInsteadOfDoubleLinking) {
+  bsd_task a{{}, 0, {}, 1};
+  bsd::force_next(a);     // pinned, not linked
+  bsd::enqueue(a, at(0)); // must not double-link a stale-pinned entry
+  EXPECT_EQ(bsd::pick_next(at(0))->id, 1);
+  EXPECT_EQ(bsd::pick_next(at(0)), nullptr);
 }
 
 } // namespace

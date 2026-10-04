@@ -33,14 +33,14 @@ call `requeue()` if it fires while the task is still runnable).
 
 ## One uniform interface across all five, so they're interchangeable
 
-Every policy exposes the exact same nine method names and signatures --
+Every policy exposes the exact same ten method names and signatures --
 `enqueue(entry, now)`, `pick_next(now)`, `on_yield(entry, now)`,
 `on_block(entry, now)`, `on_wake(entry, now)`, `requeue(entry, now)`,
-`remove(entry)`, `is_linked(entry)`, `empty()`, `size()` -- so
-generic/templated caller code (a test harness driving "whichever policy
-this instantiation picked" through one fixed call sequence, in
-particular) never has to branch on *which* of the five is bound.
-`noop_sched`/`fixed_priority_sched`/`edf_sched` accept `now` as a
+`remove(entry)`, `force_next(entry)`, `is_linked(entry)`, `empty()`,
+`size()` -- so generic/templated caller code (a test harness driving
+"whichever policy this instantiation picked" through one fixed call
+sequence, in particular) never has to branch on *which* of the five is
+bound. `noop_sched`/`fixed_priority_sched`/`edf_sched` accept `now` as a
 defaulted, unused parameter on every method that takes it (they have no
 clock/duration logic of their own) purely for this signature parity --
 it's discarded, never read. Where a policy has nothing extra to compute
@@ -56,6 +56,45 @@ deliberate exception to full parity -- no other policy has any notion
 of a caller-adjustable "niceness", so faking a no-op `set_nice`
 elsewhere would silently discard a caller's intent rather than
 genuinely support it.
+
+## `force_next`: bypassing priority order entirely for one dispatch
+
+All five policies also support one additional, deliberately
+out-of-band operation: `force_next(entry)` unlinks `entry` from
+wherever it currently sits (if linked at all) and pins it in a
+dedicated one-entry slot that the very next `pick_next` call always
+checks *first*, before any of the policy's own ordering -- i.e. "this
+exact task must run next, no matter what else is runnable or how it
+compares in priority/deadline/interactivity score". This exists for
+protocols that need to hand a CPU to one specific task immediately and
+unconditionally -- e.g. `sched_world_handoff.hpp`'s cross-world
+handoff, where an interrupt needing urgent routing elsewhere must make
+a dedicated "world thread" entry win over *any* locally runnable task,
+regardless of that task's priority. Like `remove`, `force_next` takes
+no `now` -- it is a purely structural operation, never involving a
+policy's clock-driven recompute logic.
+
+Two things to know before reaching for it:
+
+- **At most one entry can be pinned at a time.** Calling `force_next`
+  again before the previous pin is consumed by `pick_next` re-enqueues
+  the previous one through the policy's normal path first, so it is
+  never silently lost -- but it does lose its "runs next" guarantee at
+  that point.
+- **`force_next` accepts an already-blocked (unlinked) entry**, not
+  just a currently-queued one -- useful for resuming an entry that was
+  deliberately `on_block`ed so this one could be forced into its
+  place. This is only behaviorally safe when that specific block was
+  arranged as part of the same handoff protocol; forcing an entry
+  that's blocked for an unrelated reason (a lock, I/O, a condition
+  variable, ...) would dispatch it before whatever it is actually
+  waiting for has happened -- `force_next` has no way to tell the
+  difference, so this is the caller protocol's responsibility.
+  Symmetrically, if a pinned-but-not-yet-dispatched entry is then
+  independently `on_block`ed (blocking before `pick_next` ever
+  consumed its pin), the stale pin is automatically cleared so
+  `pick_next` doesn't later hand out an entry the caller now considers
+  blocked.
 
 ## `Entry` owns its own per-task scheduling state
 
@@ -232,6 +271,11 @@ priority-inversion/priority-propagation handling.
   still runnable, for round-robin-style quantum expiry (same operation
   as `on_yield` for `sched_ule`/`sched_4bsd`).
 - `remove(entry)` -- removes `entry`. Precondition: `is_linked(entry)`.
+- `force_next(entry)` -- pins `entry` so the very next `pick_next` call
+  returns it first, bypassing all normal ordering (see "`force_next`:
+  bypassing priority order entirely for one dispatch" above). Also
+  accepts an already-blocked `entry`, under the caller protocol's own
+  responsibility.
 - `is_linked(entry)` -- O(1), whether `entry` is currently enqueued (on
   any CPU).
 - `empty()`, `size()`.

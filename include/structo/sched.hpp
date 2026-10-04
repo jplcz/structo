@@ -33,29 +33,71 @@
  *
  * ## One uniform interface across all five, so they're interchangeable
  *
- * Every policy exposes the exact same nine method names and signatures
+ * Every policy exposes the exact same ten method names and signatures
  * -- `enqueue(entry, now)`, `pick_next(now)`, `on_yield(entry, now)`,
  * `on_block(entry, now)`, `on_wake(entry, now)`, `requeue(entry, now)`,
- * `remove(entry)`, `is_linked(entry)`, `empty()`, `size()` -- so
- * generic/templated caller code (a test harness driving "whichever
- * policy this instantiation picked" through one fixed call sequence, in
- * particular) never has to branch on *which* of the five is bound.
- * `noop_sched`/`fixed_priority_sched`/`edf_sched` accept @p now as a
- * defaulted, unused parameter on every method that takes it (they have
- * no clock/duration logic of their own) purely for this signature
- * parity -- it's `[[maybe_unused]]`/discarded, never read. Where a
- * policy has nothing extra to compute for an operation (e.g. `on_block`
- * for the three clock-free policies: `pick_next` already removed the
- * entry from the queue, so there's nothing to track until the matching
- * `on_wake`/`enqueue`), that method is a documented no-op or a plain
- * alias for whichever other method does the equivalent work (e.g.
- * `requeue` for `sched_ule`/`sched_4bsd` is exactly `on_yield`: both
- * mean "this still-runnable entry needs to be re-scored and put back",
- * whether that happened voluntarily or because a round-robin quantum
- * expired). `sched_4bsd::set_nice` is the one deliberate exception to
- * full parity -- no other policy has any notion of a caller-adjustable
+ * `remove(entry)`, `force_next(entry)`, `is_linked(entry)`, `empty()`,
+ * `size()` -- so generic/templated caller code (a test harness driving
+ * "whichever policy this instantiation picked" through one fixed call
+ * sequence, in particular) never has to branch on *which* of the five
+ * is bound. `noop_sched`/`fixed_priority_sched`/`edf_sched` accept
+ * @p now as a defaulted, unused parameter on every method that takes it
+ * (they have no clock/duration logic of their own) purely for this
+ * signature parity -- it's `[[maybe_unused]]`/discarded, never read.
+ * Where a policy has nothing extra to compute for an operation (e.g.
+ * `on_block` for the three clock-free policies: `pick_next` already
+ * removed the entry from the queue, so there's nothing to track until
+ * the matching `on_wake`/`enqueue`), that method is a documented no-op
+ * or a plain alias for whichever other method does the equivalent work
+ * (e.g. `requeue` for `sched_ule`/`sched_4bsd` is exactly `on_yield`:
+ * both mean "this still-runnable entry needs to be re-scored and put
+ * back", whether that happened voluntarily or because a round-robin
+ * quantum expired). `sched_4bsd::set_nice` is the one deliberate
+ * exception to full parity -- no other policy has any notion of a
+ * caller-adjustable
  * "niceness", so faking a no-op `set_nice` elsewhere would silently
  * discard a caller's intent rather than genuinely support it.
+ *
+ * ## `force_next`: bypassing priority order entirely for one dispatch
+ *
+ * All five policies also support one additional, deliberately
+ * out-of-band operation: `force_next(entry)` unlinks @p entry from
+ * wherever it currently sits (if linked at all -- see below) and pins
+ * it in a dedicated one-entry slot that the very next `pick_next` call
+ * always checks *first*, before any of the policy's own ordering --
+ * i.e. "this exact task must run next, no matter what else is
+ * runnable or how it compares in priority/deadline/interactivity
+ * score". This exists for protocols that need to hand a CPU to one
+ * specific task immediately and unconditionally -- e.g.
+ * `sched_world_handoff.hpp`'s cross-world handoff, where an interrupt
+ * needing urgent routing elsewhere must make a dedicated "world
+ * thread" entry win over *any* locally runnable task, regardless of
+ * that task's priority. Like `remove`, `force_next` takes no @p now --
+ * it is a purely structural operation, never involving a policy's
+ * clock-driven recompute logic (it does not re-score, decay, or touch
+ * `Entry.*Priority`/`Entry.*Deadline` at all).
+ *
+ * Two things to know before reaching for it:
+ * - **At most one entry can be pinned at a time.** Calling
+ *   `force_next` again before the previous pin is consumed by
+ *   `pick_next` re-enqueues the previous one through the policy's
+ *   normal path first, so it is never silently lost -- but it does
+ *   lose its "runs next" guarantee at that point.
+ * - **`force_next` accepts an already-blocked (unlinked) @p entry**,
+ *   not just a currently-queued one -- useful for resuming an entry
+ *   that was deliberately `on_block`ed so this one could be forced
+ *   into its place. This is only behaviorally safe when that specific
+ *   block was arranged as part of the same handoff protocol; forcing
+ *   an entry that is blocked for an unrelated reason (waiting on a
+ *   lock, I/O, a condition variable, ...) would dispatch it before
+ *   whatever it is actually waiting for has happened -- `force_next`
+ *   has no way to tell the difference, so this is the caller
+ *   protocol's responsibility, not something this header can enforce.
+ *   Symmetrically, if a pinned-but-not-yet-dispatched @p entry is then
+ *   independently `on_block`ed (blocking before `pick_next` ever
+ *   consumed its pin), the stale pin is automatically cleared so
+ *   `pick_next` doesn't later hand out an entry the caller now
+ *   considers blocked.
  *
  * ## `Entry` owns its own per-task scheduling state
  *
@@ -268,8 +310,12 @@ using namespace reloco;
 // noop_sched
 // --------------------------------------------------------------------
 
-/** @brief `noop_sched<Entry, Hook, PerCpu>`'s per-CPU state-blob type. */
-template <typename Entry, auto Hook> using noop_sched_state = fifo_runqueue<Entry, Hook>;
+/** @brief `noop_sched<Entry, Hook, PerCpu>`'s per-CPU state-blob type: the FIFO queue plus one
+ * `force_next`-pinned slot (see `noop_sched::force_next`). */
+template <typename Entry, auto Hook> struct noop_sched_state {
+  fifo_runqueue<Entry, Hook> queue{};
+  Entry *pinned = nullptr;
+};
 
 /**
  * @brief Trivial FIFO scheduler: no priority concept, no per-task state
@@ -282,6 +328,8 @@ template <typename Entry, auto Hook> using noop_sched_state = fifo_runqueue<Entr
  * Hook>` blob; see the file-level "Per-CPU *global* data" section.
  */
 template <typename Entry, auto Hook, typename PerCpu> class noop_sched {
+  using queue_type = fifo_runqueue<Entry, Hook>;
+
 public:
   using state_type = noop_sched_state<Entry, Hook>;
 
@@ -291,23 +339,43 @@ public:
    * operations" section. */
   static void enqueue(Entry &entry, instant now = instant{}) noexcept {
     (void)now;
-    PerCpu::get()->enqueue(entry);
+    auto *st = PerCpu::get();
+    // A stale `force_next` pin on @p entry must be released first: a pinned entry is deliberately unlinked
+    // from the queue, so enqueuing it without clearing the pin would both double-link it and leave the pin
+    // dangling toward an entry `pick_next` would also hand out separately.
+    if (st->pinned == &entry)
+      st->pinned = nullptr;
+    st->queue.enqueue(entry);
   }
 
-  /** @brief Selects and removes the next task to run, or `nullptr` if none is runnable. O(1). @p now is accepted
-   * but unused; see `enqueue`'s doc. */
+  /** @brief Selects and removes the next task to run, or `nullptr` if none is runnable -- a pending
+   * `force_next` pin (if any) always wins over the queue's own order. O(1). @p now is accepted but unused; see
+   * `enqueue`'s doc. */
   static Entry *pick_next(instant now = instant{}) noexcept {
     (void)now;
-    return PerCpu::get()->dequeue();
+    auto *st = PerCpu::get();
+    if (Entry *pinned = st->pinned) {
+      st->pinned = nullptr;
+      return pinned;
+    }
+    return st->queue.dequeue();
   }
 
   /** @brief A dispatched @p entry voluntarily gives up the CPU but stays runnable; re-enqueues it at the tail,
    * same as `enqueue` -- this policy has no interactivity/decay state to recompute. O(1). */
   static void on_yield(Entry &entry, instant now = instant{}) noexcept { enqueue(entry, now); }
 
-  /** @brief A dispatched @p entry blocks (becomes non-runnable); no-op -- `pick_next` already removed it from the
-   * queue, and this policy has nothing else to track until `on_wake`/`enqueue`. O(1). */
-  static void on_block(Entry & /*entry*/, instant /*now*/ = instant{}) noexcept {}
+  /** @brief A dispatched @p entry blocks (becomes non-runnable); normally a no-op -- `pick_next` already
+   * removed it from the queue, and this policy has nothing else to track until `on_wake`/`enqueue` -- except
+   * that if @p entry happens to be the currently `force_next`-pinned one (blocking before ever being
+   * dispatched/consumed by `pick_next`), the stale pin is cleared so `pick_next` doesn't later hand out an
+   * entry the caller now considers blocked. O(1). */
+  static void on_block(Entry &entry, instant now = instant{}) noexcept {
+    (void)now;
+    auto *st = PerCpu::get();
+    if (st->pinned == &entry)
+      st->pinned = nullptr;
+  }
 
   /** @brief A previously-`on_block`ed @p entry becomes runnable again; re-enqueues it at the tail, same as
    * `enqueue`. O(1). */
@@ -318,23 +386,58 @@ public:
    * `enqueue`: this policy has nothing extra to recompute on quantum expiry. O(1). */
   static void requeue(Entry &entry, instant now = instant{}) noexcept { enqueue(entry, now); }
 
-  /** @brief Removes @p entry. O(1). Precondition: `is_linked(entry)`. */
-  static void remove(Entry &entry) noexcept { PerCpu::get()->remove(entry); }
+  /** @brief Removes @p entry. O(1). Precondition: `is_linked(entry)` -- unless @p entry is the current
+   * `force_next` pin, which is not linked by construction; in that case the pin is simply released instead of
+   * touching the queue. */
+  static void remove(Entry &entry) noexcept {
+    auto *st = PerCpu::get();
+    if (st->pinned == &entry) {
+      st->pinned = nullptr;
+      return;
+    }
+    st->queue.remove(entry);
+  }
+
+  /**
+   * @brief Unlinks @p entry from wherever it currently sits (if linked; an already-blocked, unlinked @p entry
+   * is also accepted) and pins it so the very next `pick_next` call returns it unconditionally, bypassing this
+   * policy's normal ordering entirely -- e.g. "the CPU must resume this exact task right now, regardless of
+   * whatever else is runnable". O(1). @p now is accepted but unused; see `enqueue`'s doc. At most one entry can
+   * be pinned at a time: calling `force_next` again before the previous pin is consumed re-enqueues the
+   * previous one normally first, so it is never silently lost.
+   */
+  static void force_next(Entry &entry) noexcept {
+    auto *st = PerCpu::get();
+    if (queue_type::is_linked(entry))
+      st->queue.remove(entry);
+    if (st->pinned != nullptr)
+      st->queue.enqueue(*st->pinned);
+    st->pinned = &entry;
+  }
 
   /** @brief Whether @p entry is currently enqueued (on any CPU). O(1). */
-  [[nodiscard]] static bool is_linked(const Entry &entry) noexcept { return state_type::is_linked(entry); }
+  [[nodiscard]] static bool is_linked(const Entry &entry) noexcept { return queue_type::is_linked(entry); }
 
-  [[nodiscard]] static bool empty() noexcept { return PerCpu::get()->empty(); }
-  [[nodiscard]] static std::size_t size() noexcept { return PerCpu::get()->size(); }
+  [[nodiscard]] static bool empty() noexcept {
+    auto *st = PerCpu::get();
+    return st->pinned == nullptr && st->queue.empty();
+  }
+  [[nodiscard]] static std::size_t size() noexcept {
+    auto *st = PerCpu::get();
+    return st->queue.size() + (st->pinned != nullptr ? 1 : 0);
+  }
 };
 
 // --------------------------------------------------------------------
 // fixed_priority_sched
 // --------------------------------------------------------------------
 
-/** @brief `fixed_priority_sched<...>`'s per-CPU state-blob type. */
-template <typename Entry, auto Hook, auto Priority, std::size_t NumPriorities>
-using fixed_priority_sched_state = priority_bucket_runqueue<Entry, Hook, Priority, NumPriorities>;
+/** @brief `fixed_priority_sched<...>`'s per-CPU state-blob type: the priority-bucket queue plus one
+ * `force_next`-pinned slot (see `fixed_priority_sched::force_next`). */
+template <typename Entry, auto Hook, auto Priority, std::size_t NumPriorities> struct fixed_priority_sched_state {
+  priority_bucket_runqueue<Entry, Hook, Priority, NumPriorities> queue{};
+  Entry *pinned = nullptr;
+};
 
 /**
  * @brief Static-priority scheduler -- `Entry.*Priority` is set once by
@@ -354,6 +457,8 @@ using fixed_priority_sched_state = priority_bucket_runqueue<Entry, Hook, Priorit
  */
 template <typename Entry, auto Hook, auto Priority, std::size_t NumPriorities, typename PerCpu>
 class fixed_priority_sched {
+  using queue_type = priority_bucket_runqueue<Entry, Hook, Priority, NumPriorities>;
+
 public:
   using state_type = fixed_priority_sched_state<Entry, Hook, Priority, NumPriorities>;
 
@@ -363,14 +468,26 @@ public:
    * "Common operations" section. */
   static void enqueue(Entry &entry, instant now = instant{}) noexcept {
     (void)now;
-    PerCpu::get()->enqueue(entry);
+    auto *st = PerCpu::get();
+    // A stale `force_next` pin on @p entry must be released first: a pinned entry is deliberately unlinked
+    // from the queue, so enqueuing it without clearing the pin would both double-link it and leave the pin
+    // dangling toward an entry `pick_next` would also hand out separately.
+    if (st->pinned == &entry)
+      st->pinned = nullptr;
+    st->queue.enqueue(entry);
   }
 
-  /** @brief Selects and removes the highest-priority runnable task, or `nullptr`. O(1). @p now is accepted but
-   * unused; see `enqueue`'s doc. */
+  /** @brief Selects and removes the highest-priority runnable task, or `nullptr` -- a pending `force_next` pin
+   * (if any) always wins over the queue's own priority order. O(1). @p now is accepted but unused; see
+   * `enqueue`'s doc. */
   static Entry *pick_next(instant now = instant{}) noexcept {
     (void)now;
-    return PerCpu::get()->dequeue();
+    auto *st = PerCpu::get();
+    if (Entry *pinned = st->pinned) {
+      st->pinned = nullptr;
+      return pinned;
+    }
+    return st->queue.dequeue();
   }
 
   /**
@@ -386,30 +503,72 @@ public:
    * policy has no interactivity/decay state to recompute. O(1). */
   static void on_yield(Entry &entry, instant now = instant{}) noexcept { requeue(entry, now); }
 
-  /** @brief A dispatched @p entry blocks (becomes non-runnable); no-op -- `pick_next` already removed it from the
-   * queue, and this policy has nothing else to track until `on_wake`/`enqueue`. O(1). */
-  static void on_block(Entry & /*entry*/, instant /*now*/ = instant{}) noexcept {}
+  /** @brief A dispatched @p entry blocks (becomes non-runnable); normally a no-op -- `pick_next` already
+   * removed it from the queue, and this policy has nothing else to track until `on_wake`/`enqueue` -- except
+   * that if @p entry happens to be the currently `force_next`-pinned one (blocking before ever being
+   * dispatched/consumed by `pick_next`), the stale pin is cleared so `pick_next` doesn't later hand out an
+   * entry the caller now considers blocked. O(1). */
+  static void on_block(Entry &entry, instant now = instant{}) noexcept {
+    (void)now;
+    auto *st = PerCpu::get();
+    if (st->pinned == &entry)
+      st->pinned = nullptr;
+  }
 
   /** @brief A previously-`on_block`ed @p entry becomes runnable again; same as `enqueue`. O(1). */
   static void on_wake(Entry &entry, instant now = instant{}) noexcept { enqueue(entry, now); }
 
-  /** @brief Removes @p entry. O(1). Precondition: `is_linked(entry)`. */
-  static void remove(Entry &entry) noexcept { PerCpu::get()->remove(entry); }
+  /** @brief Removes @p entry. O(1). Precondition: `is_linked(entry)` -- unless @p entry is the current
+   * `force_next` pin, which is not linked by construction; in that case the pin is simply released instead of
+   * touching the queue. */
+  static void remove(Entry &entry) noexcept {
+    auto *st = PerCpu::get();
+    if (st->pinned == &entry) {
+      st->pinned = nullptr;
+      return;
+    }
+    st->queue.remove(entry);
+  }
+
+  /**
+   * @brief Unlinks @p entry from wherever it currently sits (if linked; an already-blocked, unlinked @p entry
+   * is also accepted) and pins it so the very next `pick_next` call returns it unconditionally, bypassing this
+   * policy's normal priority order entirely. O(1). @p now is accepted but unused; see `enqueue`'s doc. At most
+   * one entry can be pinned at a time: calling `force_next` again before the previous pin is consumed
+   * re-enqueues the previous one normally first, so it is never silently lost.
+   */
+  static void force_next(Entry &entry) noexcept {
+    auto *st = PerCpu::get();
+    if (queue_type::is_linked(entry))
+      st->queue.remove(entry);
+    if (st->pinned != nullptr)
+      st->queue.enqueue(*st->pinned);
+    st->pinned = &entry;
+  }
 
   /** @brief Whether @p entry is currently enqueued (on any CPU). O(1). */
-  [[nodiscard]] static bool is_linked(const Entry &entry) noexcept { return state_type::is_linked(entry); }
+  [[nodiscard]] static bool is_linked(const Entry &entry) noexcept { return queue_type::is_linked(entry); }
 
-  [[nodiscard]] static bool empty() noexcept { return PerCpu::get()->empty(); }
-  [[nodiscard]] static std::size_t size() noexcept { return PerCpu::get()->size(); }
+  [[nodiscard]] static bool empty() noexcept {
+    auto *st = PerCpu::get();
+    return st->pinned == nullptr && st->queue.empty();
+  }
+  [[nodiscard]] static std::size_t size() noexcept {
+    auto *st = PerCpu::get();
+    return st->queue.size() + (st->pinned != nullptr ? 1 : 0);
+  }
 };
 
 // --------------------------------------------------------------------
 // edf_sched
 // --------------------------------------------------------------------
 
-/** @brief `edf_sched<...>`'s per-CPU state-blob type. */
-template <typename Entry, auto Hook, auto Deadline>
-using edf_sched_state = priority_list_runqueue<Entry, Hook, Deadline>;
+/** @brief `edf_sched<...>`'s per-CPU state-blob type: the deadline-ordered queue plus one
+ * `force_next`-pinned slot (see `edf_sched::force_next`). */
+template <typename Entry, auto Hook, auto Deadline> struct edf_sched_state {
+  priority_list_runqueue<Entry, Hook, Deadline> queue{};
+  Entry *pinned = nullptr;
+};
 
 /**
  * @brief Earliest Deadline First: always dispatches whichever runnable
@@ -431,6 +590,8 @@ using edf_sched_state = priority_list_runqueue<Entry, Hook, Deadline>;
  * Hook, Deadline>` blob.
  */
 template <typename Entry, auto Hook, auto Deadline, typename PerCpu> class edf_sched {
+  using queue_type = priority_list_runqueue<Entry, Hook, Deadline>;
+
 public:
   using state_type = edf_sched_state<Entry, Hook, Deadline>;
 
@@ -440,14 +601,26 @@ public:
    * file-level "Common operations" section. */
   static void enqueue(Entry &entry, instant now = instant{}) noexcept {
     (void)now;
-    PerCpu::get()->enqueue(entry);
+    auto *st = PerCpu::get();
+    // A stale `force_next` pin on @p entry must be released first: a pinned entry is deliberately unlinked
+    // from the queue, so enqueuing it without clearing the pin would both double-link it and leave the pin
+    // dangling toward an entry `pick_next` would also hand out separately.
+    if (st->pinned == &entry)
+      st->pinned = nullptr;
+    st->queue.enqueue(entry);
   }
 
-  /** @brief Selects and removes the task with the soonest deadline, or `nullptr` if none is runnable. O(1).
-   * @p now is accepted but unused; see `enqueue`'s doc. */
+  /** @brief Selects and removes the task with the soonest deadline, or `nullptr` if none is runnable -- a
+   * pending `force_next` pin (if any) always wins over deadline order. O(1). @p now is accepted but unused; see
+   * `enqueue`'s doc. */
   static Entry *pick_next(instant now = instant{}) noexcept {
     (void)now;
-    return PerCpu::get()->dequeue();
+    auto *st = PerCpu::get();
+    if (Entry *pinned = st->pinned) {
+      st->pinned = nullptr;
+      return pinned;
+    }
+    return st->queue.dequeue();
   }
 
   /** @brief Re-inserts a just-dispatched @p entry in `Entry.*Deadline` order -- call this (instead of leaving it
@@ -458,21 +631,61 @@ public:
   /** @brief A dispatched @p entry voluntarily gives up the CPU but stays runnable; same as `requeue`. O(n). */
   static void on_yield(Entry &entry, instant now = instant{}) noexcept { requeue(entry, now); }
 
-  /** @brief A dispatched @p entry blocks (becomes non-runnable); no-op -- `pick_next` already removed it from the
-   * queue, and this policy has nothing else to track until `on_wake`/`enqueue`. O(1). */
-  static void on_block(Entry & /*entry*/, instant /*now*/ = instant{}) noexcept {}
+  /** @brief A dispatched @p entry blocks (becomes non-runnable); normally a no-op -- `pick_next` already
+   * removed it from the queue, and this policy has nothing else to track until `on_wake`/`enqueue` -- except
+   * that if @p entry happens to be the currently `force_next`-pinned one (blocking before ever being
+   * dispatched/consumed by `pick_next`), the stale pin is cleared so `pick_next` doesn't later hand out an
+   * entry the caller now considers blocked. O(1). */
+  static void on_block(Entry &entry, instant now = instant{}) noexcept {
+    (void)now;
+    auto *st = PerCpu::get();
+    if (st->pinned == &entry)
+      st->pinned = nullptr;
+  }
 
   /** @brief A previously-`on_block`ed @p entry becomes runnable again; same as `enqueue`. O(n). */
   static void on_wake(Entry &entry, instant now = instant{}) noexcept { enqueue(entry, now); }
 
-  /** @brief Removes @p entry. O(1). Precondition: `is_linked(entry)`. */
-  static void remove(Entry &entry) noexcept { PerCpu::get()->remove(entry); }
+  /** @brief Removes @p entry. O(1). Precondition: `is_linked(entry)` -- unless @p entry is the current
+   * `force_next` pin, which is not linked by construction; in that case the pin is simply released instead of
+   * touching the queue. */
+  static void remove(Entry &entry) noexcept {
+    auto *st = PerCpu::get();
+    if (st->pinned == &entry) {
+      st->pinned = nullptr;
+      return;
+    }
+    st->queue.remove(entry);
+  }
+
+  /**
+   * @brief Unlinks @p entry from wherever it currently sits (if linked; an already-blocked, unlinked @p entry
+   * is also accepted) and pins it so the very next `pick_next` call returns it unconditionally, bypassing
+   * deadline order entirely. O(n) (the unlink is O(1); re-enqueuing a previously-pinned entry, if any, is
+   * O(n)). No `now` parameter: like `remove`, this is a purely structural operation with no
+   * wall-clock-dependent logic. At most one entry can be pinned at a time: calling `force_next` again before
+   * the previous pin is consumed re-enqueues the previous one normally first, so it is never silently lost.
+   */
+  static void force_next(Entry &entry) noexcept {
+    auto *st = PerCpu::get();
+    if (queue_type::is_linked(entry))
+      st->queue.remove(entry);
+    if (st->pinned != nullptr)
+      st->queue.enqueue(*st->pinned);
+    st->pinned = &entry;
+  }
 
   /** @brief Whether @p entry is currently enqueued (on any CPU). O(1). */
-  [[nodiscard]] static bool is_linked(const Entry &entry) noexcept { return state_type::is_linked(entry); }
+  [[nodiscard]] static bool is_linked(const Entry &entry) noexcept { return queue_type::is_linked(entry); }
 
-  [[nodiscard]] static bool empty() noexcept { return PerCpu::get()->empty(); }
-  [[nodiscard]] static std::size_t size() noexcept { return PerCpu::get()->size(); }
+  [[nodiscard]] static bool empty() noexcept {
+    auto *st = PerCpu::get();
+    return st->pinned == nullptr && st->queue.empty();
+  }
+  [[nodiscard]] static std::size_t size() noexcept {
+    auto *st = PerCpu::get();
+    return st->queue.size() + (st->pinned != nullptr ? 1 : 0);
+  }
 };
 
 // --------------------------------------------------------------------
@@ -493,10 +706,21 @@ struct ule_task_state {
   bool in_next_queue = true;
 };
 
-/** @brief `sched_ule<...>`'s per-CPU state-blob type: the `curr`/`next` queue pair. */
+/** @brief `sched_ule<...>`'s per-CPU state-blob type: the `curr`/`next` queue pair plus one
+ * `force_next`-pinned slot (see `sched_ule::force_next`).
+ *
+ * @note `force_next` accepts an already-blocked (unlinked) @p entry (see its own doc), but has no way to tell
+ * *why* an entry isn't linked -- it is purely a mechanical unlink-if-linked-then-pin operation. Forcing a
+ * blocked entry to be dispatched next is only behaviorally safe when that specific block was arranged as part
+ * of the same handoff protocol (e.g. a task deliberately `on_block`ed so another entry could be force-run in
+ * its place); forcing an entry that is blocked for an unrelated reason (waiting on a lock, I/O, ...) would
+ * dispatch it before whatever it is actually waiting for has happened. Callers building a protocol on top of
+ * `force_next` (see `sched_world_handoff.hpp`) must track this themselves and defer until the entry's own,
+ * independent `on_wake` if its block wasn't protocol-arranged. */
 template <typename Entry, auto Hook, auto Priority, std::size_t NumPriorities> struct sched_ule_state {
   priority_bucket_runqueue<Entry, Hook, Priority, NumPriorities> curr{};
   priority_bucket_runqueue<Entry, Hook, Priority, NumPriorities> next{};
+  Entry *pinned = nullptr;
 };
 
 /**
@@ -538,7 +762,9 @@ class sched_ule {
 public:
   using state_type = sched_ule_state<Entry, Hook, Priority, NumPriorities>;
 
-  /** @brief Makes a never-before-seen @p entry runnable, as fully interactive. O(1). */
+  /** @brief Makes a never-before-seen @p entry runnable, as fully interactive. O(1). Also releases a stale
+   * `force_next` pin on @p entry, if any (see `remove`'s doc for why: a pinned entry is deliberately unlinked,
+   * so inserting it again without clearing the pin would double-link it). */
   static void enqueue(Entry &entry, instant now) noexcept {
     auto &st = entry.*State;
     st.sleep_started = now;
@@ -546,7 +772,10 @@ public:
     st.sleep_micros = 0;
     st.in_next_queue = true;
     assign_priority(entry, interact_max);
-    PerCpu::get()->next.enqueue(entry);
+    auto *blob = PerCpu::get();
+    if (blob->pinned == &entry)
+      blob->pinned = nullptr;
+    blob->next.enqueue(entry);
   }
 
   /**
@@ -556,6 +785,11 @@ public:
    */
   static Entry *pick_next(instant now) noexcept {
     auto *blob = PerCpu::get();
+    if (Entry *pinned = blob->pinned) {
+      blob->pinned = nullptr;
+      (pinned->*State).run_started = now;
+      return pinned;
+    }
     if (blob->curr.empty())
       std::swap(blob->curr, blob->next);
     Entry *entry = blob->curr.dequeue();
@@ -575,10 +809,16 @@ public:
    * `on_yield`: this policy always re-scores on every return-to-runnable transition, voluntary or not. O(1). */
   static void requeue(Entry &entry, instant now) noexcept { on_yield(entry, now); }
 
-  /** @brief A dispatched @p entry blocks (becomes non-runnable); not requeued until `on_wake`. O(1). */
+  /** @brief A dispatched @p entry blocks (becomes non-runnable); not requeued until `on_wake`. Also clears
+   * @p entry's `force_next` pin, if it happened to still be the pinned entry (blocking before ever being
+   * dispatched/consumed by `pick_next`) -- so `pick_next` doesn't later hand out an entry the caller now
+   * considers blocked. O(1). */
   static void on_block(Entry &entry, instant now) noexcept {
     accumulate_run(entry, now);
     (entry.*State).sleep_started = now;
+    auto *blob = PerCpu::get();
+    if (blob->pinned == &entry)
+      blob->pinned = nullptr;
   }
 
   /** @brief A previously-`on_block`ed @p entry becomes runnable again; re-scores and requeues it. O(1). */
@@ -588,9 +828,14 @@ public:
   }
 
   /** @brief Removes @p entry from whichever of `curr`/`next` it currently sits in. O(1). Precondition:
-   * `is_linked(entry)`. */
+   * `is_linked(entry)` -- unless @p entry is the current `force_next` pin, which is not linked by construction;
+   * in that case the pin is simply released instead of touching either queue. */
   static void remove(Entry &entry) noexcept {
     auto *blob = PerCpu::get();
+    if (blob->pinned == &entry) {
+      blob->pinned = nullptr;
+      return;
+    }
     if ((entry.*State).in_next_queue)
       blob->next.remove(entry);
     else
@@ -600,14 +845,37 @@ public:
   /** @brief Whether @p entry is currently enqueued in `curr` or `next` (on any CPU). O(1). */
   [[nodiscard]] static bool is_linked(const Entry &entry) noexcept { return bucket_type::is_linked(entry); }
 
+  /**
+   * @brief Unlinks @p entry from whichever of `curr`/`next` it currently sits in (if linked; an already-blocked,
+   * unlinked @p entry is also accepted -- see the per-CPU state blob's doc note on when that's safe) and pins
+   * it so the very next `pick_next` call returns it unconditionally, bypassing interactivity scoring entirely.
+   * O(1). No `now` parameter: like `remove`, this is a purely structural operation -- it deliberately does
+   * *not* update @p entry's `ule_task_state` (no `run_started`/accumulated run or sleep time change); `pick_next`
+   * sets `run_started` itself once @p entry is actually dispatched. At most one entry can be pinned at a time:
+   * calling `force_next` again before the previous pin is consumed re-enqueues the previous one (into `next`,
+   * as `on_yield`/`on_wake` would) first, so it is never silently lost.
+   */
+  static void force_next(Entry &entry) noexcept {
+    auto *blob = PerCpu::get();
+    if (bucket_type::is_linked(entry)) {
+      if ((entry.*State).in_next_queue)
+        blob->next.remove(entry);
+      else
+        blob->curr.remove(entry);
+    }
+    if (blob->pinned != nullptr)
+      blob->next.enqueue(*blob->pinned);
+    blob->pinned = &entry;
+  }
+
   [[nodiscard]] static bool empty() noexcept {
     auto *blob = PerCpu::get();
-    return blob->curr.empty() && blob->next.empty();
+    return blob->pinned == nullptr && blob->curr.empty() && blob->next.empty();
   }
 
   [[nodiscard]] static std::size_t size() noexcept {
     auto *blob = PerCpu::get();
-    return blob->curr.size() + blob->next.size();
+    return blob->curr.size() + blob->next.size() + (blob->pinned != nullptr ? 1 : 0);
   }
 
 private:
@@ -630,13 +898,18 @@ private:
     }
   }
 
+  /** @brief Shared `on_yield`/`requeue`/`on_wake` tail: re-scores and re-enqueues @p entry into `next`. Also
+   * releases a stale `force_next` pin on @p entry, if any -- see `enqueue`'s doc for why. */
   static void requeue_after_run(Entry &entry) noexcept {
     auto &st = entry.*State;
     const std::uint64_t total = st.run_micros + st.sleep_micros;
     const std::uint64_t score = total == 0 ? interact_max : (st.sleep_micros * interact_max) / total;
     assign_priority(entry, score);
     st.in_next_queue = true;
-    PerCpu::get()->next.enqueue(entry);
+    auto *blob = PerCpu::get();
+    if (blob->pinned == &entry)
+      blob->pinned = nullptr;
+    blob->next.enqueue(entry);
   }
 
   static void assign_priority(Entry &entry, std::uint64_t score) noexcept {
@@ -673,9 +946,16 @@ struct bsd_task_state {
   int nice = 0;
 };
 
-/** @brief `sched_4bsd<...>`'s per-CPU state-blob type. */
-template <typename Entry, auto Hook, auto Priority, std::size_t NumPriorities>
-using sched_4bsd_state = priority_bucket_runqueue<Entry, Hook, Priority, NumPriorities>;
+/** @brief `sched_4bsd<...>`'s per-CPU state-blob type: the priority-bucket queue plus one
+ * `force_next`-pinned slot (see `sched_4bsd::force_next`).
+ *
+ * @note Same caveat as `sched_ule_state`: `force_next` accepts an already-blocked (unlinked) entry
+ * mechanically, but forcing one to be dispatched next is only behaviorally safe when its block was arranged
+ * as part of the same handoff protocol, not an unrelated wait. */
+template <typename Entry, auto Hook, auto Priority, std::size_t NumPriorities> struct sched_4bsd_state {
+  priority_bucket_runqueue<Entry, Hook, Priority, NumPriorities> queue{};
+  Entry *pinned = nullptr;
+};
 
 /**
  * @brief Simplified `SCHED_4BSD` -- a single per-CPU runqueue, with
@@ -696,6 +976,7 @@ using sched_4bsd_state = priority_bucket_runqueue<Entry, Hook, Priority, NumPrio
 template <typename Entry, auto Hook, auto Priority, auto State, std::size_t NumPriorities, typename PerCpu>
 class sched_4bsd {
   using priority_type = std::remove_reference_t<decltype(std::declval<Entry &>().*Priority)>;
+  using queue_type = priority_bucket_runqueue<Entry, Hook, Priority, NumPriorities>;
 
   // Real 4BSD halves `estcpu` roughly once per second of wall-clock
   // time (its `schedcpu()` sweep); this header reproduces that same
@@ -713,30 +994,45 @@ class sched_4bsd {
 public:
   using state_type = sched_4bsd_state<Entry, Hook, Priority, NumPriorities>;
 
-  /** @brief Makes a (possibly never-before-seen) @p entry runnable. O(1). */
+  /** @brief Makes a (possibly never-before-seen) @p entry runnable. O(1). Also releases a stale `force_next`
+   * pin on @p entry, if any (see `remove`'s doc for why). */
   static void enqueue(Entry &entry, instant now) noexcept {
     auto &st = entry.*State;
     if (st.last_decay == instant{})
       st.last_decay = now; // first use: nothing to decay yet
     decay(entry, now);
     recompute_priority(entry);
-    PerCpu::get()->enqueue(entry);
+    auto *cpu = PerCpu::get();
+    if (cpu->pinned == &entry)
+      cpu->pinned = nullptr;
+    cpu->queue.enqueue(entry);
   }
 
-  /** @brief Selects and removes the highest-priority runnable task, or `nullptr`. O(1). */
+  /** @brief Selects and removes the highest-priority runnable task, or `nullptr` -- a pending `force_next` pin
+   * (if any) always wins over the queue's own priority order. O(1). */
   static Entry *pick_next(instant now) noexcept {
-    Entry *entry = PerCpu::get()->dequeue();
+    auto *st = PerCpu::get();
+    if (Entry *pinned = st->pinned) {
+      st->pinned = nullptr;
+      (pinned->*State).dispatched_at = now;
+      return pinned;
+    }
+    Entry *entry = st->queue.dequeue();
     if (entry != nullptr)
       (entry->*State).dispatched_at = now;
     return entry;
   }
 
-  /** @brief A dispatched @p entry voluntarily gives up the CPU but stays runnable; re-scores and requeues it. O(1). */
+  /** @brief A dispatched @p entry voluntarily gives up the CPU but stays runnable; re-scores and requeues it.
+   * Also releases a stale `force_next` pin on @p entry, if any -- see `enqueue`'s doc. O(1). */
   static void on_yield(Entry &entry, instant now) noexcept {
     accumulate_runtime(entry, now);
     decay(entry, now);
     recompute_priority(entry);
-    PerCpu::get()->enqueue(entry);
+    auto *cpu = PerCpu::get();
+    if (cpu->pinned == &entry)
+      cpu->pinned = nullptr;
+    cpu->queue.enqueue(entry);
   }
 
   /** @brief Re-scores and requeues a just-dispatched @p entry that's still runnable -- call this (instead of
@@ -744,28 +1040,71 @@ public:
    * `on_yield`: this policy always re-scores on every return-to-runnable transition, voluntary or not. O(1). */
   static void requeue(Entry &entry, instant now) noexcept { on_yield(entry, now); }
 
-  /** @brief A dispatched @p entry blocks (becomes non-runnable); not requeued until `on_wake`. O(1). */
-  static void on_block(Entry &entry, instant now) noexcept { accumulate_runtime(entry, now); }
+  /** @brief A dispatched @p entry blocks (becomes non-runnable); not requeued until `on_wake`. Also clears
+   * @p entry's `force_next` pin, if it happened to still be the pinned entry (blocking before ever being
+   * dispatched/consumed by `pick_next`) -- so `pick_next` doesn't later hand out an entry the caller now
+   * considers blocked. O(1). */
+  static void on_block(Entry &entry, instant now) noexcept {
+    accumulate_runtime(entry, now);
+    auto *st = PerCpu::get();
+    if (st->pinned == &entry)
+      st->pinned = nullptr;
+  }
 
   /** @brief A previously-`on_block`ed @p entry becomes runnable again; catches up decay, re-scores, and requeues it.
-   * O(1). */
+   * Also releases a stale `force_next` pin on @p entry, if any -- see `enqueue`'s doc. O(1). */
   static void on_wake(Entry &entry, instant now) noexcept {
     decay(entry, now);
     recompute_priority(entry);
-    PerCpu::get()->enqueue(entry);
+    auto *cpu = PerCpu::get();
+    if (cpu->pinned == &entry)
+      cpu->pinned = nullptr;
+    cpu->queue.enqueue(entry);
   }
 
-  /** @brief Removes @p entry. O(1). Precondition: `is_linked(entry)`. */
-  static void remove(Entry &entry) noexcept { PerCpu::get()->remove(entry); }
+  /** @brief Removes @p entry. O(1). Precondition: `is_linked(entry)` -- unless @p entry is the current
+   * `force_next` pin, which is not linked by construction; in that case the pin is simply released instead of
+   * touching the queue. */
+  static void remove(Entry &entry) noexcept {
+    auto *st = PerCpu::get();
+    if (st->pinned == &entry) {
+      st->pinned = nullptr;
+      return;
+    }
+    st->queue.remove(entry);
+  }
+
+  /**
+   * @brief Unlinks @p entry from wherever it currently sits (if linked; an already-blocked, unlinked @p entry
+   * is also accepted -- see `sched_4bsd_state`'s doc note on when that's safe) and pins it so the very next
+   * `pick_next` call returns it unconditionally, bypassing `estcpu`/`nice` priority entirely. O(1). No `now`
+   * parameter: like `remove`, this is a purely structural operation -- it deliberately does not run decay or
+   * recompute `Entry.*Priority`. At most one entry can be pinned at a time: calling `force_next` again before
+   * the previous pin is consumed re-enqueues the previous one normally first, so it is never silently lost.
+   */
+  static void force_next(Entry &entry) noexcept {
+    auto *st = PerCpu::get();
+    if (queue_type::is_linked(entry))
+      st->queue.remove(entry);
+    if (st->pinned != nullptr)
+      st->queue.enqueue(*st->pinned);
+    st->pinned = &entry;
+  }
 
   /** @brief Sets @p entry's `nice` value (like `setpriority(2)`); takes effect at the next recompute. */
   static void set_nice(Entry &entry, int nice) noexcept { (entry.*State).nice = nice; }
 
   /** @brief Whether @p entry is currently enqueued (on any CPU). O(1). */
-  [[nodiscard]] static bool is_linked(const Entry &entry) noexcept { return state_type::is_linked(entry); }
+  [[nodiscard]] static bool is_linked(const Entry &entry) noexcept { return queue_type::is_linked(entry); }
 
-  [[nodiscard]] static bool empty() noexcept { return PerCpu::get()->empty(); }
-  [[nodiscard]] static std::size_t size() noexcept { return PerCpu::get()->size(); }
+  [[nodiscard]] static bool empty() noexcept {
+    auto *st = PerCpu::get();
+    return st->pinned == nullptr && st->queue.empty();
+  }
+  [[nodiscard]] static std::size_t size() noexcept {
+    auto *st = PerCpu::get();
+    return st->queue.size() + (st->pinned != nullptr ? 1 : 0);
+  }
 
 private:
   static void accumulate_runtime(Entry &entry, instant now) noexcept {
