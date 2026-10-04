@@ -63,14 +63,13 @@ ownership model needed:
 | `reloco::flat_map`, `reloco::inline_flat_map`, `reloco::sso_flat_map`, `reloco::flat_hash_map`, `reloco::tree_map` | `std::map`/`std::unordered_map` |
 | `reloco::optional<T>` | `std::optional<T>` |
 
-`std::` containers are permitted in `tests/**` (host-only, linked against a
-full C++ standard library and GoogleTest already) where bare-metal/
-allocation-free constraints do not apply; prefer them there when they are
-simpler than the matching `reloco::` type for a test's purposes. Plain
-value types, `std::size_t`/fixed-width integers, `std::pair`/`std::tuple`
-of trivial types, and standard algorithms/type-traits headers are fine
-everywhere -- this rule is specifically about *container* types that own
-or bounds-check a buffer of elements.
+Tests should also avoid `std::` containers in favor of `reloco::` equivalents.
+The same allocation-free, no-libc-dependency constraints apply to tests because
+the test suite may run on bare-metal or with stripped-down C++ standard library
+support. Plain value types, `std::size_t`/fixed-width integers,
+`std::pair`/`std::tuple` of trivial types, and standard algorithms/type-traits
+headers are fine everywhere -- this rule is specifically about *container* types
+that own or bounds-check a buffer of elements.
 
 ## Prefer `TEST_F`/`TEST_P` for new GoogleTest tests
 
