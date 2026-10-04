@@ -2943,4 +2943,148 @@ struct cnthp_cval {
 #endif // defined(__arm__) && !defined(__aarch64__)
 };
 
+/** @brief Raw accessor for the AArch32 `FPSCR` coprocessor register (23 named field(s)). */
+struct fpscr {
+  std::uint32_t raw{0};
+
+  struct bits {
+    using ioc = ::structo::arch::pte_bit_field<0, 1, std::uint32_t>;
+    using dzc = ::structo::arch::pte_bit_field<1, 1, std::uint32_t>;
+    using ofc = ::structo::arch::pte_bit_field<2, 1, std::uint32_t>;
+    using ufc = ::structo::arch::pte_bit_field<3, 1, std::uint32_t>;
+    using ixc = ::structo::arch::pte_bit_field<4, 1, std::uint32_t>;
+    using idc = ::structo::arch::pte_bit_field<7, 1, std::uint32_t>;
+    using ioe = ::structo::arch::pte_bit_field<8, 1, std::uint32_t>;
+    using dze = ::structo::arch::pte_bit_field<9, 1, std::uint32_t>;
+    using ofe = ::structo::arch::pte_bit_field<10, 1, std::uint32_t>;
+    using ufe = ::structo::arch::pte_bit_field<11, 1, std::uint32_t>;
+    using ixe = ::structo::arch::pte_bit_field<12, 1, std::uint32_t>;
+    using ide = ::structo::arch::pte_bit_field<15, 1, std::uint32_t>;
+    using len = ::structo::arch::pte_bit_field<16, 3, std::uint32_t>;
+    using stride = ::structo::arch::pte_bit_field<20, 2, std::uint32_t>;
+    using rmode = ::structo::arch::pte_bit_field<22, 2, std::uint32_t>;
+    using fz = ::structo::arch::pte_bit_field<24, 1, std::uint32_t>;
+    using dn = ::structo::arch::pte_bit_field<25, 1, std::uint32_t>;
+    using ahp = ::structo::arch::pte_bit_field<26, 1, std::uint32_t>;
+    using qc = ::structo::arch::pte_bit_field<27, 1, std::uint32_t>;
+    using v = ::structo::arch::pte_bit_field<28, 1, std::uint32_t>;
+    using c = ::structo::arch::pte_bit_field<29, 1, std::uint32_t>;
+    using z = ::structo::arch::pte_bit_field<30, 1, std::uint32_t>;
+    using n = ::structo::arch::pte_bit_field<31, 1, std::uint32_t>;
+  };
+
+  [[nodiscard]] constexpr bool ioc() const noexcept { return bits::ioc::test(raw); }
+  constexpr auto &set_ioc(bool value) noexcept { raw = bits::ioc::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool dzc() const noexcept { return bits::dzc::test(raw); }
+  constexpr auto &set_dzc(bool value) noexcept { raw = bits::dzc::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool ofc() const noexcept { return bits::ofc::test(raw); }
+  constexpr auto &set_ofc(bool value) noexcept { raw = bits::ofc::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool ufc() const noexcept { return bits::ufc::test(raw); }
+  constexpr auto &set_ufc(bool value) noexcept { raw = bits::ufc::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool ixc() const noexcept { return bits::ixc::test(raw); }
+  constexpr auto &set_ixc(bool value) noexcept { raw = bits::ixc::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool idc() const noexcept { return bits::idc::test(raw); }
+  constexpr auto &set_idc(bool value) noexcept { raw = bits::idc::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool ioe() const noexcept { return bits::ioe::test(raw); }
+  constexpr auto &set_ioe(bool value) noexcept { raw = bits::ioe::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool dze() const noexcept { return bits::dze::test(raw); }
+  constexpr auto &set_dze(bool value) noexcept { raw = bits::dze::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool ofe() const noexcept { return bits::ofe::test(raw); }
+  constexpr auto &set_ofe(bool value) noexcept { raw = bits::ofe::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool ufe() const noexcept { return bits::ufe::test(raw); }
+  constexpr auto &set_ufe(bool value) noexcept { raw = bits::ufe::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool ixe() const noexcept { return bits::ixe::test(raw); }
+  constexpr auto &set_ixe(bool value) noexcept { raw = bits::ixe::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool ide() const noexcept { return bits::ide::test(raw); }
+  constexpr auto &set_ide(bool value) noexcept { raw = bits::ide::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t len() const noexcept { return bits::len::get(raw); }
+  constexpr auto &set_len(std::uint32_t value) noexcept { raw = bits::len::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t stride() const noexcept { return bits::stride::get(raw); }
+  constexpr auto &set_stride(std::uint32_t value) noexcept { raw = bits::stride::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t rmode() const noexcept { return bits::rmode::get(raw); }
+  constexpr auto &set_rmode(std::uint32_t value) noexcept { raw = bits::rmode::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool fz() const noexcept { return bits::fz::test(raw); }
+  constexpr auto &set_fz(bool value) noexcept { raw = bits::fz::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool dn() const noexcept { return bits::dn::test(raw); }
+  constexpr auto &set_dn(bool value) noexcept { raw = bits::dn::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool ahp() const noexcept { return bits::ahp::test(raw); }
+  constexpr auto &set_ahp(bool value) noexcept { raw = bits::ahp::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool qc() const noexcept { return bits::qc::test(raw); }
+  constexpr auto &set_qc(bool value) noexcept { raw = bits::qc::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool v() const noexcept { return bits::v::test(raw); }
+  constexpr auto &set_v(bool value) noexcept { raw = bits::v::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool c() const noexcept { return bits::c::test(raw); }
+  constexpr auto &set_c(bool value) noexcept { raw = bits::c::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool z() const noexcept { return bits::z::test(raw); }
+  constexpr auto &set_z(bool value) noexcept { raw = bits::z::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool n() const noexcept { return bits::n::test(raw); }
+  constexpr auto &set_n(bool value) noexcept { raw = bits::n::set_bit(raw, value); return *this; }
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static fpscr read() noexcept {
+    std::uint32_t value;
+    asm volatile("mrc p10, 7, %0, c1, c0, 0" : "=r"(value));
+    return fpscr{value};
+  }
+  void write() const noexcept { asm volatile("mcr p10, 7, %0, c1, c0, 0" ::"r"(raw)); }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 `FPEXC` coprocessor register (13 named field(s)). */
+struct fpexc {
+  std::uint32_t raw{0};
+
+  struct bits {
+    using iof = ::structo::arch::pte_bit_field<0, 1, std::uint32_t>;
+    using dzf = ::structo::arch::pte_bit_field<1, 1, std::uint32_t>;
+    using off = ::structo::arch::pte_bit_field<2, 1, std::uint32_t>;
+    using uff = ::structo::arch::pte_bit_field<3, 1, std::uint32_t>;
+    using ixf = ::structo::arch::pte_bit_field<4, 1, std::uint32_t>;
+    using idf = ::structo::arch::pte_bit_field<7, 1, std::uint32_t>;
+    using length = ::structo::arch::pte_bit_field<8, 3, std::uint32_t>;
+    using tfv = ::structo::arch::pte_bit_field<26, 1, std::uint32_t>;
+    using vv = ::structo::arch::pte_bit_field<27, 1, std::uint32_t>;
+    using fp2v = ::structo::arch::pte_bit_field<28, 1, std::uint32_t>;
+    using dex = ::structo::arch::pte_bit_field<29, 1, std::uint32_t>;
+    using en = ::structo::arch::pte_bit_field<30, 1, std::uint32_t>;
+    using ex = ::structo::arch::pte_bit_field<31, 1, std::uint32_t>;
+  };
+
+  [[nodiscard]] constexpr bool iof() const noexcept { return bits::iof::test(raw); }
+  constexpr auto &set_iof(bool value) noexcept { raw = bits::iof::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool dzf() const noexcept { return bits::dzf::test(raw); }
+  constexpr auto &set_dzf(bool value) noexcept { raw = bits::dzf::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool off() const noexcept { return bits::off::test(raw); }
+  constexpr auto &set_off(bool value) noexcept { raw = bits::off::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool uff() const noexcept { return bits::uff::test(raw); }
+  constexpr auto &set_uff(bool value) noexcept { raw = bits::uff::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool ixf() const noexcept { return bits::ixf::test(raw); }
+  constexpr auto &set_ixf(bool value) noexcept { raw = bits::ixf::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool idf() const noexcept { return bits::idf::test(raw); }
+  constexpr auto &set_idf(bool value) noexcept { raw = bits::idf::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint32_t length() const noexcept { return bits::length::get(raw); }
+  constexpr auto &set_length(std::uint32_t value) noexcept { raw = bits::length::set(raw, value); return *this; }
+  [[nodiscard]] constexpr bool tfv() const noexcept { return bits::tfv::test(raw); }
+  constexpr auto &set_tfv(bool value) noexcept { raw = bits::tfv::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool vv() const noexcept { return bits::vv::test(raw); }
+  constexpr auto &set_vv(bool value) noexcept { raw = bits::vv::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool fp2v() const noexcept { return bits::fp2v::test(raw); }
+  constexpr auto &set_fp2v(bool value) noexcept { raw = bits::fp2v::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool dex() const noexcept { return bits::dex::test(raw); }
+  constexpr auto &set_dex(bool value) noexcept { raw = bits::dex::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool en() const noexcept { return bits::en::test(raw); }
+  constexpr auto &set_en(bool value) noexcept { raw = bits::en::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr bool ex() const noexcept { return bits::ex::test(raw); }
+  constexpr auto &set_ex(bool value) noexcept { raw = bits::ex::set_bit(raw, value); return *this; }
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static fpexc read() noexcept {
+    std::uint32_t value;
+    asm volatile("mrc p10, 7, %0, c8, c0, 0" : "=r"(value));
+    return fpexc{value};
+  }
+  void write() const noexcept { asm volatile("mcr p10, 7, %0, c8, c0, 0" ::"r"(raw)); }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
 } // namespace structo::arch::arm::sysreg_raw

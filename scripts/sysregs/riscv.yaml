@@ -605,6 +605,7 @@ registers:
   - sie:1:1
   - spie:5:1
   - spp:8:1
+  - fs:13:2
   - sum:18:1
   - mxr:19:1
 - name: sie
@@ -1530,3 +1531,14 @@ registers:
     kind: csr
     address: 21
   fields: []
+- name: fcsr
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: csr
+    address: 3
+  fields:
+  - fflags:0:5
+  - frm:5:3

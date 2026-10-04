@@ -931,7 +931,7 @@ struct sscountovf {
 #endif // defined(__riscv)
 };
 
-/** @brief Raw accessor for the RISC-V `sstatus` CSR (address 0x100; 5 named field(s)). */
+/** @brief Raw accessor for the RISC-V `sstatus` CSR (address 0x100; 6 named field(s)). */
 struct sstatus {
   std::uint64_t raw{0};
 
@@ -939,6 +939,7 @@ struct sstatus {
     using sie = ::structo::arch::pte_bit_field<1, 1, std::uint64_t>;
     using spie = ::structo::arch::pte_bit_field<5, 1, std::uint64_t>;
     using spp = ::structo::arch::pte_bit_field<8, 1, std::uint64_t>;
+    using fs = ::structo::arch::pte_bit_field<13, 2, std::uint64_t>;
     using sum = ::structo::arch::pte_bit_field<18, 1, std::uint64_t>;
     using mxr = ::structo::arch::pte_bit_field<19, 1, std::uint64_t>;
   };
@@ -949,6 +950,8 @@ struct sstatus {
   constexpr auto &set_spie(bool value) noexcept { raw = bits::spie::set_bit(raw, value); return *this; }
   [[nodiscard]] constexpr bool spp() const noexcept { return bits::spp::test(raw); }
   constexpr auto &set_spp(bool value) noexcept { raw = bits::spp::set_bit(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint64_t fs() const noexcept { return bits::fs::get(raw); }
+  constexpr auto &set_fs(std::uint64_t value) noexcept { raw = bits::fs::set(raw, value); return *this; }
   [[nodiscard]] constexpr bool sum() const noexcept { return bits::sum::test(raw); }
   constexpr auto &set_sum(bool value) noexcept { raw = bits::sum::set_bit(raw, value); return *this; }
   [[nodiscard]] constexpr bool mxr() const noexcept { return bits::mxr::test(raw); }
@@ -2496,6 +2499,30 @@ struct seed {
     return seed{value};
   }
   void write() const noexcept { asm volatile("csrw 0x15, %0" ::"r"(raw)); }
+#endif // defined(__riscv)
+};
+
+/** @brief Raw accessor for the RISC-V `fcsr` CSR (address 0x3; 2 named field(s)). */
+struct fcsr {
+  std::uint64_t raw{0};
+
+  struct bits {
+    using fflags = ::structo::arch::pte_bit_field<0, 5, std::uint64_t>;
+    using frm = ::structo::arch::pte_bit_field<5, 3, std::uint64_t>;
+  };
+
+  [[nodiscard]] constexpr std::uint64_t fflags() const noexcept { return bits::fflags::get(raw); }
+  constexpr auto &set_fflags(std::uint64_t value) noexcept { raw = bits::fflags::set(raw, value); return *this; }
+  [[nodiscard]] constexpr std::uint64_t frm() const noexcept { return bits::frm::get(raw); }
+  constexpr auto &set_frm(std::uint64_t value) noexcept { raw = bits::frm::set(raw, value); return *this; }
+
+#if defined(__riscv)
+  [[nodiscard]] static fcsr read() noexcept {
+    std::uint64_t value;
+    asm volatile("csrr %0, 0x3" : "=r"(value));
+    return fcsr{value};
+  }
+  void write() const noexcept { asm volatile("csrw 0x3, %0" ::"r"(raw)); }
 #endif // defined(__riscv)
 };
 

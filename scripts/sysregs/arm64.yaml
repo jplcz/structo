@@ -521,7 +521,11 @@ registers:
     crn: 1
     crm: 0
     op2: 2
-  fields: []
+  fields:
+  - zen:16:2
+  - fpen:20:2
+  - smen:24:2
+  - tta:28:1
 - name: cpacr_el12
   width: 64
   access:
@@ -2479,3 +2483,52 @@ registers:
     crm: 0
     op2: 3
   fields: []
+- name: fpcr
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 4
+    crm: 4
+    op2: 0
+  fields:
+  - ioe:8:1
+  - dze:9:1
+  - ofe:10:1
+  - ufe:11:1
+  - ixe:12:1
+  - ide:15:1
+  - len:16:3
+  - stride:20:2
+  - rmode:22:2
+  - fz:24:1
+  - dn:25:1
+  - ahp:26:1
+- name: fpsr
+  width: 64
+  access:
+  - read
+  - write
+  encoding:
+    kind: mrs_msr
+    op0: 3
+    op1: 3
+    crn: 4
+    crm: 4
+    op2: 1
+  fields:
+  - ioc:0:1
+  - dzc:1:1
+  - ofc:2:1
+  - ufc:3:1
+  - ixc:4:1
+  - idc:7:1
+  - qc:27:1
+  - v:28:1
+  - c:29:1
+  - z:30:1
+  - n:31:1

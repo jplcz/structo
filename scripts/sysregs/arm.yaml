@@ -2078,3 +2078,65 @@ registers:
     opc1: 6
     crm: 14
   fields: []
+- name: fpscr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p10
+    opc1: 7
+    crn: 1
+    crm: 0
+    opc2: 0
+  fields:
+  - ioc:0:1
+  - dzc:1:1
+  - ofc:2:1
+  - ufc:3:1
+  - ixc:4:1
+  - idc:7:1
+  - ioe:8:1
+  - dze:9:1
+  - ofe:10:1
+  - ufe:11:1
+  - ixe:12:1
+  - ide:15:1
+  - len:16:3
+  - stride:20:2
+  - rmode:22:2
+  - fz:24:1
+  - dn:25:1
+  - ahp:26:1
+  - qc:27:1
+  - v:28:1
+  - c:29:1
+  - z:30:1
+  - n:31:1
+- name: fpexc
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: coproc
+    coproc: p10
+    opc1: 7
+    crn: 8
+    crm: 0
+    opc2: 0
+  fields:
+  - iof:0:1
+  - dzf:1:1
+  - off:2:1
+  - uff:3:1
+  - ixf:4:1
+  - idf:7:1
+  - length:8:3
+  - tfv:26:1
+  - vv:27:1
+  - fp2v:28:1
+  - dex:29:1
+  - en:30:1
+  - ex:31:1
