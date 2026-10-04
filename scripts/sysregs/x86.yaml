@@ -47,8 +47,7 @@ registers:
   fields:
   - pwt:3:1
   - pcd:4:1
-  - pcid:0:12
-  - base_addr:12:40
+  - base_addr:12:20
 - name: cr4
   width: 32
   access:
