@@ -239,15 +239,15 @@ struct {name} {{
 
 def cpp_struct_csr(name: str, enc: dict, fields: list[str]) -> str:
     addr = enc["address"]
-    bitfields = emit_bitfield_members(fields, "unsigned long")
+    bitfields = emit_bitfield_members(fields, "std::uint64_t")
     return f"""\
 /** @brief Raw accessor for the RISC-V `{name}` CSR (address {hex(addr)}; {_doc_suffix(fields)}). */
 struct {name} {{
-  unsigned long raw{{0}};
+  std::uint64_t raw{{0}};
 
 {bitfields}#if defined(__riscv)
   [[nodiscard]] static {name} read() noexcept {{
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, {hex(addr)}" : "=r"(value));
     return {name}{{value}};
   }}

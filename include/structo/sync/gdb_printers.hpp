@@ -46,9 +46,17 @@
 
 #if defined(__clang__) || defined(__GNUC__)
 
+// GNU assembler section-type syntax: `@progbits` almost everywhere, but `@` is
+// the comment character on 32-bit ARM, where the type character is `%` instead.
+#if defined(__arm__) && !defined(__aarch64__)
+#define STRUCTO_GDB_SECTION_TYPE "%progbits"
+#else
+#define STRUCTO_GDB_SECTION_TYPE "@progbits"
+#endif
+
 // clang-format off
 asm(
-    ".pushsection \".debug_gdb_scripts\", \"MS\",@progbits,1\n"
+    ".pushsection \".debug_gdb_scripts\", \"MS\"," STRUCTO_GDB_SECTION_TYPE ",1\n"
     ".byte 4\n" /* SECTION_SCRIPT_ID_PYTHON_TEXT */
     ".ascii \"structo-pretty-printers.py\\n# SPDX-FileCopyrightText: 2026 Jarosław Pelczar <jarek@jpelczar.com>\\n\"\n"
     ".ascii \"#\\n# SPDX-License-Identifier: BSD-2-Clause\\n\\n\\\"\\\"\\\"GDB pretty printers for the structo header-only li\"\n"
@@ -184,5 +192,7 @@ asm(
     ".popsection\n"
 );
 // clang-format on
+
+#undef STRUCTO_GDB_SECTION_TYPE
 
 #endif // defined(__clang__) || defined(__GNUC__)

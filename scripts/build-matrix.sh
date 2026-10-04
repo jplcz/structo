@@ -119,7 +119,7 @@ for entry in "${matrix[@]}"; do
     fi
 
     printf '\n==> Building %s / %s\n' "${name}" "${build_type}"
-    if ! cmake --build "${build_dir}"; then
+    if ! cmake --build "${build_dir}" -j"$(nproc)"; then
       failures+=("${name}/${build_type}: build")
       continue
     fi
@@ -127,7 +127,7 @@ for entry in "${matrix[@]}"; do
     if [[ "${run_tests}" == "ON" &&
           "${JPLCZ_STRUCTO_MATRIX_SKIP_TESTS:-0}" != "1" ]]; then
       printf '\n==> Testing %s / %s\n' "${name}" "${build_type}"
-      if ! ctest --test-dir "${build_dir}" --output-on-failure; then
+      if ! ctest --test-dir "${build_dir}" --output-on-failure -j"$(nproc)"; then
         failures+=("${name}/${build_type}: tests")
       fi
     fi

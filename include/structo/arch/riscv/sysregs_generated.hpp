@@ -23,11 +23,11 @@ namespace structo::arch::riscv::sysreg_raw {
 
 /** @brief Raw accessor for the RISC-V `cycle` CSR (address 0xc00; no named fields yet). */
 struct cycle {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static cycle read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc00" : "=r"(value));
     return cycle{value};
   }
@@ -37,11 +37,11 @@ struct cycle {
 
 /** @brief Raw accessor for the RISC-V `time` CSR (address 0xc01; no named fields yet). */
 struct time {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static time read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc01" : "=r"(value));
     return time{value};
   }
@@ -51,11 +51,11 @@ struct time {
 
 /** @brief Raw accessor for the RISC-V `instret` CSR (address 0xc02; no named fields yet). */
 struct instret {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static instret read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc02" : "=r"(value));
     return instret{value};
   }
@@ -65,11 +65,11 @@ struct instret {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter3` CSR (address 0xc03; no named fields yet). */
 struct hpmcounter3 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter3 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc03" : "=r"(value));
     return hpmcounter3{value};
   }
@@ -79,11 +79,11 @@ struct hpmcounter3 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter4` CSR (address 0xc04; no named fields yet). */
 struct hpmcounter4 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter4 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc04" : "=r"(value));
     return hpmcounter4{value};
   }
@@ -93,11 +93,11 @@ struct hpmcounter4 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter5` CSR (address 0xc05; no named fields yet). */
 struct hpmcounter5 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter5 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc05" : "=r"(value));
     return hpmcounter5{value};
   }
@@ -107,11 +107,11 @@ struct hpmcounter5 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter6` CSR (address 0xc06; no named fields yet). */
 struct hpmcounter6 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter6 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc06" : "=r"(value));
     return hpmcounter6{value};
   }
@@ -121,11 +121,11 @@ struct hpmcounter6 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter7` CSR (address 0xc07; no named fields yet). */
 struct hpmcounter7 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter7 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc07" : "=r"(value));
     return hpmcounter7{value};
   }
@@ -135,11 +135,11 @@ struct hpmcounter7 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter8` CSR (address 0xc08; no named fields yet). */
 struct hpmcounter8 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter8 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc08" : "=r"(value));
     return hpmcounter8{value};
   }
@@ -149,11 +149,11 @@ struct hpmcounter8 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter9` CSR (address 0xc09; no named fields yet). */
 struct hpmcounter9 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter9 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc09" : "=r"(value));
     return hpmcounter9{value};
   }
@@ -163,11 +163,11 @@ struct hpmcounter9 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter10` CSR (address 0xc0a; no named fields yet). */
 struct hpmcounter10 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter10 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc0a" : "=r"(value));
     return hpmcounter10{value};
   }
@@ -177,11 +177,11 @@ struct hpmcounter10 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter11` CSR (address 0xc0b; no named fields yet). */
 struct hpmcounter11 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter11 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc0b" : "=r"(value));
     return hpmcounter11{value};
   }
@@ -191,11 +191,11 @@ struct hpmcounter11 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter12` CSR (address 0xc0c; no named fields yet). */
 struct hpmcounter12 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter12 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc0c" : "=r"(value));
     return hpmcounter12{value};
   }
@@ -205,11 +205,11 @@ struct hpmcounter12 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter13` CSR (address 0xc0d; no named fields yet). */
 struct hpmcounter13 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter13 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc0d" : "=r"(value));
     return hpmcounter13{value};
   }
@@ -219,11 +219,11 @@ struct hpmcounter13 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter14` CSR (address 0xc0e; no named fields yet). */
 struct hpmcounter14 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter14 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc0e" : "=r"(value));
     return hpmcounter14{value};
   }
@@ -233,11 +233,11 @@ struct hpmcounter14 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter15` CSR (address 0xc0f; no named fields yet). */
 struct hpmcounter15 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter15 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc0f" : "=r"(value));
     return hpmcounter15{value};
   }
@@ -247,11 +247,11 @@ struct hpmcounter15 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter16` CSR (address 0xc10; no named fields yet). */
 struct hpmcounter16 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter16 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc10" : "=r"(value));
     return hpmcounter16{value};
   }
@@ -261,11 +261,11 @@ struct hpmcounter16 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter17` CSR (address 0xc11; no named fields yet). */
 struct hpmcounter17 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter17 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc11" : "=r"(value));
     return hpmcounter17{value};
   }
@@ -275,11 +275,11 @@ struct hpmcounter17 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter18` CSR (address 0xc12; no named fields yet). */
 struct hpmcounter18 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter18 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc12" : "=r"(value));
     return hpmcounter18{value};
   }
@@ -289,11 +289,11 @@ struct hpmcounter18 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter19` CSR (address 0xc13; no named fields yet). */
 struct hpmcounter19 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter19 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc13" : "=r"(value));
     return hpmcounter19{value};
   }
@@ -303,11 +303,11 @@ struct hpmcounter19 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter20` CSR (address 0xc14; no named fields yet). */
 struct hpmcounter20 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter20 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc14" : "=r"(value));
     return hpmcounter20{value};
   }
@@ -317,11 +317,11 @@ struct hpmcounter20 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter21` CSR (address 0xc15; no named fields yet). */
 struct hpmcounter21 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter21 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc15" : "=r"(value));
     return hpmcounter21{value};
   }
@@ -331,11 +331,11 @@ struct hpmcounter21 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter22` CSR (address 0xc16; no named fields yet). */
 struct hpmcounter22 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter22 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc16" : "=r"(value));
     return hpmcounter22{value};
   }
@@ -345,11 +345,11 @@ struct hpmcounter22 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter23` CSR (address 0xc17; no named fields yet). */
 struct hpmcounter23 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter23 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc17" : "=r"(value));
     return hpmcounter23{value};
   }
@@ -359,11 +359,11 @@ struct hpmcounter23 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter24` CSR (address 0xc18; no named fields yet). */
 struct hpmcounter24 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter24 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc18" : "=r"(value));
     return hpmcounter24{value};
   }
@@ -373,11 +373,11 @@ struct hpmcounter24 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter25` CSR (address 0xc19; no named fields yet). */
 struct hpmcounter25 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter25 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc19" : "=r"(value));
     return hpmcounter25{value};
   }
@@ -387,11 +387,11 @@ struct hpmcounter25 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter26` CSR (address 0xc1a; no named fields yet). */
 struct hpmcounter26 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter26 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc1a" : "=r"(value));
     return hpmcounter26{value};
   }
@@ -401,11 +401,11 @@ struct hpmcounter26 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter27` CSR (address 0xc1b; no named fields yet). */
 struct hpmcounter27 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter27 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc1b" : "=r"(value));
     return hpmcounter27{value};
   }
@@ -415,11 +415,11 @@ struct hpmcounter27 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter28` CSR (address 0xc1c; no named fields yet). */
 struct hpmcounter28 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter28 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc1c" : "=r"(value));
     return hpmcounter28{value};
   }
@@ -429,11 +429,11 @@ struct hpmcounter28 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter29` CSR (address 0xc1d; no named fields yet). */
 struct hpmcounter29 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter29 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc1d" : "=r"(value));
     return hpmcounter29{value};
   }
@@ -443,11 +443,11 @@ struct hpmcounter29 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter30` CSR (address 0xc1e; no named fields yet). */
 struct hpmcounter30 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter30 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc1e" : "=r"(value));
     return hpmcounter30{value};
   }
@@ -457,11 +457,11 @@ struct hpmcounter30 {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter31` CSR (address 0xc1f; no named fields yet). */
 struct hpmcounter31 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter31 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc1f" : "=r"(value));
     return hpmcounter31{value};
   }
@@ -471,11 +471,11 @@ struct hpmcounter31 {
 
 /** @brief Raw accessor for the RISC-V `cycleh` CSR (address 0xc80; no named fields yet). */
 struct cycleh {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static cycleh read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc80" : "=r"(value));
     return cycleh{value};
   }
@@ -485,11 +485,11 @@ struct cycleh {
 
 /** @brief Raw accessor for the RISC-V `timeh` CSR (address 0xc81; no named fields yet). */
 struct timeh {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static timeh read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc81" : "=r"(value));
     return timeh{value};
   }
@@ -499,11 +499,11 @@ struct timeh {
 
 /** @brief Raw accessor for the RISC-V `instreth` CSR (address 0xc82; no named fields yet). */
 struct instreth {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static instreth read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc82" : "=r"(value));
     return instreth{value};
   }
@@ -513,11 +513,11 @@ struct instreth {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter3_h` CSR (address 0xc83; no named fields yet). */
 struct hpmcounter3_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter3_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc83" : "=r"(value));
     return hpmcounter3_h{value};
   }
@@ -527,11 +527,11 @@ struct hpmcounter3_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter4_h` CSR (address 0xc84; no named fields yet). */
 struct hpmcounter4_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter4_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc84" : "=r"(value));
     return hpmcounter4_h{value};
   }
@@ -541,11 +541,11 @@ struct hpmcounter4_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter5_h` CSR (address 0xc85; no named fields yet). */
 struct hpmcounter5_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter5_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc85" : "=r"(value));
     return hpmcounter5_h{value};
   }
@@ -555,11 +555,11 @@ struct hpmcounter5_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter6_h` CSR (address 0xc86; no named fields yet). */
 struct hpmcounter6_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter6_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc86" : "=r"(value));
     return hpmcounter6_h{value};
   }
@@ -569,11 +569,11 @@ struct hpmcounter6_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter7_h` CSR (address 0xc87; no named fields yet). */
 struct hpmcounter7_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter7_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc87" : "=r"(value));
     return hpmcounter7_h{value};
   }
@@ -583,11 +583,11 @@ struct hpmcounter7_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter8_h` CSR (address 0xc88; no named fields yet). */
 struct hpmcounter8_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter8_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc88" : "=r"(value));
     return hpmcounter8_h{value};
   }
@@ -597,11 +597,11 @@ struct hpmcounter8_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter9_h` CSR (address 0xc89; no named fields yet). */
 struct hpmcounter9_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter9_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc89" : "=r"(value));
     return hpmcounter9_h{value};
   }
@@ -611,11 +611,11 @@ struct hpmcounter9_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter10_h` CSR (address 0xc8a; no named fields yet). */
 struct hpmcounter10_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter10_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc8a" : "=r"(value));
     return hpmcounter10_h{value};
   }
@@ -625,11 +625,11 @@ struct hpmcounter10_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter11_h` CSR (address 0xc8b; no named fields yet). */
 struct hpmcounter11_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter11_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc8b" : "=r"(value));
     return hpmcounter11_h{value};
   }
@@ -639,11 +639,11 @@ struct hpmcounter11_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter12_h` CSR (address 0xc8c; no named fields yet). */
 struct hpmcounter12_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter12_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc8c" : "=r"(value));
     return hpmcounter12_h{value};
   }
@@ -653,11 +653,11 @@ struct hpmcounter12_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter13_h` CSR (address 0xc8d; no named fields yet). */
 struct hpmcounter13_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter13_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc8d" : "=r"(value));
     return hpmcounter13_h{value};
   }
@@ -667,11 +667,11 @@ struct hpmcounter13_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter14_h` CSR (address 0xc8e; no named fields yet). */
 struct hpmcounter14_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter14_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc8e" : "=r"(value));
     return hpmcounter14_h{value};
   }
@@ -681,11 +681,11 @@ struct hpmcounter14_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter15_h` CSR (address 0xc8f; no named fields yet). */
 struct hpmcounter15_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter15_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc8f" : "=r"(value));
     return hpmcounter15_h{value};
   }
@@ -695,11 +695,11 @@ struct hpmcounter15_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter16_h` CSR (address 0xc90; no named fields yet). */
 struct hpmcounter16_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter16_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc90" : "=r"(value));
     return hpmcounter16_h{value};
   }
@@ -709,11 +709,11 @@ struct hpmcounter16_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter17_h` CSR (address 0xc91; no named fields yet). */
 struct hpmcounter17_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter17_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc91" : "=r"(value));
     return hpmcounter17_h{value};
   }
@@ -723,11 +723,11 @@ struct hpmcounter17_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter18_h` CSR (address 0xc92; no named fields yet). */
 struct hpmcounter18_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter18_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc92" : "=r"(value));
     return hpmcounter18_h{value};
   }
@@ -737,11 +737,11 @@ struct hpmcounter18_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter19_h` CSR (address 0xc93; no named fields yet). */
 struct hpmcounter19_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter19_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc93" : "=r"(value));
     return hpmcounter19_h{value};
   }
@@ -751,11 +751,11 @@ struct hpmcounter19_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter20_h` CSR (address 0xc94; no named fields yet). */
 struct hpmcounter20_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter20_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc94" : "=r"(value));
     return hpmcounter20_h{value};
   }
@@ -765,11 +765,11 @@ struct hpmcounter20_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter21_h` CSR (address 0xc95; no named fields yet). */
 struct hpmcounter21_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter21_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc95" : "=r"(value));
     return hpmcounter21_h{value};
   }
@@ -779,11 +779,11 @@ struct hpmcounter21_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter22_h` CSR (address 0xc96; no named fields yet). */
 struct hpmcounter22_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter22_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc96" : "=r"(value));
     return hpmcounter22_h{value};
   }
@@ -793,11 +793,11 @@ struct hpmcounter22_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter23_h` CSR (address 0xc97; no named fields yet). */
 struct hpmcounter23_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter23_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc97" : "=r"(value));
     return hpmcounter23_h{value};
   }
@@ -807,11 +807,11 @@ struct hpmcounter23_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter24_h` CSR (address 0xc98; no named fields yet). */
 struct hpmcounter24_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter24_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc98" : "=r"(value));
     return hpmcounter24_h{value};
   }
@@ -821,11 +821,11 @@ struct hpmcounter24_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter25_h` CSR (address 0xc99; no named fields yet). */
 struct hpmcounter25_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter25_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc99" : "=r"(value));
     return hpmcounter25_h{value};
   }
@@ -835,11 +835,11 @@ struct hpmcounter25_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter26_h` CSR (address 0xc9a; no named fields yet). */
 struct hpmcounter26_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter26_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc9a" : "=r"(value));
     return hpmcounter26_h{value};
   }
@@ -849,11 +849,11 @@ struct hpmcounter26_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter27_h` CSR (address 0xc9b; no named fields yet). */
 struct hpmcounter27_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter27_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc9b" : "=r"(value));
     return hpmcounter27_h{value};
   }
@@ -863,11 +863,11 @@ struct hpmcounter27_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter28_h` CSR (address 0xc9c; no named fields yet). */
 struct hpmcounter28_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter28_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc9c" : "=r"(value));
     return hpmcounter28_h{value};
   }
@@ -877,11 +877,11 @@ struct hpmcounter28_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter29_h` CSR (address 0xc9d; no named fields yet). */
 struct hpmcounter29_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter29_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc9d" : "=r"(value));
     return hpmcounter29_h{value};
   }
@@ -891,11 +891,11 @@ struct hpmcounter29_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter30_h` CSR (address 0xc9e; no named fields yet). */
 struct hpmcounter30_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter30_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc9e" : "=r"(value));
     return hpmcounter30_h{value};
   }
@@ -905,11 +905,11 @@ struct hpmcounter30_h {
 
 /** @brief Raw accessor for the RISC-V `hpmcounter31_h` CSR (address 0xc9f; no named fields yet). */
 struct hpmcounter31_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hpmcounter31_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc9f" : "=r"(value));
     return hpmcounter31_h{value};
   }
@@ -919,11 +919,11 @@ struct hpmcounter31_h {
 
 /** @brief Raw accessor for the RISC-V `sscountovf` CSR (address 0xda0; no named fields yet). */
 struct sscountovf {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static sscountovf read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xda0" : "=r"(value));
     return sscountovf{value};
   }
@@ -933,14 +933,14 @@ struct sscountovf {
 
 /** @brief Raw accessor for the RISC-V `sstatus` CSR (address 0x100; 5 named field(s)). */
 struct sstatus {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
   struct bits {
-    using sie = ::structo::arch::pte_bit_field<1, 1, unsigned long>;
-    using spie = ::structo::arch::pte_bit_field<5, 1, unsigned long>;
-    using spp = ::structo::arch::pte_bit_field<8, 1, unsigned long>;
-    using sum = ::structo::arch::pte_bit_field<18, 1, unsigned long>;
-    using mxr = ::structo::arch::pte_bit_field<19, 1, unsigned long>;
+    using sie = ::structo::arch::pte_bit_field<1, 1, std::uint64_t>;
+    using spie = ::structo::arch::pte_bit_field<5, 1, std::uint64_t>;
+    using spp = ::structo::arch::pte_bit_field<8, 1, std::uint64_t>;
+    using sum = ::structo::arch::pte_bit_field<18, 1, std::uint64_t>;
+    using mxr = ::structo::arch::pte_bit_field<19, 1, std::uint64_t>;
   };
 
   [[nodiscard]] constexpr bool sie() const noexcept { return bits::sie::test(raw); }
@@ -971,7 +971,7 @@ struct sstatus {
 
 #if defined(__riscv)
   [[nodiscard]] static sstatus read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x100" : "=r"(value));
     return sstatus{value};
   }
@@ -981,12 +981,12 @@ struct sstatus {
 
 /** @brief Raw accessor for the RISC-V `sie` CSR (address 0x104; 3 named field(s)). */
 struct sie {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
   struct bits {
-    using ssie = ::structo::arch::pte_bit_field<1, 1, unsigned long>;
-    using stie = ::structo::arch::pte_bit_field<5, 1, unsigned long>;
-    using seie = ::structo::arch::pte_bit_field<9, 1, unsigned long>;
+    using ssie = ::structo::arch::pte_bit_field<1, 1, std::uint64_t>;
+    using stie = ::structo::arch::pte_bit_field<5, 1, std::uint64_t>;
+    using seie = ::structo::arch::pte_bit_field<9, 1, std::uint64_t>;
   };
 
   [[nodiscard]] constexpr bool ssie() const noexcept { return bits::ssie::test(raw); }
@@ -1007,7 +1007,7 @@ struct sie {
 
 #if defined(__riscv)
   [[nodiscard]] static sie read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x104" : "=r"(value));
     return sie{value};
   }
@@ -1017,27 +1017,27 @@ struct sie {
 
 /** @brief Raw accessor for the RISC-V `stvec` CSR (address 0x105; 2 named field(s)). */
 struct stvec {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
   struct bits {
-    using mode = ::structo::arch::pte_bit_field<0, 2, unsigned long>;
-    using base = ::structo::arch::pte_bit_field<2, 62, unsigned long>;
+    using mode = ::structo::arch::pte_bit_field<0, 2, std::uint64_t>;
+    using base = ::structo::arch::pte_bit_field<2, 62, std::uint64_t>;
   };
 
-  [[nodiscard]] constexpr unsigned long mode() const noexcept { return bits::mode::get(raw); }
-  constexpr auto &set_mode(unsigned long value) noexcept {
+  [[nodiscard]] constexpr std::uint64_t mode() const noexcept { return bits::mode::get(raw); }
+  constexpr auto &set_mode(std::uint64_t value) noexcept {
     raw = bits::mode::set(raw, value);
     return *this;
   }
-  [[nodiscard]] constexpr unsigned long base() const noexcept { return bits::base::get(raw); }
-  constexpr auto &set_base(unsigned long value) noexcept {
+  [[nodiscard]] constexpr std::uint64_t base() const noexcept { return bits::base::get(raw); }
+  constexpr auto &set_base(std::uint64_t value) noexcept {
     raw = bits::base::set(raw, value);
     return *this;
   }
 
 #if defined(__riscv)
   [[nodiscard]] static stvec read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x105" : "=r"(value));
     return stvec{value};
   }
@@ -1047,11 +1047,11 @@ struct stvec {
 
 /** @brief Raw accessor for the RISC-V `scounteren` CSR (address 0x106; no named fields yet). */
 struct scounteren {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static scounteren read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x106" : "=r"(value));
     return scounteren{value};
   }
@@ -1061,11 +1061,11 @@ struct scounteren {
 
 /** @brief Raw accessor for the RISC-V `senvcfg` CSR (address 0x10a; no named fields yet). */
 struct senvcfg {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static senvcfg read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x10a" : "=r"(value));
     return senvcfg{value};
   }
@@ -1075,11 +1075,11 @@ struct senvcfg {
 
 /** @brief Raw accessor for the RISC-V `sstateen0` CSR (address 0x10c; no named fields yet). */
 struct sstateen0 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static sstateen0 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x10c" : "=r"(value));
     return sstateen0{value};
   }
@@ -1089,11 +1089,11 @@ struct sstateen0 {
 
 /** @brief Raw accessor for the RISC-V `sscratch` CSR (address 0x140; no named fields yet). */
 struct sscratch {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static sscratch read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x140" : "=r"(value));
     return sscratch{value};
   }
@@ -1103,11 +1103,11 @@ struct sscratch {
 
 /** @brief Raw accessor for the RISC-V `sepc` CSR (address 0x141; no named fields yet). */
 struct sepc {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static sepc read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x141" : "=r"(value));
     return sepc{value};
   }
@@ -1117,15 +1117,15 @@ struct sepc {
 
 /** @brief Raw accessor for the RISC-V `scause` CSR (address 0x142; 2 named field(s)). */
 struct scause {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
   struct bits {
-    using exception_code = ::structo::arch::pte_bit_field<0, 63, unsigned long>;
-    using interrupt = ::structo::arch::pte_bit_field<63, 1, unsigned long>;
+    using exception_code = ::structo::arch::pte_bit_field<0, 63, std::uint64_t>;
+    using interrupt = ::structo::arch::pte_bit_field<63, 1, std::uint64_t>;
   };
 
-  [[nodiscard]] constexpr unsigned long exception_code() const noexcept { return bits::exception_code::get(raw); }
-  constexpr auto &set_exception_code(unsigned long value) noexcept {
+  [[nodiscard]] constexpr std::uint64_t exception_code() const noexcept { return bits::exception_code::get(raw); }
+  constexpr auto &set_exception_code(std::uint64_t value) noexcept {
     raw = bits::exception_code::set(raw, value);
     return *this;
   }
@@ -1137,7 +1137,7 @@ struct scause {
 
 #if defined(__riscv)
   [[nodiscard]] static scause read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x142" : "=r"(value));
     return scause{value};
   }
@@ -1147,11 +1147,11 @@ struct scause {
 
 /** @brief Raw accessor for the RISC-V `stval` CSR (address 0x143; no named fields yet). */
 struct stval {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static stval read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x143" : "=r"(value));
     return stval{value};
   }
@@ -1161,12 +1161,12 @@ struct stval {
 
 /** @brief Raw accessor for the RISC-V `sip` CSR (address 0x144; 3 named field(s)). */
 struct sip {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
   struct bits {
-    using ssip = ::structo::arch::pte_bit_field<1, 1, unsigned long>;
-    using stip = ::structo::arch::pte_bit_field<5, 1, unsigned long>;
-    using seip = ::structo::arch::pte_bit_field<9, 1, unsigned long>;
+    using ssip = ::structo::arch::pte_bit_field<1, 1, std::uint64_t>;
+    using stip = ::structo::arch::pte_bit_field<5, 1, std::uint64_t>;
+    using seip = ::structo::arch::pte_bit_field<9, 1, std::uint64_t>;
   };
 
   [[nodiscard]] constexpr bool ssip() const noexcept { return bits::ssip::test(raw); }
@@ -1187,7 +1187,7 @@ struct sip {
 
 #if defined(__riscv)
   [[nodiscard]] static sip read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x144" : "=r"(value));
     return sip{value};
   }
@@ -1197,33 +1197,33 @@ struct sip {
 
 /** @brief Raw accessor for the RISC-V `satp` CSR (address 0x180; 3 named field(s)). */
 struct satp {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
   struct bits {
-    using ppn = ::structo::arch::pte_bit_field<0, 44, unsigned long>;
-    using asid = ::structo::arch::pte_bit_field<44, 16, unsigned long>;
-    using mode = ::structo::arch::pte_bit_field<60, 4, unsigned long>;
+    using ppn = ::structo::arch::pte_bit_field<0, 44, std::uint64_t>;
+    using asid = ::structo::arch::pte_bit_field<44, 16, std::uint64_t>;
+    using mode = ::structo::arch::pte_bit_field<60, 4, std::uint64_t>;
   };
 
-  [[nodiscard]] constexpr unsigned long ppn() const noexcept { return bits::ppn::get(raw); }
-  constexpr auto &set_ppn(unsigned long value) noexcept {
+  [[nodiscard]] constexpr std::uint64_t ppn() const noexcept { return bits::ppn::get(raw); }
+  constexpr auto &set_ppn(std::uint64_t value) noexcept {
     raw = bits::ppn::set(raw, value);
     return *this;
   }
-  [[nodiscard]] constexpr unsigned long asid() const noexcept { return bits::asid::get(raw); }
-  constexpr auto &set_asid(unsigned long value) noexcept {
+  [[nodiscard]] constexpr std::uint64_t asid() const noexcept { return bits::asid::get(raw); }
+  constexpr auto &set_asid(std::uint64_t value) noexcept {
     raw = bits::asid::set(raw, value);
     return *this;
   }
-  [[nodiscard]] constexpr unsigned long mode() const noexcept { return bits::mode::get(raw); }
-  constexpr auto &set_mode(unsigned long value) noexcept {
+  [[nodiscard]] constexpr std::uint64_t mode() const noexcept { return bits::mode::get(raw); }
+  constexpr auto &set_mode(std::uint64_t value) noexcept {
     raw = bits::mode::set(raw, value);
     return *this;
   }
 
 #if defined(__riscv)
   [[nodiscard]] static satp read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x180" : "=r"(value));
     return satp{value};
   }
@@ -1233,11 +1233,11 @@ struct satp {
 
 /** @brief Raw accessor for the RISC-V `stimecmp` CSR (address 0x14d; no named fields yet). */
 struct stimecmp {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static stimecmp read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x14d" : "=r"(value));
     return stimecmp{value};
   }
@@ -1247,11 +1247,11 @@ struct stimecmp {
 
 /** @brief Raw accessor for the RISC-V `stimecmph` CSR (address 0x15d; no named fields yet). */
 struct stimecmph {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static stimecmph read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x15d" : "=r"(value));
     return stimecmph{value};
   }
@@ -1261,11 +1261,11 @@ struct stimecmph {
 
 /** @brief Raw accessor for the RISC-V `siselect` CSR (address 0x150; no named fields yet). */
 struct siselect {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static siselect read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x150" : "=r"(value));
     return siselect{value};
   }
@@ -1275,11 +1275,11 @@ struct siselect {
 
 /** @brief Raw accessor for the RISC-V `sireg` CSR (address 0x151; no named fields yet). */
 struct sireg {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static sireg read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x151" : "=r"(value));
     return sireg{value};
   }
@@ -1289,11 +1289,11 @@ struct sireg {
 
 /** @brief Raw accessor for the RISC-V `stopei` CSR (address 0x15c; no named fields yet). */
 struct stopei {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static stopei read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x15c" : "=r"(value));
     return stopei{value};
   }
@@ -1303,11 +1303,11 @@ struct stopei {
 
 /** @brief Raw accessor for the RISC-V `stopi` CSR (address 0xdb0; no named fields yet). */
 struct stopi {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static stopi read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xdb0" : "=r"(value));
     return stopi{value};
   }
@@ -1317,11 +1317,11 @@ struct stopi {
 
 /** @brief Raw accessor for the RISC-V `sieh` CSR (address 0x114; no named fields yet). */
 struct sieh {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static sieh read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x114" : "=r"(value));
     return sieh{value};
   }
@@ -1331,11 +1331,11 @@ struct sieh {
 
 /** @brief Raw accessor for the RISC-V `siph` CSR (address 0x154; no named fields yet). */
 struct siph {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static siph read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x154" : "=r"(value));
     return siph{value};
   }
@@ -1345,11 +1345,11 @@ struct siph {
 
 /** @brief Raw accessor for the RISC-V `vsstatus` CSR (address 0x200; no named fields yet). */
 struct vsstatus {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vsstatus read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x200" : "=r"(value));
     return vsstatus{value};
   }
@@ -1359,11 +1359,11 @@ struct vsstatus {
 
 /** @brief Raw accessor for the RISC-V `vsie` CSR (address 0x204; no named fields yet). */
 struct vsie {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vsie read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x204" : "=r"(value));
     return vsie{value};
   }
@@ -1373,11 +1373,11 @@ struct vsie {
 
 /** @brief Raw accessor for the RISC-V `vstvec` CSR (address 0x205; no named fields yet). */
 struct vstvec {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vstvec read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x205" : "=r"(value));
     return vstvec{value};
   }
@@ -1387,11 +1387,11 @@ struct vstvec {
 
 /** @brief Raw accessor for the RISC-V `vsscratch` CSR (address 0x240; no named fields yet). */
 struct vsscratch {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vsscratch read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x240" : "=r"(value));
     return vsscratch{value};
   }
@@ -1401,11 +1401,11 @@ struct vsscratch {
 
 /** @brief Raw accessor for the RISC-V `vsepc` CSR (address 0x241; no named fields yet). */
 struct vsepc {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vsepc read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x241" : "=r"(value));
     return vsepc{value};
   }
@@ -1415,11 +1415,11 @@ struct vsepc {
 
 /** @brief Raw accessor for the RISC-V `vscause` CSR (address 0x242; no named fields yet). */
 struct vscause {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vscause read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x242" : "=r"(value));
     return vscause{value};
   }
@@ -1429,11 +1429,11 @@ struct vscause {
 
 /** @brief Raw accessor for the RISC-V `vstval` CSR (address 0x243; no named fields yet). */
 struct vstval {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vstval read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x243" : "=r"(value));
     return vstval{value};
   }
@@ -1443,11 +1443,11 @@ struct vstval {
 
 /** @brief Raw accessor for the RISC-V `vsip` CSR (address 0x244; no named fields yet). */
 struct vsip {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vsip read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x244" : "=r"(value));
     return vsip{value};
   }
@@ -1457,11 +1457,11 @@ struct vsip {
 
 /** @brief Raw accessor for the RISC-V `vsatp` CSR (address 0x280; no named fields yet). */
 struct vsatp {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vsatp read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x280" : "=r"(value));
     return vsatp{value};
   }
@@ -1471,11 +1471,11 @@ struct vsatp {
 
 /** @brief Raw accessor for the RISC-V `vstimecmp` CSR (address 0x24d; no named fields yet). */
 struct vstimecmp {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vstimecmp read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x24d" : "=r"(value));
     return vstimecmp{value};
   }
@@ -1485,11 +1485,11 @@ struct vstimecmp {
 
 /** @brief Raw accessor for the RISC-V `vstimecmph` CSR (address 0x25d; no named fields yet). */
 struct vstimecmph {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vstimecmph read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x25d" : "=r"(value));
     return vstimecmph{value};
   }
@@ -1499,11 +1499,11 @@ struct vstimecmph {
 
 /** @brief Raw accessor for the RISC-V `hstatus` CSR (address 0x600; no named fields yet). */
 struct hstatus {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hstatus read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x600" : "=r"(value));
     return hstatus{value};
   }
@@ -1513,11 +1513,11 @@ struct hstatus {
 
 /** @brief Raw accessor for the RISC-V `hedeleg` CSR (address 0x602; no named fields yet). */
 struct hedeleg {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hedeleg read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x602" : "=r"(value));
     return hedeleg{value};
   }
@@ -1527,11 +1527,11 @@ struct hedeleg {
 
 /** @brief Raw accessor for the RISC-V `hideleg` CSR (address 0x603; no named fields yet). */
 struct hideleg {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hideleg read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x603" : "=r"(value));
     return hideleg{value};
   }
@@ -1541,11 +1541,11 @@ struct hideleg {
 
 /** @brief Raw accessor for the RISC-V `hie` CSR (address 0x604; no named fields yet). */
 struct hie {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hie read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x604" : "=r"(value));
     return hie{value};
   }
@@ -1555,11 +1555,11 @@ struct hie {
 
 /** @brief Raw accessor for the RISC-V `htimedelta` CSR (address 0x605; no named fields yet). */
 struct htimedelta {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static htimedelta read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x605" : "=r"(value));
     return htimedelta{value};
   }
@@ -1569,11 +1569,11 @@ struct htimedelta {
 
 /** @brief Raw accessor for the RISC-V `hcounteren` CSR (address 0x606; no named fields yet). */
 struct hcounteren {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hcounteren read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x606" : "=r"(value));
     return hcounteren{value};
   }
@@ -1583,11 +1583,11 @@ struct hcounteren {
 
 /** @brief Raw accessor for the RISC-V `hgeie` CSR (address 0x607; no named fields yet). */
 struct hgeie {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hgeie read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x607" : "=r"(value));
     return hgeie{value};
   }
@@ -1597,11 +1597,11 @@ struct hgeie {
 
 /** @brief Raw accessor for the RISC-V `henvcfg` CSR (address 0x60a; no named fields yet). */
 struct henvcfg {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static henvcfg read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x60a" : "=r"(value));
     return henvcfg{value};
   }
@@ -1611,11 +1611,11 @@ struct henvcfg {
 
 /** @brief Raw accessor for the RISC-V `htimedeltah` CSR (address 0x615; no named fields yet). */
 struct htimedeltah {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static htimedeltah read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x615" : "=r"(value));
     return htimedeltah{value};
   }
@@ -1625,11 +1625,11 @@ struct htimedeltah {
 
 /** @brief Raw accessor for the RISC-V `henvcfgh` CSR (address 0x61a; no named fields yet). */
 struct henvcfgh {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static henvcfgh read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x61a" : "=r"(value));
     return henvcfgh{value};
   }
@@ -1639,11 +1639,11 @@ struct henvcfgh {
 
 /** @brief Raw accessor for the RISC-V `htval` CSR (address 0x643; no named fields yet). */
 struct htval {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static htval read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x643" : "=r"(value));
     return htval{value};
   }
@@ -1653,11 +1653,11 @@ struct htval {
 
 /** @brief Raw accessor for the RISC-V `hip` CSR (address 0x644; no named fields yet). */
 struct hip {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hip read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x644" : "=r"(value));
     return hip{value};
   }
@@ -1667,11 +1667,11 @@ struct hip {
 
 /** @brief Raw accessor for the RISC-V `hvip` CSR (address 0x645; no named fields yet). */
 struct hvip {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hvip read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x645" : "=r"(value));
     return hvip{value};
   }
@@ -1681,11 +1681,11 @@ struct hvip {
 
 /** @brief Raw accessor for the RISC-V `htinst` CSR (address 0x64a; no named fields yet). */
 struct htinst {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static htinst read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x64a" : "=r"(value));
     return htinst{value};
   }
@@ -1695,11 +1695,11 @@ struct htinst {
 
 /** @brief Raw accessor for the RISC-V `hgatp` CSR (address 0x680; no named fields yet). */
 struct hgatp {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hgatp read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x680" : "=r"(value));
     return hgatp{value};
   }
@@ -1709,11 +1709,11 @@ struct hgatp {
 
 /** @brief Raw accessor for the RISC-V `hgeip` CSR (address 0xe12; no named fields yet). */
 struct hgeip {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hgeip read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xe12" : "=r"(value));
     return hgeip{value};
   }
@@ -1723,11 +1723,11 @@ struct hgeip {
 
 /** @brief Raw accessor for the RISC-V `hvien` CSR (address 0x608; no named fields yet). */
 struct hvien {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hvien read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x608" : "=r"(value));
     return hvien{value};
   }
@@ -1737,11 +1737,11 @@ struct hvien {
 
 /** @brief Raw accessor for the RISC-V `hvictl` CSR (address 0x609; no named fields yet). */
 struct hvictl {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hvictl read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x609" : "=r"(value));
     return hvictl{value};
   }
@@ -1751,11 +1751,11 @@ struct hvictl {
 
 /** @brief Raw accessor for the RISC-V `hviprio1` CSR (address 0x646; no named fields yet). */
 struct hviprio1 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hviprio1 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x646" : "=r"(value));
     return hviprio1{value};
   }
@@ -1765,11 +1765,11 @@ struct hviprio1 {
 
 /** @brief Raw accessor for the RISC-V `hviprio2` CSR (address 0x647; no named fields yet). */
 struct hviprio2 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hviprio2 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x647" : "=r"(value));
     return hviprio2{value};
   }
@@ -1779,11 +1779,11 @@ struct hviprio2 {
 
 /** @brief Raw accessor for the RISC-V `vsiselect` CSR (address 0x250; no named fields yet). */
 struct vsiselect {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vsiselect read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x250" : "=r"(value));
     return vsiselect{value};
   }
@@ -1793,11 +1793,11 @@ struct vsiselect {
 
 /** @brief Raw accessor for the RISC-V `vsireg` CSR (address 0x251; no named fields yet). */
 struct vsireg {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vsireg read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x251" : "=r"(value));
     return vsireg{value};
   }
@@ -1807,11 +1807,11 @@ struct vsireg {
 
 /** @brief Raw accessor for the RISC-V `vstopei` CSR (address 0x25c; no named fields yet). */
 struct vstopei {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vstopei read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x25c" : "=r"(value));
     return vstopei{value};
   }
@@ -1821,11 +1821,11 @@ struct vstopei {
 
 /** @brief Raw accessor for the RISC-V `vstopi` CSR (address 0xeb0; no named fields yet). */
 struct vstopi {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vstopi read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xeb0" : "=r"(value));
     return vstopi{value};
   }
@@ -1835,11 +1835,11 @@ struct vstopi {
 
 /** @brief Raw accessor for the RISC-V `hidelegh` CSR (address 0x613; no named fields yet). */
 struct hidelegh {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hidelegh read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x613" : "=r"(value));
     return hidelegh{value};
   }
@@ -1849,11 +1849,11 @@ struct hidelegh {
 
 /** @brief Raw accessor for the RISC-V `hvienh` CSR (address 0x618; no named fields yet). */
 struct hvienh {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hvienh read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x618" : "=r"(value));
     return hvienh{value};
   }
@@ -1863,11 +1863,11 @@ struct hvienh {
 
 /** @brief Raw accessor for the RISC-V `hviph` CSR (address 0x655; no named fields yet). */
 struct hviph {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hviph read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x655" : "=r"(value));
     return hviph{value};
   }
@@ -1877,11 +1877,11 @@ struct hviph {
 
 /** @brief Raw accessor for the RISC-V `hviprio1_h` CSR (address 0x656; no named fields yet). */
 struct hviprio1_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hviprio1_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x656" : "=r"(value));
     return hviprio1_h{value};
   }
@@ -1891,11 +1891,11 @@ struct hviprio1_h {
 
 /** @brief Raw accessor for the RISC-V `hviprio2_h` CSR (address 0x657; no named fields yet). */
 struct hviprio2_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hviprio2_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x657" : "=r"(value));
     return hviprio2_h{value};
   }
@@ -1905,11 +1905,11 @@ struct hviprio2_h {
 
 /** @brief Raw accessor for the RISC-V `vsieh` CSR (address 0x214; no named fields yet). */
 struct vsieh {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vsieh read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x214" : "=r"(value));
     return vsieh{value};
   }
@@ -1919,11 +1919,11 @@ struct vsieh {
 
 /** @brief Raw accessor for the RISC-V `vsiph` CSR (address 0x254; no named fields yet). */
 struct vsiph {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vsiph read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x254" : "=r"(value));
     return vsiph{value};
   }
@@ -1933,11 +1933,11 @@ struct vsiph {
 
 /** @brief Raw accessor for the RISC-V `hstateen0` CSR (address 0x60c; no named fields yet). */
 struct hstateen0 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hstateen0 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x60c" : "=r"(value));
     return hstateen0{value};
   }
@@ -1947,11 +1947,11 @@ struct hstateen0 {
 
 /** @brief Raw accessor for the RISC-V `hstateen0_h` CSR (address 0x61c; no named fields yet). */
 struct hstateen0_h {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static hstateen0_h read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x61c" : "=r"(value));
     return hstateen0_h{value};
   }
@@ -1961,21 +1961,21 @@ struct hstateen0_h {
 
 /** @brief Raw accessor for the RISC-V `mstatus` CSR (address 0x300; 12 named field(s)). */
 struct mstatus {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
   struct bits {
-    using sie = ::structo::arch::pte_bit_field<1, 1, unsigned long>;
-    using mie = ::structo::arch::pte_bit_field<3, 1, unsigned long>;
-    using spie = ::structo::arch::pte_bit_field<5, 1, unsigned long>;
-    using mpie = ::structo::arch::pte_bit_field<7, 1, unsigned long>;
-    using spp = ::structo::arch::pte_bit_field<8, 1, unsigned long>;
-    using mpp = ::structo::arch::pte_bit_field<11, 2, unsigned long>;
-    using mprv = ::structo::arch::pte_bit_field<17, 1, unsigned long>;
-    using sum = ::structo::arch::pte_bit_field<18, 1, unsigned long>;
-    using mxr = ::structo::arch::pte_bit_field<19, 1, unsigned long>;
-    using tvm = ::structo::arch::pte_bit_field<20, 1, unsigned long>;
-    using tw = ::structo::arch::pte_bit_field<21, 1, unsigned long>;
-    using tsr = ::structo::arch::pte_bit_field<22, 1, unsigned long>;
+    using sie = ::structo::arch::pte_bit_field<1, 1, std::uint64_t>;
+    using mie = ::structo::arch::pte_bit_field<3, 1, std::uint64_t>;
+    using spie = ::structo::arch::pte_bit_field<5, 1, std::uint64_t>;
+    using mpie = ::structo::arch::pte_bit_field<7, 1, std::uint64_t>;
+    using spp = ::structo::arch::pte_bit_field<8, 1, std::uint64_t>;
+    using mpp = ::structo::arch::pte_bit_field<11, 2, std::uint64_t>;
+    using mprv = ::structo::arch::pte_bit_field<17, 1, std::uint64_t>;
+    using sum = ::structo::arch::pte_bit_field<18, 1, std::uint64_t>;
+    using mxr = ::structo::arch::pte_bit_field<19, 1, std::uint64_t>;
+    using tvm = ::structo::arch::pte_bit_field<20, 1, std::uint64_t>;
+    using tw = ::structo::arch::pte_bit_field<21, 1, std::uint64_t>;
+    using tsr = ::structo::arch::pte_bit_field<22, 1, std::uint64_t>;
   };
 
   [[nodiscard]] constexpr bool sie() const noexcept { return bits::sie::test(raw); }
@@ -2003,8 +2003,8 @@ struct mstatus {
     raw = bits::spp::set_bit(raw, value);
     return *this;
   }
-  [[nodiscard]] constexpr unsigned long mpp() const noexcept { return bits::mpp::get(raw); }
-  constexpr auto &set_mpp(unsigned long value) noexcept {
+  [[nodiscard]] constexpr std::uint64_t mpp() const noexcept { return bits::mpp::get(raw); }
+  constexpr auto &set_mpp(std::uint64_t value) noexcept {
     raw = bits::mpp::set(raw, value);
     return *this;
   }
@@ -2041,7 +2041,7 @@ struct mstatus {
 
 #if defined(__riscv)
   [[nodiscard]] static mstatus read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x300" : "=r"(value));
     return mstatus{value};
   }
@@ -2051,11 +2051,11 @@ struct mstatus {
 
 /** @brief Raw accessor for the RISC-V `misa` CSR (address 0x301; no named fields yet). */
 struct misa {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static misa read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x301" : "=r"(value));
     return misa{value};
   }
@@ -2065,11 +2065,11 @@ struct misa {
 
 /** @brief Raw accessor for the RISC-V `mideleg` CSR (address 0x303; no named fields yet). */
 struct mideleg {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static mideleg read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x303" : "=r"(value));
     return mideleg{value};
   }
@@ -2079,15 +2079,15 @@ struct mideleg {
 
 /** @brief Raw accessor for the RISC-V `mie` CSR (address 0x304; 6 named field(s)). */
 struct mie {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
   struct bits {
-    using ssie = ::structo::arch::pte_bit_field<1, 1, unsigned long>;
-    using msie = ::structo::arch::pte_bit_field<3, 1, unsigned long>;
-    using stie = ::structo::arch::pte_bit_field<5, 1, unsigned long>;
-    using mtie = ::structo::arch::pte_bit_field<7, 1, unsigned long>;
-    using seie = ::structo::arch::pte_bit_field<9, 1, unsigned long>;
-    using meie = ::structo::arch::pte_bit_field<11, 1, unsigned long>;
+    using ssie = ::structo::arch::pte_bit_field<1, 1, std::uint64_t>;
+    using msie = ::structo::arch::pte_bit_field<3, 1, std::uint64_t>;
+    using stie = ::structo::arch::pte_bit_field<5, 1, std::uint64_t>;
+    using mtie = ::structo::arch::pte_bit_field<7, 1, std::uint64_t>;
+    using seie = ::structo::arch::pte_bit_field<9, 1, std::uint64_t>;
+    using meie = ::structo::arch::pte_bit_field<11, 1, std::uint64_t>;
   };
 
   [[nodiscard]] constexpr bool ssie() const noexcept { return bits::ssie::test(raw); }
@@ -2123,7 +2123,7 @@ struct mie {
 
 #if defined(__riscv)
   [[nodiscard]] static mie read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x304" : "=r"(value));
     return mie{value};
   }
@@ -2133,27 +2133,27 @@ struct mie {
 
 /** @brief Raw accessor for the RISC-V `mtvec` CSR (address 0x305; 2 named field(s)). */
 struct mtvec {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
   struct bits {
-    using mode = ::structo::arch::pte_bit_field<0, 2, unsigned long>;
-    using base = ::structo::arch::pte_bit_field<2, 62, unsigned long>;
+    using mode = ::structo::arch::pte_bit_field<0, 2, std::uint64_t>;
+    using base = ::structo::arch::pte_bit_field<2, 62, std::uint64_t>;
   };
 
-  [[nodiscard]] constexpr unsigned long mode() const noexcept { return bits::mode::get(raw); }
-  constexpr auto &set_mode(unsigned long value) noexcept {
+  [[nodiscard]] constexpr std::uint64_t mode() const noexcept { return bits::mode::get(raw); }
+  constexpr auto &set_mode(std::uint64_t value) noexcept {
     raw = bits::mode::set(raw, value);
     return *this;
   }
-  [[nodiscard]] constexpr unsigned long base() const noexcept { return bits::base::get(raw); }
-  constexpr auto &set_base(unsigned long value) noexcept {
+  [[nodiscard]] constexpr std::uint64_t base() const noexcept { return bits::base::get(raw); }
+  constexpr auto &set_base(std::uint64_t value) noexcept {
     raw = bits::base::set(raw, value);
     return *this;
   }
 
 #if defined(__riscv)
   [[nodiscard]] static mtvec read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x305" : "=r"(value));
     return mtvec{value};
   }
@@ -2163,11 +2163,11 @@ struct mtvec {
 
 /** @brief Raw accessor for the RISC-V `menvcfg` CSR (address 0x30a; no named fields yet). */
 struct menvcfg {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static menvcfg read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x30a" : "=r"(value));
     return menvcfg{value};
   }
@@ -2177,11 +2177,11 @@ struct menvcfg {
 
 /** @brief Raw accessor for the RISC-V `menvcfgh` CSR (address 0x31a; no named fields yet). */
 struct menvcfgh {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static menvcfgh read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x31a" : "=r"(value));
     return menvcfgh{value};
   }
@@ -2191,11 +2191,11 @@ struct menvcfgh {
 
 /** @brief Raw accessor for the RISC-V `mscratch` CSR (address 0x340; no named fields yet). */
 struct mscratch {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static mscratch read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x340" : "=r"(value));
     return mscratch{value};
   }
@@ -2205,11 +2205,11 @@ struct mscratch {
 
 /** @brief Raw accessor for the RISC-V `mepc` CSR (address 0x341; no named fields yet). */
 struct mepc {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static mepc read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x341" : "=r"(value));
     return mepc{value};
   }
@@ -2219,15 +2219,15 @@ struct mepc {
 
 /** @brief Raw accessor for the RISC-V `mcause` CSR (address 0x342; 2 named field(s)). */
 struct mcause {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
   struct bits {
-    using exception_code = ::structo::arch::pte_bit_field<0, 63, unsigned long>;
-    using interrupt = ::structo::arch::pte_bit_field<63, 1, unsigned long>;
+    using exception_code = ::structo::arch::pte_bit_field<0, 63, std::uint64_t>;
+    using interrupt = ::structo::arch::pte_bit_field<63, 1, std::uint64_t>;
   };
 
-  [[nodiscard]] constexpr unsigned long exception_code() const noexcept { return bits::exception_code::get(raw); }
-  constexpr auto &set_exception_code(unsigned long value) noexcept {
+  [[nodiscard]] constexpr std::uint64_t exception_code() const noexcept { return bits::exception_code::get(raw); }
+  constexpr auto &set_exception_code(std::uint64_t value) noexcept {
     raw = bits::exception_code::set(raw, value);
     return *this;
   }
@@ -2239,7 +2239,7 @@ struct mcause {
 
 #if defined(__riscv)
   [[nodiscard]] static mcause read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x342" : "=r"(value));
     return mcause{value};
   }
@@ -2249,11 +2249,11 @@ struct mcause {
 
 /** @brief Raw accessor for the RISC-V `mtval` CSR (address 0x343; no named fields yet). */
 struct mtval {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static mtval read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x343" : "=r"(value));
     return mtval{value};
   }
@@ -2263,15 +2263,15 @@ struct mtval {
 
 /** @brief Raw accessor for the RISC-V `mip` CSR (address 0x344; 6 named field(s)). */
 struct mip {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
   struct bits {
-    using ssip = ::structo::arch::pte_bit_field<1, 1, unsigned long>;
-    using msip = ::structo::arch::pte_bit_field<3, 1, unsigned long>;
-    using stip = ::structo::arch::pte_bit_field<5, 1, unsigned long>;
-    using mtip = ::structo::arch::pte_bit_field<7, 1, unsigned long>;
-    using seip = ::structo::arch::pte_bit_field<9, 1, unsigned long>;
-    using meip = ::structo::arch::pte_bit_field<11, 1, unsigned long>;
+    using ssip = ::structo::arch::pte_bit_field<1, 1, std::uint64_t>;
+    using msip = ::structo::arch::pte_bit_field<3, 1, std::uint64_t>;
+    using stip = ::structo::arch::pte_bit_field<5, 1, std::uint64_t>;
+    using mtip = ::structo::arch::pte_bit_field<7, 1, std::uint64_t>;
+    using seip = ::structo::arch::pte_bit_field<9, 1, std::uint64_t>;
+    using meip = ::structo::arch::pte_bit_field<11, 1, std::uint64_t>;
   };
 
   [[nodiscard]] constexpr bool ssip() const noexcept { return bits::ssip::test(raw); }
@@ -2307,7 +2307,7 @@ struct mip {
 
 #if defined(__riscv)
   [[nodiscard]] static mip read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x344" : "=r"(value));
     return mip{value};
   }
@@ -2317,11 +2317,11 @@ struct mip {
 
 /** @brief Raw accessor for the RISC-V `pmpcfg0` CSR (address 0x3a0; no named fields yet). */
 struct pmpcfg0 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static pmpcfg0 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x3a0" : "=r"(value));
     return pmpcfg0{value};
   }
@@ -2331,11 +2331,11 @@ struct pmpcfg0 {
 
 /** @brief Raw accessor for the RISC-V `pmpaddr0` CSR (address 0x3b0; no named fields yet). */
 struct pmpaddr0 {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static pmpaddr0 read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x3b0" : "=r"(value));
     return pmpaddr0{value};
   }
@@ -2345,11 +2345,11 @@ struct pmpaddr0 {
 
 /** @brief Raw accessor for the RISC-V `mvendorid` CSR (address 0xf11; no named fields yet). */
 struct mvendorid {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static mvendorid read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xf11" : "=r"(value));
     return mvendorid{value};
   }
@@ -2359,11 +2359,11 @@ struct mvendorid {
 
 /** @brief Raw accessor for the RISC-V `marchid` CSR (address 0xf12; no named fields yet). */
 struct marchid {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static marchid read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xf12" : "=r"(value));
     return marchid{value};
   }
@@ -2373,11 +2373,11 @@ struct marchid {
 
 /** @brief Raw accessor for the RISC-V `mimpid` CSR (address 0xf13; no named fields yet). */
 struct mimpid {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static mimpid read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xf13" : "=r"(value));
     return mimpid{value};
   }
@@ -2387,11 +2387,11 @@ struct mimpid {
 
 /** @brief Raw accessor for the RISC-V `mhartid` CSR (address 0xf14; no named fields yet). */
 struct mhartid {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static mhartid read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xf14" : "=r"(value));
     return mhartid{value};
   }
@@ -2401,11 +2401,11 @@ struct mhartid {
 
 /** @brief Raw accessor for the RISC-V `miselect` CSR (address 0x350; no named fields yet). */
 struct miselect {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static miselect read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x350" : "=r"(value));
     return miselect{value};
   }
@@ -2415,11 +2415,11 @@ struct miselect {
 
 /** @brief Raw accessor for the RISC-V `mireg` CSR (address 0x351; no named fields yet). */
 struct mireg {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static mireg read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x351" : "=r"(value));
     return mireg{value};
   }
@@ -2429,11 +2429,11 @@ struct mireg {
 
 /** @brief Raw accessor for the RISC-V `mtopei` CSR (address 0x35c; no named fields yet). */
 struct mtopei {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static mtopei read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x35c" : "=r"(value));
     return mtopei{value};
   }
@@ -2443,11 +2443,11 @@ struct mtopei {
 
 /** @brief Raw accessor for the RISC-V `mtopi` CSR (address 0xfb0; no named fields yet). */
 struct mtopi {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static mtopi read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xfb0" : "=r"(value));
     return mtopi{value};
   }
@@ -2457,11 +2457,11 @@ struct mtopi {
 
 /** @brief Raw accessor for the RISC-V `mvien` CSR (address 0x308; no named fields yet). */
 struct mvien {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static mvien read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x308" : "=r"(value));
     return mvien{value};
   }
@@ -2471,11 +2471,11 @@ struct mvien {
 
 /** @brief Raw accessor for the RISC-V `mvip` CSR (address 0x309; no named fields yet). */
 struct mvip {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static mvip read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x309" : "=r"(value));
     return mvip{value};
   }
@@ -2485,11 +2485,11 @@ struct mvip {
 
 /** @brief Raw accessor for the RISC-V `midelegh` CSR (address 0x313; no named fields yet). */
 struct midelegh {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static midelegh read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x313" : "=r"(value));
     return midelegh{value};
   }
@@ -2499,11 +2499,11 @@ struct midelegh {
 
 /** @brief Raw accessor for the RISC-V `mieh` CSR (address 0x314; no named fields yet). */
 struct mieh {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static mieh read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x314" : "=r"(value));
     return mieh{value};
   }
@@ -2513,11 +2513,11 @@ struct mieh {
 
 /** @brief Raw accessor for the RISC-V `mvienh` CSR (address 0x318; no named fields yet). */
 struct mvienh {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static mvienh read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x318" : "=r"(value));
     return mvienh{value};
   }
@@ -2527,11 +2527,11 @@ struct mvienh {
 
 /** @brief Raw accessor for the RISC-V `mviph` CSR (address 0x319; no named fields yet). */
 struct mviph {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static mviph read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x319" : "=r"(value));
     return mviph{value};
   }
@@ -2541,11 +2541,11 @@ struct mviph {
 
 /** @brief Raw accessor for the RISC-V `miph` CSR (address 0x354; no named fields yet). */
 struct miph {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static miph read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x354" : "=r"(value));
     return miph{value};
   }
@@ -2555,11 +2555,11 @@ struct miph {
 
 /** @brief Raw accessor for the RISC-V `vstart` CSR (address 0x8; no named fields yet). */
 struct vstart {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vstart read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x8" : "=r"(value));
     return vstart{value};
   }
@@ -2569,11 +2569,11 @@ struct vstart {
 
 /** @brief Raw accessor for the RISC-V `vcsr` CSR (address 0xf; no named fields yet). */
 struct vcsr {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vcsr read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xf" : "=r"(value));
     return vcsr{value};
   }
@@ -2583,11 +2583,11 @@ struct vcsr {
 
 /** @brief Raw accessor for the RISC-V `vl` CSR (address 0xc20; no named fields yet). */
 struct vl {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vl read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc20" : "=r"(value));
     return vl{value};
   }
@@ -2597,11 +2597,11 @@ struct vl {
 
 /** @brief Raw accessor for the RISC-V `vtype` CSR (address 0xc21; no named fields yet). */
 struct vtype {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vtype read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc21" : "=r"(value));
     return vtype{value};
   }
@@ -2611,11 +2611,11 @@ struct vtype {
 
 /** @brief Raw accessor for the RISC-V `vlenb` CSR (address 0xc22; no named fields yet). */
 struct vlenb {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static vlenb read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0xc22" : "=r"(value));
     return vlenb{value};
   }
@@ -2625,11 +2625,11 @@ struct vlenb {
 
 /** @brief Raw accessor for the RISC-V `seed` CSR (address 0x15; no named fields yet). */
 struct seed {
-  unsigned long raw{0};
+  std::uint64_t raw{0};
 
 #if defined(__riscv)
   [[nodiscard]] static seed read() noexcept {
-    unsigned long value;
+    std::uint64_t value;
     asm volatile("csrr %0, 0x15" : "=r"(value));
     return seed{value};
   }
