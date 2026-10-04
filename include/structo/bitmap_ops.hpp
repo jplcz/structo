@@ -194,6 +194,122 @@ public:
   }
 
   // ---------------------------------------------------------------------------
+  // Range Operations (FreeBSD `bitstring.h`-style)
+  // ---------------------------------------------------------------------------
+
+  /** @brief Sets every bit in `[start, stop]`. Traps if `start > stop` or `stop >= size()`. */
+  void set_range(std::size_t start, std::size_t stop) noexcept {
+    bitmap_utils::set_range(derived().words(), derived().nbits(), start, stop);
+  }
+
+  /** @brief Fallible variant of `set_range()`. */
+  result<void> try_set_range(std::size_t start, std::size_t stop) noexcept {
+    return bitmap_utils::try_set_range(derived().words(), derived().nbits(), start, stop);
+  }
+
+  /** @brief `set_range()` without range-checking; UB if `start > stop` or the range doesn't fit. */
+  RELOCO_UNSAFE_BUFFER_USAGE void unsafe_set_range(std::size_t start, std::size_t stop) noexcept {
+    bitmap_utils::unsafe_set_range(derived().words(), start, stop);
+  }
+
+  /** @brief Clears every bit in `[start, stop]`. Traps if `start > stop` or `stop >= size()`. */
+  void clear_range(std::size_t start, std::size_t stop) noexcept {
+    bitmap_utils::clear_range(derived().words(), derived().nbits(), start, stop);
+  }
+
+  /** @brief Fallible variant of `clear_range()`. */
+  result<void> try_clear_range(std::size_t start, std::size_t stop) noexcept {
+    return bitmap_utils::try_clear_range(derived().words(), derived().nbits(), start, stop);
+  }
+
+  /** @brief `clear_range()` without range-checking; UB if `start > stop` or the range doesn't fit. */
+  RELOCO_UNSAFE_BUFFER_USAGE void unsafe_clear_range(std::size_t start, std::size_t stop) noexcept {
+    bitmap_utils::unsafe_clear_range(derived().words(), start, stop);
+  }
+
+  /** @brief Number of set bits in `[start, stop]`. Traps if `start > stop` or `stop >= size()`. */
+  [[nodiscard]] std::size_t count_range(std::size_t start, std::size_t stop) const noexcept {
+    return bitmap_utils::count_range(derived().words(), derived().nbits(), start, stop);
+  }
+
+  /** @brief Fallible variant of `count_range()`. */
+  [[nodiscard]] result<std::size_t> try_count_range(std::size_t start, std::size_t stop) const noexcept {
+    return bitmap_utils::try_count_range(derived().words(), derived().nbits(), start, stop);
+  }
+
+  /** @brief `count_range()` without range-checking; UB if `start > stop` or the range doesn't fit. */
+  [[nodiscard]] RELOCO_UNSAFE_BUFFER_USAGE std::size_t unsafe_count_range(std::size_t start,
+                                                                         std::size_t stop) const noexcept {
+    return bitmap_utils::unsafe_count_range(derived().words(), start, stop);
+  }
+
+  /** @brief `true` if every bit in `[start, stop]` is set. Traps if `start > stop` or `stop >= size()`. */
+  [[nodiscard]] bool all_set_in_range(std::size_t start, std::size_t stop) const noexcept {
+    return bitmap_utils::all_set_in_range(derived().words(), derived().nbits(), start, stop);
+  }
+
+  /** @brief Fallible variant of `all_set_in_range()`. */
+  [[nodiscard]] result<bool> try_all_set_in_range(std::size_t start, std::size_t stop) const noexcept {
+    return bitmap_utils::try_all_set_in_range(derived().words(), derived().nbits(), start, stop);
+  }
+
+  /** @brief `all_set_in_range()` without range-checking; UB if `start > stop` or the range doesn't fit. */
+  [[nodiscard]] RELOCO_UNSAFE_BUFFER_USAGE bool unsafe_all_set_in_range(std::size_t start,
+                                                                       std::size_t stop) const noexcept {
+    return bitmap_utils::unsafe_all_set_in_range(derived().words(), start, stop);
+  }
+
+  /** @brief `true` if every bit in `[start, stop]` is clear. Traps if `start > stop` or `stop >= size()`. */
+  [[nodiscard]] bool all_clear_in_range(std::size_t start, std::size_t stop) const noexcept {
+    return bitmap_utils::all_clear_in_range(derived().words(), derived().nbits(), start, stop);
+  }
+
+  /** @brief Fallible variant of `all_clear_in_range()`. */
+  [[nodiscard]] result<bool> try_all_clear_in_range(std::size_t start, std::size_t stop) const noexcept {
+    return bitmap_utils::try_all_clear_in_range(derived().words(), derived().nbits(), start, stop);
+  }
+
+  /** @brief `all_clear_in_range()` without range-checking; UB if `start > stop` or the range doesn't fit. */
+  [[nodiscard]] RELOCO_UNSAFE_BUFFER_USAGE bool unsafe_all_clear_in_range(std::size_t start,
+                                                                         std::size_t stop) const noexcept {
+    return bitmap_utils::unsafe_all_clear_in_range(derived().words(), start, stop);
+  }
+
+  /** @brief Lowest index at or after `start` where `size` consecutive CLEAR bits begin, if any. */
+  [[nodiscard]] reloco::optional<std::size_t> lowest_clear_run_from(std::size_t start, std::size_t size) const noexcept {
+    return bitmap_utils::lowest_clear_run_from(derived().words(), derived().nbits(), start, size);
+  }
+
+  /** @brief `lowest_clear_run_from()` starting at bit 0. */
+  [[nodiscard]] reloco::optional<std::size_t> lowest_clear_run(std::size_t size) const noexcept {
+    return bitmap_utils::lowest_clear_run(derived().words(), derived().nbits(), size);
+  }
+
+  /** @brief Lowest index at or after `start` where `size` consecutive SET bits begin, if any. */
+  [[nodiscard]] reloco::optional<std::size_t> lowest_set_run_from(std::size_t start, std::size_t size) const noexcept {
+    return bitmap_utils::lowest_set_run_from(derived().words(), derived().nbits(), start, size);
+  }
+
+  /** @brief `lowest_set_run_from()` starting at bit 0. */
+  [[nodiscard]] reloco::optional<std::size_t> lowest_set_run(std::size_t size) const noexcept {
+    return bitmap_utils::lowest_set_run(derived().words(), derived().nbits(), size);
+  }
+
+  /**
+   * @brief Finds the lowest run of `size` consecutive clear bits at or
+   * after `start` and sets all of them -- the contiguous-run counterpart
+   * to `find_and_set_from()`.
+   */
+  [[nodiscard]] reloco::optional<std::size_t> find_and_set_run_from(std::size_t start, std::size_t size) noexcept {
+    return bitmap_utils::find_and_set_run_from(derived().words(), derived().nbits(), start, size);
+  }
+
+  /** @brief `find_and_set_run_from()` starting at bit 0. */
+  [[nodiscard]] reloco::optional<std::size_t> find_and_set_run(std::size_t size) noexcept {
+    return bitmap_utils::find_and_set_run(derived().words(), derived().nbits(), size);
+  }
+
+  // ---------------------------------------------------------------------------
   // Atomic Operations (lock-free, GCC/Clang `__atomic_*` builtins)
   // ---------------------------------------------------------------------------
 

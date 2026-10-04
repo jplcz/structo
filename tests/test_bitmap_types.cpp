@@ -68,6 +68,27 @@ TEST(FixedBitmapTest, FindAndSetClaimsLowestFreeSlot) {
   EXPECT_TRUE(bm.test(2));
 }
 
+TEST(FixedBitmapTest, RangeOperationsSetClearCountAndFindRuns) {
+  fixed_bitmap<32> bm;
+  bm.set_range(4, 10);
+  EXPECT_TRUE(bm.all_set_in_range(4, 10));
+  EXPECT_EQ(bm.count_range(4, 10), 7u);
+
+  bm.clear_range(6, 8);
+  EXPECT_TRUE(bm.all_clear_in_range(6, 8));
+  EXPECT_FALSE(bm.all_set_in_range(4, 10));
+
+  bm.clear_all();
+  auto run = bm.find_and_set_run(5);
+  ASSERT_TRUE(run.has_value());
+  EXPECT_EQ(*run, 0u);
+  EXPECT_TRUE(bm.all_set_in_range(0, 4));
+
+  auto next_run = bm.lowest_clear_run_from(0, 3);
+  ASSERT_TRUE(next_run.has_value());
+  EXPECT_EQ(*next_run, 5u);
+}
+
 TEST(FixedBitmapTest, LowestClearFindsFreeSlot) {
   auto bm = fixed_bitmap<8>::filled();
   bm.clear(3);

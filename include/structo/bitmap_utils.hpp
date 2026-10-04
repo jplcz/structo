@@ -50,6 +50,27 @@
  * bool was_set = structo::bitmap_utils::test(bits, 200, 5);
  * auto free_slot = structo::bitmap_utils::lowest_clear(bits, 200); // "last free" scan
  * @endcode
+ *
+ * ## Range operations (`<sys/bitstring.h>`-style)
+ *
+ * Beyond single-bit access and whole-bitmap scans, `bitmap_utils` also
+ * provides FreeBSD `<sys/bitstring.h>`-flavored range operations:
+ * `set_range()`/`clear_range()` (`bit_nset()`/`bit_nclear()`),
+ * `count_range()`/`all_set_in_range()`/`all_clear_in_range()`
+ * (`bit_count()`/`bit_ntest()`), and `lowest_clear_run_from()`/
+ * `lowest_set_run_from()`/`find_and_set_run_from()`
+ * (`bit_ffc_area_at()`/`bit_ffs_area_at()`) for locating -- and
+ * atomically-with-respect-to-the-caller's-own-lock claiming -- a
+ * contiguous run of `size` consecutive bits, e.g. a multi-page-contiguous
+ * allocation out of a page-frame bitmap:
+ *
+ * @code
+ * // Find and claim 4 contiguous free page frames.
+ * auto run = structo::bitmap_utils::find_and_set_run(bits, 200, 4);
+ * if (run) {
+ *   std::size_t first_frame = *run; // frames [first_frame, first_frame + 4) are now set
+ * }
+ * @endcode
  */
 
 #include <atomic>
@@ -336,6 +357,253 @@ public:
   }
 
   // ---------------------------------------------------------------------------
+  // Range Operations (FreeBSD `bitstring.h`-style: bit_nset/bit_nclear/
+  // bit_ntest/bit_count/bit_ffc_area_at/bit_ffs_area_at)
+  // ---------------------------------------------------------------------------
+  //
+  // `[start, stop]` below is always INCLUSIVE of both endpoints, matching
+  // `<sys/bitstring.h>`'s own `bit_nset()`/`bit_nclear()`/`bit_ntest()`
+  // convention (rather than this library's usual half-open `[start, nbits)`
+  // scan convention), since that is the natural way to describe "a run of
+  // bits" once both ends are already known -- the "first contiguous run of
+  // at least `size` bits" finders below stay half-open/`size`-based instead,
+  // for the same reason `bit_ffc_area_at()`/`bit_ffs_area_at()` are.
+
+  /** @brief Sets every bit in `[start, stop]`. Traps if `start > stop` or `stop >= nbits`. */
+  static void set_range(span<unsigned long> words, std::size_t nbits, std::size_t start, std::size_t stop) noexcept {
+    RELOCO_ASSERT(start <= stop && stop < nbits, "bitmap_utils: set_range() range out of bounds");
+    unsafe_set_range(words, start, stop);
+  }
+
+  /** @brief Fallible variant of `set_range()`. */
+  static result<void> try_set_range(span<unsigned long> words, std::size_t nbits, std::size_t start,
+                                    std::size_t stop) noexcept {
+    if (start > stop || stop >= nbits) {
+      return unexpected(error::out_of_range);
+    }
+    unsafe_set_range(words, start, stop);
+    return {};
+  }
+
+  /** @brief Sets every bit in `[start, stop]` without range-checking; UB if `start > stop` or the range doesn't fit in `words`. */
+  RELOCO_UNSAFE_BUFFER_USAGE static void unsafe_set_range(span<unsigned long> words, std::size_t start,
+                                                          std::size_t stop) noexcept {
+    const std::size_t first_word = start / bits_per_word;
+    const std::size_t last_word = stop / bits_per_word;
+    if (first_word == last_word) {
+      words.unsafe_at(first_word) |= range_mask_(start % bits_per_word, stop % bits_per_word);
+      return;
+    }
+    words.unsafe_at(first_word) |= range_mask_(start % bits_per_word, bits_per_word - 1);
+    for (std::size_t w = first_word + 1; w < last_word; ++w) {
+      words.unsafe_at(w) = ~0ul;
+    }
+    words.unsafe_at(last_word) |= range_mask_(0, stop % bits_per_word);
+  }
+
+  /** @brief Clears every bit in `[start, stop]`. Traps if `start > stop` or `stop >= nbits`. */
+  static void clear_range(span<unsigned long> words, std::size_t nbits, std::size_t start,
+                          std::size_t stop) noexcept {
+    RELOCO_ASSERT(start <= stop && stop < nbits, "bitmap_utils: clear_range() range out of bounds");
+    unsafe_clear_range(words, start, stop);
+  }
+
+  /** @brief Fallible variant of `clear_range()`. */
+  static result<void> try_clear_range(span<unsigned long> words, std::size_t nbits, std::size_t start,
+                                      std::size_t stop) noexcept {
+    if (start > stop || stop >= nbits) {
+      return unexpected(error::out_of_range);
+    }
+    unsafe_clear_range(words, start, stop);
+    return {};
+  }
+
+  /** @brief Clears every bit in `[start, stop]` without range-checking; UB if `start > stop` or the range doesn't fit in `words`. */
+  RELOCO_UNSAFE_BUFFER_USAGE static void unsafe_clear_range(span<unsigned long> words, std::size_t start,
+                                                            std::size_t stop) noexcept {
+    const std::size_t first_word = start / bits_per_word;
+    const std::size_t last_word = stop / bits_per_word;
+    if (first_word == last_word) {
+      words.unsafe_at(first_word) &= ~range_mask_(start % bits_per_word, stop % bits_per_word);
+      return;
+    }
+    words.unsafe_at(first_word) &= ~range_mask_(start % bits_per_word, bits_per_word - 1);
+    for (std::size_t w = first_word + 1; w < last_word; ++w) {
+      words.unsafe_at(w) = 0;
+    }
+    words.unsafe_at(last_word) &= ~range_mask_(0, stop % bits_per_word);
+  }
+
+  /** @brief Number of set bits in `[start, stop]`. Traps if `start > stop` or `stop >= nbits`. */
+  [[nodiscard]] static std::size_t count_range(span<const unsigned long> words, std::size_t nbits, std::size_t start,
+                                               std::size_t stop) noexcept {
+    RELOCO_ASSERT(start <= stop && stop < nbits, "bitmap_utils: count_range() range out of bounds");
+    return unsafe_count_range(words, start, stop);
+  }
+
+  /** @brief Fallible variant of `count_range()`. */
+  [[nodiscard]] static result<std::size_t> try_count_range(span<const unsigned long> words, std::size_t nbits,
+                                                           std::size_t start, std::size_t stop) noexcept {
+    if (start > stop || stop >= nbits) {
+      return unexpected(error::out_of_range);
+    }
+    return unsafe_count_range(words, start, stop);
+  }
+
+  /** @brief `count_range()` without range-checking; UB if `start > stop` or the range doesn't fit in `words`. */
+  [[nodiscard]] RELOCO_UNSAFE_BUFFER_USAGE static std::size_t
+  unsafe_count_range(span<const unsigned long> words, std::size_t start, std::size_t stop) noexcept {
+    const std::size_t first_word = start / bits_per_word;
+    const std::size_t last_word = stop / bits_per_word;
+    if (first_word == last_word) {
+      return static_cast<std::size_t>(
+          __builtin_popcountl(words.unsafe_at(first_word) & range_mask_(start % bits_per_word, stop % bits_per_word)));
+    }
+    std::size_t total = static_cast<std::size_t>(
+        __builtin_popcountl(words.unsafe_at(first_word) & range_mask_(start % bits_per_word, bits_per_word - 1)));
+    for (std::size_t w = first_word + 1; w < last_word; ++w) {
+      total += static_cast<std::size_t>(__builtin_popcountl(words.unsafe_at(w)));
+    }
+    total +=
+        static_cast<std::size_t>(__builtin_popcountl(words.unsafe_at(last_word) & range_mask_(0, stop % bits_per_word)));
+    return total;
+  }
+
+  /** @brief `true` if every bit in `[start, stop]` is set. Traps if `start > stop` or `stop >= nbits`. */
+  [[nodiscard]] static bool all_set_in_range(span<const unsigned long> words, std::size_t nbits, std::size_t start,
+                                             std::size_t stop) noexcept {
+    return count_range(words, nbits, start, stop) == (stop - start + 1);
+  }
+
+  /** @brief Fallible variant of `all_set_in_range()`. */
+  [[nodiscard]] static result<bool> try_all_set_in_range(span<const unsigned long> words, std::size_t nbits,
+                                                         std::size_t start, std::size_t stop) noexcept {
+    auto n = try_count_range(words, nbits, start, stop);
+    if (!n) {
+      return unexpected(n.error());
+    }
+    return *n == (stop - start + 1);
+  }
+
+  /** @brief `all_set_in_range()` without range-checking; UB if `start > stop` or the range doesn't fit in `words`. */
+  [[nodiscard]] RELOCO_UNSAFE_BUFFER_USAGE static bool
+  unsafe_all_set_in_range(span<const unsigned long> words, std::size_t start, std::size_t stop) noexcept {
+    return unsafe_count_range(words, start, stop) == (stop - start + 1);
+  }
+
+  /** @brief `true` if every bit in `[start, stop]` is clear. Traps if `start > stop` or `stop >= nbits`. */
+  [[nodiscard]] static bool all_clear_in_range(span<const unsigned long> words, std::size_t nbits, std::size_t start,
+                                               std::size_t stop) noexcept {
+    return count_range(words, nbits, start, stop) == 0;
+  }
+
+  /** @brief Fallible variant of `all_clear_in_range()`. */
+  [[nodiscard]] static result<bool> try_all_clear_in_range(span<const unsigned long> words, std::size_t nbits,
+                                                           std::size_t start, std::size_t stop) noexcept {
+    auto n = try_count_range(words, nbits, start, stop);
+    if (!n) {
+      return unexpected(n.error());
+    }
+    return *n == 0;
+  }
+
+  /** @brief `all_clear_in_range()` without range-checking; UB if `start > stop` or the range doesn't fit in `words`. */
+  [[nodiscard]] RELOCO_UNSAFE_BUFFER_USAGE static bool
+  unsafe_all_clear_in_range(span<const unsigned long> words, std::size_t start, std::size_t stop) noexcept {
+    return unsafe_count_range(words, start, stop) == 0;
+  }
+
+  /**
+   * @brief Lowest index at or after `start` where `size` consecutive CLEAR
+   * bits begin (all within `[0, nbits)`), if any -- the "find a
+   * contiguous free run" scan `bit_ffc_area_at()` provides, e.g. for a
+   * multi-page-contiguous allocation out of a page-frame bitmap. A
+   * `size == 0` request trivially matches at `start` itself (if
+   * `start <= nbits`).
+   */
+  [[nodiscard]] static reloco::optional<std::size_t>
+  lowest_clear_run_from(span<const unsigned long> words, std::size_t nbits, std::size_t start,
+                        std::size_t size) noexcept {
+    if (size == 0) {
+      return start <= nbits ? reloco::optional<std::size_t>(start) : reloco::nullopt;
+    }
+    if (start + size > nbits) {
+      return reloco::nullopt;
+    }
+    std::size_t candidate = start;
+    while (candidate + size <= nbits) {
+      // Any set bit strictly inside [candidate, candidate + size) blocks
+      // this candidate; jump straight past it rather than re-testing bit
+      // by bit (mirrors bit_ffc_area_at_()'s own word-skipping shape).
+      auto obstruction = lowest_set_from(words, candidate + size, candidate);
+      if (!obstruction.has_value()) {
+        return candidate;
+      }
+      candidate = *obstruction + 1;
+    }
+    return reloco::nullopt;
+  }
+
+  /** @brief `lowest_clear_run_from()` starting at bit 0. */
+  [[nodiscard]] static reloco::optional<std::size_t> lowest_clear_run(span<const unsigned long> words,
+                                                                      std::size_t nbits, std::size_t size) noexcept {
+    return lowest_clear_run_from(words, nbits, 0, size);
+  }
+
+  /**
+   * @brief Lowest index at or after `start` where `size` consecutive SET
+   * bits begin, if any -- the inverse of `lowest_clear_run_from()`
+   * (`bit_ffs_area_at()`).
+   */
+  [[nodiscard]] static reloco::optional<std::size_t>
+  lowest_set_run_from(span<const unsigned long> words, std::size_t nbits, std::size_t start,
+                      std::size_t size) noexcept {
+    if (size == 0) {
+      return start <= nbits ? reloco::optional<std::size_t>(start) : reloco::nullopt;
+    }
+    if (start + size > nbits) {
+      return reloco::nullopt;
+    }
+    std::size_t candidate = start;
+    while (candidate + size <= nbits) {
+      auto obstruction = lowest_clear_from(words, candidate + size, candidate);
+      if (!obstruction.has_value()) {
+        return candidate;
+      }
+      candidate = *obstruction + 1;
+    }
+    return reloco::nullopt;
+  }
+
+  /** @brief `lowest_set_run_from()` starting at bit 0. */
+  [[nodiscard]] static reloco::optional<std::size_t> lowest_set_run(span<const unsigned long> words, std::size_t nbits,
+                                                                    std::size_t size) noexcept {
+    return lowest_set_run_from(words, nbits, 0, size);
+  }
+
+  /**
+   * @brief Non-atomic "find the lowest run of `size` consecutive clear
+   * bits at or after `start` and set all of them" -- the contiguous-run
+   * counterpart to `find_and_set_from()`, for callers already holding
+   * whatever lock protects `words`.
+   */
+  [[nodiscard]] static reloco::optional<std::size_t> find_and_set_run_from(span<unsigned long> words,
+                                                                           std::size_t nbits, std::size_t start,
+                                                                           std::size_t size) noexcept {
+    auto pos = lowest_clear_run_from(words, nbits, start, size);
+    if (pos.has_value() && size > 0) {
+      unsafe_set_range(words, pos.value(), pos.value() + size - 1);
+    }
+    return pos;
+  }
+
+  /** @brief `find_and_set_run_from()` starting at bit 0. */
+  [[nodiscard]] static reloco::optional<std::size_t> find_and_set_run(span<unsigned long> words, std::size_t nbits,
+                                                                      std::size_t size) noexcept {
+    return find_and_set_run_from(words, nbits, 0, size);
+  }
+
+  // ---------------------------------------------------------------------------
   // Atomic Operations (lock-free, GCC/Clang `__atomic_*` builtins)
   // ---------------------------------------------------------------------------
   //
@@ -587,6 +855,21 @@ public:
   }
 
 private:
+  /**
+   * @brief Mask covering bits `[start_offset, stop_offset]` (both
+   * inclusive, both already local bit offsets within a single word --
+   * i.e. each `< bits_per_word`) -- the single-word building block
+   * `unsafe_set_range()`/`unsafe_clear_range()`/`unsafe_count_range()`
+   * compose across multiple words, mirroring `<sys/bitstring.h>`'s own
+   * `_bit_make_mask()`.
+   */
+  [[nodiscard]] static constexpr unsigned long range_mask_(std::size_t start_offset,
+                                                           std::size_t stop_offset) noexcept {
+    const unsigned long low = ~0ul << start_offset;
+    const unsigned long high = (stop_offset + 1 == bits_per_word) ? ~0ul : ((1ul << (stop_offset + 1)) - 1);
+    return low & high;
+  }
+
   // GCC/Clang's `__atomic_*` builtins take a plain `int` memory-order
   // constant (`__ATOMIC_RELAXED`, ...); both compilers' `std::memory_order`
   // enumerators are defined with exactly these same underlying values
