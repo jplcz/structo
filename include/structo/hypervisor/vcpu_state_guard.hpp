@@ -42,8 +42,8 @@
  *   `R15`, aside from `RSP`) are not part of the VMCS at all**. Software
  *   must save the host's GPRs and load the guest's immediately around
  *   `VMLAUNCH`/`VMRESUME`, and reverse that on the VM-exit that follows
- *   -- exactly what KVM's `__vmx_vcpu_run` assembly stub does by hand
- *   for every entry.
+ *   -- a hand-written assembly stub's job on every entry, not something
+ *   the VMCS itself ever automates.
  * - **AMD SVM**: `VMRUN` is broader -- its VMCB save-state area does
  *   cover `RAX`, `RSP`, `RIP`, `RFLAGS`, and control/segment state -- but
  *   the *other* GPRs (`RBX`, `RCX`, `RDX`, `RSI`, `RDI`, `RBP`, `R8`-

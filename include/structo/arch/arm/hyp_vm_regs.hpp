@@ -6,12 +6,16 @@
 /** @file hyp_vm_regs.hpp
  * @brief AArch32 (ARMv7-A Virtualization Extensions) hypervisor VM
  * system-register sets: the system registers a type-2 hypervisor must
- * save on VM exit and restore before VM entry -- *system registers
- * only*, never general-purpose registers (`R0`-`R12`, banked
- * `SP`/`LR`), which live in the trap frame built on Hyp-mode entry, not
- * here.
+ * save on VM exit and restore before VM entry -- plus the handful of
+ * *banked* registers (`SP`/`LR` of every other exception mode, FIQ's
+ * extra `R8`-`R12`, `SP_usr`, `ELR_hyp`) that, unlike the currently-
+ * interrupted mode's own `R0`-`R12`/`SP`/`LR` (captured in the GPR trap
+ * frame built on Hyp-mode entry, out of scope here), cannot be reached
+ * from Hyp mode by a plain register read at all -- only via the
+ * ARMv7VE banked-register transfer instruction, exactly like this
+ * header's other, more obviously "system register" groups.
  *
- * Three groups, each a flat struct of `sysreg_raw::*` members plus
+ * Four groups, each a flat struct of `sysreg_raw::*` members plus
  * `save()`/`restore()`:
  *
  * - `vm_guest_state`: the guest's own privileged-mode control state
@@ -21,20 +25,26 @@
  *   virtualization-control state for this VM (`HCR`, `VTTBR`, `VTCR`,
  *   `HCPTR`, ...) -- not banked by hardware, so the hypervisor tracks
  *   one copy per VM and reloads it on every world switch.
- * - `vm_banked_spsrs`: the guest's banked `SPSR_svc`/`SPSR_abt`/
- *   `SPSR_und`/`SPSR_irq`/`SPSR_fiq` -- the saved-CPSR of whichever
- *   guest exception mode was interrupted when the VM exited, read/
- *   written from Hyp mode via the ARMv7VE *banked-register transfer*
- *   instruction (`MRS`/`MSR <Rd>, SPSR_<mode>`), **not** by switching
- *   into each mode with `CPS` (unsafe/undefined from Hyp for some
- *   modes) and **not** the AArch64 EL2 mnemonic form (`mrs x0,
- *   spsr_irq`), which does not exist on ARMv7 and traps as an
- *   undefined instruction -- see `sysreg_raw::spsr_svc` and friends in
- *   `sysregs_generated.hpp` for exactly where that distinction is
- *   implemented (the `banked` encoding kind, gated by `.arch_extension
- *   virt` emitted locally per asm block).
+ * - `vm_banked_state`: everything only reachable via the ARMv7VE
+ *   *banked-register transfer* instruction (`MRS`/`MSR <Rd>,
+ *   <banked_reg>`) -- the current mode's `SPSR` and the guest's exit
+ *   PC (`ELR_hyp`), every other mode's banked `SP`/`LR`/`SPSR`
+ *   (`SVC`/`ABT`/`UND`/`IRQ`), FIQ's additionally-banked `R8`-`R12`,
+ *   and `SP_usr`. **Not** reachable by switching into each mode with
+ *   `CPS` (unsafe/undefined from Hyp for some modes) and **not** the
+ *   AArch64 EL2 mnemonic form (`mrs x0, spsr_irq`), which does not
+ *   exist on ARMv7 and traps as an undefined instruction -- see
+ *   `sysreg_raw::spsr_svc` and friends in `sysregs_generated.hpp` for
+ *   exactly where that distinction is implemented (the `banked`
+ *   encoding kind, gated by `.arch_extension virt` emitted locally per
+ *   asm block).
  * - `vm_sysreg_state`: all three groups together, the full per-VM
- *   sysreg set a VM-exit/VM-entry path saves/restores as a unit.
+ *   register set a VM-exit/VM-entry path saves/restores as a unit.
+ * - `vcpu_sysreg_traits`: a `structo::hypervisor::vcpu_entry_guard<Traits>`
+ *   (and `structo::arch::world_switch_guard<Traits>`) policy wrapping
+ *   `vm_sysreg_state` as a single register group, so a vCPU's full
+ *   CP15/Hyp-mode/banked register set can be entered/exited with one
+ *   guard instead of hand-calling `save()`/`restore()`.
  *
  * Only compiled on a real 32-bit ARM target (`__arm__` without
  * `__aarch64__`); on every other host this header is an intentional
@@ -255,58 +265,133 @@ struct vm_hyp_control_state {
 };
 
 /**
- * @brief The guest's banked per-mode `SPSR`s, read/written from Hyp
- * mode via the ARMv7VE banked-register transfer instruction -- the
- * only architecturally correct way to reach another mode's `SPSR`
+ * @brief The guest's banked-register-transfer-only state: the current
+ * mode's `SPSR` and the guest's exit PC (`ELR_hyp`), plus every other
+ * exception mode's banked `SP`/`LR`/`SPSR` (and FIQ's additionally-
+ * banked `R8`-`R12`) and `SP_usr` -- all of it read/written from Hyp
+ * mode via the ARMv7VE banked-register transfer instruction, the only
+ * architecturally correct way to reach another mode's banked state
  * without switching into it. Switching mode with `CPS` to read, say,
- * `SPSR_irq` is not a safe substitute from Hyp mode, and the AArch64
- * EL2 mnemonic (`mrs x0, spsr_irq`) is not a valid ARMv7 instruction at
+ * `SP_irq`, is not a safe substitute from Hyp mode, and the AArch64 EL2
+ * mnemonic form (`mrs x0, spsr_irq`) is not a valid ARMv7 instruction at
  * all (undefined-instruction trap) -- see `sysreg_raw::spsr_svc` et al.
+ * On a real trap-entry path these registers are *not* part of the GPR
+ * trap frame (the trap frame only captures the mode that was actually
+ * interrupted), so they need this same banked-register-transfer
+ * mechanism, not a plain GPR save, to reach them from Hyp mode.
  */
-struct vm_banked_spsrs {
+struct vm_banked_state {
+  sysreg_raw::sp_usr sp_usr{};
+  sysreg_raw::elr_hyp elr_hyp{}; // guest PC at the point of the trap into Hyp mode
+  sysreg_raw::spsr spsr{};       // guest CPSR at the point of the trap into Hyp mode
+  sysreg_raw::sp_svc sp_svc{};
+  sysreg_raw::lr_svc lr_svc{};
   sysreg_raw::spsr_svc spsr_svc{};
+  sysreg_raw::sp_abt sp_abt{};
+  sysreg_raw::lr_abt lr_abt{};
   sysreg_raw::spsr_abt spsr_abt{};
+  sysreg_raw::sp_und sp_und{};
+  sysreg_raw::lr_und lr_und{};
   sysreg_raw::spsr_und spsr_und{};
+  sysreg_raw::sp_irq sp_irq{};
+  sysreg_raw::lr_irq lr_irq{};
   sysreg_raw::spsr_irq spsr_irq{};
+  sysreg_raw::r8_fiq r8_fiq{};
+  sysreg_raw::r9_fiq r9_fiq{};
+  sysreg_raw::r10_fiq r10_fiq{};
+  sysreg_raw::r11_fiq r11_fiq{};
+  sysreg_raw::r12_fiq r12_fiq{};
+  sysreg_raw::sp_fiq sp_fiq{};
+  sysreg_raw::lr_fiq lr_fiq{};
   sysreg_raw::spsr_fiq spsr_fiq{};
 
-  /** @brief Read every banked `SPSR` via the Virtualization-Extensions banked-register transfer instruction. */
-  [[nodiscard]] static vm_banked_spsrs save() noexcept {
-    vm_banked_spsrs s{};
+  /** @brief Read every banked register via the Virtualization-Extensions banked-register transfer instruction. */
+  [[nodiscard]] static vm_banked_state save() noexcept {
+    vm_banked_state s{};
+    s.sp_usr = sysreg_raw::sp_usr::read();
+    s.elr_hyp = sysreg_raw::elr_hyp::read();
+    s.spsr = sysreg_raw::spsr::read();
+    s.sp_svc = sysreg_raw::sp_svc::read();
+    s.lr_svc = sysreg_raw::lr_svc::read();
     s.spsr_svc = sysreg_raw::spsr_svc::read();
+    s.sp_abt = sysreg_raw::sp_abt::read();
+    s.lr_abt = sysreg_raw::lr_abt::read();
     s.spsr_abt = sysreg_raw::spsr_abt::read();
+    s.sp_und = sysreg_raw::sp_und::read();
+    s.lr_und = sysreg_raw::lr_und::read();
     s.spsr_und = sysreg_raw::spsr_und::read();
+    s.sp_irq = sysreg_raw::sp_irq::read();
+    s.lr_irq = sysreg_raw::lr_irq::read();
     s.spsr_irq = sysreg_raw::spsr_irq::read();
+    s.r8_fiq = sysreg_raw::r8_fiq::read();
+    s.r9_fiq = sysreg_raw::r9_fiq::read();
+    s.r10_fiq = sysreg_raw::r10_fiq::read();
+    s.r11_fiq = sysreg_raw::r11_fiq::read();
+    s.r12_fiq = sysreg_raw::r12_fiq::read();
+    s.sp_fiq = sysreg_raw::sp_fiq::read();
+    s.lr_fiq = sysreg_raw::lr_fiq::read();
     s.spsr_fiq = sysreg_raw::spsr_fiq::read();
     return s;
   }
 
-  /** @brief Write every banked `SPSR` back via the same banked-register transfer instruction. */
+  /** @brief Write every banked register back via the same banked-register transfer instruction. */
   void restore() const noexcept {
+    sp_usr.write();
+    elr_hyp.write();
+    spsr.write();
+    sp_svc.write();
+    lr_svc.write();
     spsr_svc.write();
+    sp_abt.write();
+    lr_abt.write();
     spsr_abt.write();
+    sp_und.write();
+    lr_und.write();
     spsr_und.write();
+    sp_irq.write();
+    lr_irq.write();
     spsr_irq.write();
+    r8_fiq.write();
+    r9_fiq.write();
+    r10_fiq.write();
+    r11_fiq.write();
+    r12_fiq.write();
+    sp_fiq.write();
+    lr_fiq.write();
     spsr_fiq.write();
   }
 };
 
-/** @brief Full per-VM sysreg set: guest state, this VM's Hyp-mode virtualization controls, and the guest's banked
- * SPSRs. */
+/** @brief Full per-VM register set: guest state, this VM's Hyp-mode virtualization controls, and the guest's
+ * banked-register-transfer-only state. */
 struct vm_sysreg_state {
   vm_guest_state guest{};
   vm_hyp_control_state hyp{};
-  vm_banked_spsrs banked_spsrs{};
+  vm_banked_state banked{};
 
   [[nodiscard]] static vm_sysreg_state save() noexcept {
-    return vm_sysreg_state{vm_guest_state::save(), vm_hyp_control_state::save(), vm_banked_spsrs::save()};
+    return vm_sysreg_state{vm_guest_state::save(), vm_hyp_control_state::save(), vm_banked_state::save()};
   }
 
   void restore() const noexcept {
     guest.restore();
     hyp.restore();
-    banked_spsrs.restore();
+    banked.restore();
   }
+};
+
+/**
+ * @brief `structo::hypervisor::vcpu_entry_guard<Traits>` (and
+ * `structo::arch::world_switch_guard<Traits>`) policy wrapping
+ * `vm_sysreg_state` as a single register group: this vCPU's full
+ * CP15/Hyp-mode sysreg set, saved/restored as one unit.
+ */
+struct vcpu_sysreg_traits {
+  using state_type = vm_sysreg_state;
+
+  [[nodiscard]] static state_type save() noexcept { return state_type::save(); }
+
+  static void restore(const state_type &state) noexcept { state.restore(); }
 };
 
 } // namespace structo::arch::arm

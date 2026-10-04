@@ -8,8 +8,8 @@
  * a thin, allocation-free dispatch point from a guest-issued hypercall
  * number (decoded from whatever register the platform's calling
  * convention places it in -- `X0` under Arm's SMC Calling Convention
- * (SMCCC), `RAX`/`EAX` for a KVM- or Xen-style `VMCALL`/`VMMCALL`-based
- * paravirtual ABI, ...) to guest- and platform-specific handling code.
+ * (SMCCC), `RAX`/`EAX` for a `VMCALL`/`VMMCALL`-based paravirtual ABI,
+ * ...) to guest- and platform-specific handling code.
  *
  * ## Same shape as `vm_exit_dispatcher`, for a guest-initiated trap
  * instead of a hardware-initiated one

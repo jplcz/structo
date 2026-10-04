@@ -15,8 +15,11 @@
 #   status   - plain MRS/MSR status register access (cpsr, spsr).
 #   banked   - Virtualization-Extensions (ARMv7VE+) banked-register transfer
 #              (MRS/MSR Rd, <banked_reg>), used to reach another exception
-#              mode's banked SPSR (spsr_svc/abt/und/irq/fiq) from Hyp mode
-#              without switching modes. Field: reg (literal banked-register
+#              mode's banked SPSR/SP/LR (spsr_svc/abt/und/irq/fiq,
+#              sp_svc/abt/und/irq/fiq, lr_svc/abt/und/irq/fiq), the FIQ-only
+#              banked R8-R12 (r8_fiq-r12_fiq), SP_usr, and ELR_hyp (the
+#              guest PC on a trap into Hyp mode) from Hyp mode without
+#              switching modes. Field: reg (literal banked-register
 #              name recognized by the assembler, e.g. "SPSR_svc"). Needs
 #              `.arch_extension virt`, emitted per-asm-block by the codegen
 #              so the rest of the translation unit can stay on a plain
@@ -1813,6 +1816,142 @@ registers:
     kind: banked
     reg: SPSR_fiq
   fields: *id001
+- name: sp_usr
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: SP_usr
+- name: elr_hyp
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: ELR_hyp
+- name: sp_svc
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: SP_svc
+- name: lr_svc
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: LR_svc
+- name: sp_abt
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: SP_abt
+- name: lr_abt
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: LR_abt
+- name: sp_und
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: SP_und
+- name: lr_und
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: LR_und
+- name: sp_irq
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: SP_irq
+- name: lr_irq
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: LR_irq
+- name: r8_fiq
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: R8_fiq
+- name: r9_fiq
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: R9_fiq
+- name: r10_fiq
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: R10_fiq
+- name: r11_fiq
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: R11_fiq
+- name: r12_fiq
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: R12_fiq
+- name: sp_fiq
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: SP_fiq
+- name: lr_fiq
+  width: 32
+  access:
+  - read
+  - write
+  encoding:
+    kind: banked
+    reg: LR_fiq
 - name: lpae_ttbr0
   width: 64
   access:

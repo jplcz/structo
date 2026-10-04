@@ -10,7 +10,7 @@ SPDX-License-Identifier: BSD-2-Clause
 
 A thin hypercall dispatcher for guest-initiated calls (`HVC`/`VMCALL`/
 `SBI` ecalls), same shape as [`vm_exit_dispatcher.md`](vm_exit_dispatcher.md)
-but keyed by a `std::uint64_t call_number` to match SMCCC/KVM-style
+but keyed by a `std::uint64_t call_number` to match SMCCC-style
 hypercall ABIs:
 
 ```cpp

@@ -41,7 +41,7 @@ host itself has run on this same core).
 
 No mainstream virtualization extension swaps the entire register file
 on VM-entry/VM-exit: Intel VMX's VMCS does not cover general-purpose
-registers at all (KVM's `__vmx_vcpu_run` saves/restores them by hand
+registers at all (a hand-written assembly stub must save/restore them
 around `VMLAUNCH`/`VMRESUME`); AMD SVM's VMCB covers only `RAX`/`RSP`/
 `RIP`/`RFLAGS`/segment state, leaving the rest to manual save/restore
 around `VMRUN`; Arm EL2's `ERET` into a guest's EL1/EL0 touches only

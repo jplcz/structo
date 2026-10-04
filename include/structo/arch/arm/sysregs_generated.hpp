@@ -2452,6 +2452,312 @@ struct spsr_fiq {
 #endif // defined(__arm__) && !defined(__aarch64__)
 };
 
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `SP_usr` register (no named fields yet). */
+struct sp_usr {
+  std::uint32_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static sp_usr read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, SP_usr" : "=r"(value));
+    return sp_usr{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr SP_usr, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `ELR_hyp` register (no named fields yet). */
+struct elr_hyp {
+  std::uint32_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static elr_hyp read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, ELR_hyp" : "=r"(value));
+    return elr_hyp{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr ELR_hyp, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `SP_svc` register (no named fields yet). */
+struct sp_svc {
+  std::uint32_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static sp_svc read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, SP_svc" : "=r"(value));
+    return sp_svc{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr SP_svc, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `LR_svc` register (no named fields yet). */
+struct lr_svc {
+  std::uint32_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static lr_svc read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, LR_svc" : "=r"(value));
+    return lr_svc{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr LR_svc, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `SP_abt` register (no named fields yet). */
+struct sp_abt {
+  std::uint32_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static sp_abt read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, SP_abt" : "=r"(value));
+    return sp_abt{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr SP_abt, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `LR_abt` register (no named fields yet). */
+struct lr_abt {
+  std::uint32_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static lr_abt read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, LR_abt" : "=r"(value));
+    return lr_abt{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr LR_abt, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `SP_und` register (no named fields yet). */
+struct sp_und {
+  std::uint32_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static sp_und read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, SP_und" : "=r"(value));
+    return sp_und{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr SP_und, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `LR_und` register (no named fields yet). */
+struct lr_und {
+  std::uint32_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static lr_und read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, LR_und" : "=r"(value));
+    return lr_und{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr LR_und, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `SP_irq` register (no named fields yet). */
+struct sp_irq {
+  std::uint32_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static sp_irq read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, SP_irq" : "=r"(value));
+    return sp_irq{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr SP_irq, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `LR_irq` register (no named fields yet). */
+struct lr_irq {
+  std::uint32_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static lr_irq read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, LR_irq" : "=r"(value));
+    return lr_irq{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr LR_irq, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `R8_fiq` register (no named fields yet). */
+struct r8_fiq {
+  std::uint32_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static r8_fiq read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, R8_fiq" : "=r"(value));
+    return r8_fiq{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr R8_fiq, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `R9_fiq` register (no named fields yet). */
+struct r9_fiq {
+  std::uint32_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static r9_fiq read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, R9_fiq" : "=r"(value));
+    return r9_fiq{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr R9_fiq, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `R10_fiq` register (no named fields yet). */
+struct r10_fiq {
+  std::uint32_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static r10_fiq read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, R10_fiq" : "=r"(value));
+    return r10_fiq{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr R10_fiq, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `R11_fiq` register (no named fields yet). */
+struct r11_fiq {
+  std::uint32_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static r11_fiq read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, R11_fiq" : "=r"(value));
+    return r11_fiq{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr R11_fiq, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `R12_fiq` register (no named fields yet). */
+struct r12_fiq {
+  std::uint32_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static r12_fiq read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, R12_fiq" : "=r"(value));
+    return r12_fiq{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr R12_fiq, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `SP_fiq` register (no named fields yet). */
+struct sp_fiq {
+  std::uint32_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static sp_fiq read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, SP_fiq" : "=r"(value));
+    return sp_fiq{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr SP_fiq, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
+/** @brief Raw accessor for the AArch32 Virtualization-Extensions banked `LR_fiq` register (no named fields yet). */
+struct lr_fiq {
+  std::uint32_t raw{0};
+
+#if defined(__arm__) && !defined(__aarch64__)
+  [[nodiscard]] static lr_fiq read() noexcept {
+    std::uint32_t value;
+    asm volatile(".arch_extension virt\n\t"
+                 "mrs %0, LR_fiq" : "=r"(value));
+    return lr_fiq{value};
+  }
+  void write() const noexcept {
+    asm volatile(".arch_extension virt\n\t"
+                 "msr LR_fiq, %0" ::"r"(raw));
+  }
+#endif // defined(__arm__) && !defined(__aarch64__)
+};
+
 /** @brief Raw accessor for the AArch32 64-bit `LPAE_TTBR0` coprocessor register pair (1 named field(s)). */
 struct lpae_ttbr0 {
   std::uint64_t raw{0};
