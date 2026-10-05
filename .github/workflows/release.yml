@@ -1,0 +1,59 @@
+# SPDX-FileCopyrightText: 2026 Jarosław Pelczar <jarek@jpelczar.com>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+
+name: Release
+
+# Manual-only: never triggers on a tag push, so creating a GitHub release
+# is always a deliberate action, not an implicit side effect of pushing a
+# tag (e.g. one created for unrelated reasons).
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Git tag to release (e.g. v1.2.3); defaults to the current CMakeLists.txt version
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Create GitHub release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve tag
+        id: resolve
+        run: |
+          tag="${{ inputs.tag }}"
+          if [ -z "$tag" ]; then
+            version=$(grep -oP 'project\([^)]*VERSION \K\d+\.\d+\.\d+' CMakeLists.txt)
+            tag="v${version}"
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure tag exists
+        run: |
+          if ! git rev-parse "${{ steps.resolve.outputs.tag }}" >/dev/null 2>&1; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "${{ steps.resolve.outputs.tag }}" -m "${{ steps.resolve.outputs.tag }}"
+            git push origin "${{ steps.resolve.outputs.tag }}"
+          fi
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.resolve.outputs.tag }}
+          generate_release_notes: true

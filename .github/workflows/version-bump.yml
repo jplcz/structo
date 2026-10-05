@@ -1,0 +1,65 @@
+# SPDX-FileCopyrightText: 2026 Jarosław Pelczar <jarek@jpelczar.com>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+
+name: Version bump
+
+# Manual-only: never triggers on push/PR/schedule, since bumping the
+# version and pushing a tag is a deliberate release-management action,
+# not something that should ever happen implicitly from routine CI.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version part to increment
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+      tag:
+        description: Also create and push the resulting vX.Y.Z git tag
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: version-bump-${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Bump version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump version in CMakeLists.txt/conanfile.py/vcpkg.json
+        id: bump
+        run: python3 scripts/bump-version.py --bump "${{ inputs.bump }}"
+
+      - name: Commit version bump
+        run: |
+          git add CMakeLists.txt conanfile.py packaging/vcpkg/ports/*/vcpkg.json
+          git commit -m "chore: bump version to v${{ steps.bump.outputs.new_version }}"
+          git push origin "HEAD:${{ github.ref_name }}"
+
+      - name: Create and push tag
+        if: ${{ inputs.tag }}
+        run: |
+          git tag -a "v${{ steps.bump.outputs.new_version }}" -m "v${{ steps.bump.outputs.new_version }}"
+          git push origin "v${{ steps.bump.outputs.new_version }}"
