@@ -312,6 +312,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_vdso_clock_writer.cpp
         tests/test_vdso_clock_reader.cpp
         tests/test_time_manager.cpp
+        tests/test_instant_clock_traits.cpp
         tests/test_async_kernel_object.cpp
         tests/test_callout.cpp
         tests/test_load_average.cpp

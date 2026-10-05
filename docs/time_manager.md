@@ -265,6 +265,83 @@ counter access):
   frequency-changing switch, unbound/vdso-incompatible/not-yet-started
   rejection), and move construction/assignment.
 
+## Integrating with `reloco::instant`: `instant_clock_traits.hpp`
+
+`include/structo/hw/instant_clock_traits.hpp` bridges a kernel's `time_manager` to
+[reloco](https://github.com/jplcz/reloco)'s `reloco::instant_clock_traits<Tag>` customization point, so kernel
+code can call `reloco::instant_clock_traits<Tag>::now()` directly (not `reloco::instant::now()` --
+see below) and get a `reloco::duration` backed by `time_manager::try_monotonic_now()`/`try_realtime_now()`.
+
+### `kernel_time_manager()`: a kernel-supplied getter, not an internal global
+
+`instant_clock_traits<Tag>::now()` is a stateless, zero-argument, `noexcept` static function with no way to
+receive a reference to *which* `time_manager` to read from. Rather than own a hidden global/singleton, the
+header declares `structo::hw::kernel_time_manager()` as a customization point with **no definition** --
+exactly one definition, returning a reference to whatever `time_manager` the embedding kernel already
+maintains (already `start()`-ed before any use), must be linked into the final binary:
+
+```cpp
+structo::hw::time_manager &structo::hw::kernel_time_manager() noexcept {
+  static structo::hw::time_manager instance = /* ... */;
+  return instance;
+}
+```
+
+Two tags select which `time_manager` accessor is read: `kernel_monotonic_clock_tag`
+(`try_monotonic_now()`) and `kernel_realtime_clock_tag` (`try_realtime_now()`).
+
+### Failure handling: `time_manager_clock_failure_policy<Tag>`, another opt-in customization point
+
+`try_monotonic_now()`/`try_realtime_now()` are fallible, but `instant_clock_traits<Tag>::now()` must return a
+bare `reloco::duration` unconditionally, and typical callers never expect (or check for) a failure at all.
+There is no single right answer -- it depends on the architecture's own counter guarantees -- so, mirroring
+every other `*_traits<Tag>`-style hook in `structo` (`time_source_traits`, `hw_rng_traits`), this is itself
+**left undefined** until the embedding kernel specializes it for whichever tag it uses:
+
+```cpp
+template <> struct structo::hw::time_manager_clock_failure_policy<structo::hw::kernel_monotonic_clock_tag> {
+  // Called only once try_monotonic_now()/try_realtime_now() has itself already failed; must still return
+  // some duration unconditionally (never throws/aborts/returns a result<>).
+  static reloco::duration recover(structo::hw::time_manager &mgr, reloco::error err) noexcept;
+  // Called on every *successful* read instead, so a policy wanting a fallback cache can keep one warm; a
+  // policy that never needs one can leave this a no-op.
+  static void observe(reloco::duration value) noexcept;
+};
+```
+
+A kernel that uses either tag without specializing this gets an "incomplete type" compile error at the call
+site, not a silently-chosen default -- and, since `instant_clock_traits<Tag>::now()`'s body is a (dummy-)
+template rather than an ordinary member function, that completeness check is deferred to each call site
+rather than forced as soon as the header is merely included. Both `recover`/`observe` are called on whichever
+`time_manager_clock_failure_policy<Tag>` is actually active for `Tag` -- never unconditionally on some other,
+unrelated template -- so a `Tag` that doesn't want a fallback cache pays no cost for one.
+
+One ready-made policy implementing both is provided for convenience, `trap_time_failure_policy<Tag>` -- its
+`recover` traps unconditionally via `RELOCO_ASSERT`, since a fabricated fallback duration (zero, stale/cached,
+or otherwise) can silently violate monotonicity/invariants elsewhere just as badly as a crash; `Tag`s with no
+real recovery path (no ARM-style retry loop, no x86-style `switch_source()` fallback) are treated as a genuine,
+unrecoverable condition rather than something to paper over. Opt in by having your own
+`time_manager_clock_failure_policy<Tag>` specialization inherit from it rather than reimplementing the same
+trap by hand -- a custom policy (e.g. an x86 one-shot `switch_source()` retry) can also fall back to it as a
+last resort once it has genuinely exhausted its own recovery options. Because this inheritance is explicit,
+`trap_time_failure_policy<Tag>` is only ever instantiated for a `Tag` that actually asks for it -- never
+implicitly for every `Tag` in existence. See the header's own file-level docs for worked ARM/x86 examples.
+
+### Why not `RELOCO_INSTANT_CLOCK_TAG`/`reloco::instant::now()`?
+
+This header does not set `RELOCO_INSTANT_CLOCK_TAG` or otherwise wire itself into `reloco::instant::now()`.
+Kernel code is expected to call `reloco::instant_clock_traits<kernel_monotonic_clock_tag>::now()` (or the
+realtime tag) directly instead. `RELOCO_INSTANT_CLOCK_TAG` only matters to generic code that reads a POSIX-style
+instant through `reloco::instant` itself; redefining it differently across translation units of the same
+binary would also risk an ODR violation on `reloco::instant`'s own inline method bodies.
+
+### Testing
+
+`tests/test_instant_clock_traits.cpp` supplies the test binary's one definition of `kernel_time_manager()`
+(via a test-settable static slot) and exercises: `trap_time_failure_policy` trapping (`EXPECT_DEATH`) both
+directly and through the real tags' `instant_clock_traits` specializations on failure; both real tags reading
+through a started `time_manager` on success; and a custom bounded-retry ("spin") failure policy.
+
 ## See also
 
 - [`timer_ref.md`](timer_ref.md) -- the complementary countdown/interval-timer handle, and the `*_ref`
