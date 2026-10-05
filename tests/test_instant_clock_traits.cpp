@@ -71,18 +71,6 @@ template <> struct structo::hw::time_manager_clock_failure_policy<kernel_monoton
 template <> struct structo::hw::time_manager_clock_failure_policy<kernel_realtime_clock_tag>
     : structo::hw::trap_time_failure_policy<kernel_realtime_clock_tag> {};
 
-// Retries until it succeeds -- mirroring the @file-level docs' ARM example -- bounded here only so a genuinely
-// broken test cannot hang the suite.
-template <> struct structo::hw::time_manager_clock_failure_policy<test_spin_tag> {
-  static reloco::duration recover(structo::hw::time_manager &mgr, reloco::error) noexcept {
-    for (int attempt = 0; attempt < 1'000'000; ++attempt) {
-      if (auto now = mgr.try_monotonic_now())
-        return *now;
-    }
-    return reloco::duration{};
-  }
-};
-
 namespace {
 
 class InstantClockTraitsTest : public ::testing::Test {
@@ -149,18 +137,18 @@ TEST(TimeManagerClockFailurePolicyTest, UndefinedPolicyIsACompileErrorNotASilent
   SUCCEED();
 }
 
-TEST_F(InstantClockTraitsTest, SpinPolicyRetriesUntilTimeManagerSucceeds) {
+TEST_F(InstantClockTraitsTest, RetrySpinTimerPolicyRetriesUntilTimeManagerSucceeds) {
   auto mgr = time_manager::try_create(ref_, vdso_clock_source::x86_tsc);
   ASSERT_TRUE(mgr.has_value());
   ASSERT_TRUE(mgr->start());
 
-  // Build a tiny bridge exercising the spin policy directly, rather than through
+  // Exercise the ready-made retry_spin_timer_policy directly, rather than through
   // reloco::instant_clock_traits (which is only specialized for kernel_monotonic_clock_tag/
-  // kernel_realtime_clock_tag in this header) -- confirms the recover() contract itself works.
+  // kernel_realtime_clock_tag in this header) -- confirms its recover() contract works. mgr is
+  // already started/resynced, so the very first retry succeeds; this cannot hang the suite.
   backend_.value = 3'000'000'000ULL;
   ASSERT_TRUE(mgr->resync());
 
-  auto recovered = structo::hw::time_manager_clock_failure_policy<test_spin_tag>::recover(
-      mgr.value(), error::not_initialized);
+  auto recovered = structo::hw::retry_spin_timer_policy<test_spin_tag>::recover(mgr.value(), error::not_initialized);
   EXPECT_EQ(recovered.as_secs(), 3u);
 }

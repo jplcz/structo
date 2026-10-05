@@ -316,16 +316,27 @@ rather than forced as soon as the header is merely included. Both `recover`/`obs
 `time_manager_clock_failure_policy<Tag>` is actually active for `Tag` -- never unconditionally on some other,
 unrelated template -- so a `Tag` that doesn't want a fallback cache pays no cost for one.
 
-One ready-made policy implementing both is provided for convenience, `trap_time_failure_policy<Tag>` -- its
-`recover` traps unconditionally via `RELOCO_ASSERT`, since a fabricated fallback duration (zero, stale/cached,
-or otherwise) can silently violate monotonicity/invariants elsewhere just as badly as a crash; `Tag`s with no
-real recovery path (no ARM-style retry loop, no x86-style `switch_source()` fallback) are treated as a genuine,
-unrecoverable condition rather than something to paper over. Opt in by having your own
-`time_manager_clock_failure_policy<Tag>` specialization inherit from it rather than reimplementing the same
-trap by hand -- a custom policy (e.g. an x86 one-shot `switch_source()` retry) can also fall back to it as a
-last resort once it has genuinely exhausted its own recovery options. Because this inheritance is explicit,
-`trap_time_failure_policy<Tag>` is only ever instantiated for a `Tag` that actually asks for it -- never
-implicitly for every `Tag` in existence. See the header's own file-level docs for worked ARM/x86 examples.
+Two ready-made policies implementing both are provided for convenience:
+
+- `trap_time_failure_policy<Tag>` -- its `recover` traps unconditionally via `RELOCO_ASSERT`, since a
+  fabricated fallback duration (zero, stale/cached, or otherwise) can silently violate monotonicity/
+  invariants elsewhere just as badly as a crash; `Tag`s with no real recovery path are treated as a
+  genuine, unrecoverable condition rather than something to paper over.
+- `retry_spin_timer_policy<Tag>` -- its `recover` retries `try_monotonic_now()`/`try_realtime_now()` in a
+  tight, unbounded loop until it succeeds, never fabricating or caching a substitute. Appropriate only when
+  the underlying failure really is expected to be transient (e.g. a losing seqlock race) and there is no
+  sibling clock source to fail over to in the first place -- which, in practice, covers most ARM and RISC-V
+  targets: both architectures specify essentially one architectural counter (ARM's generic timer; RISC-V's
+  `time` CSR/`mtime`), so a broken/absent counter is normally handled one layer up (the whole counter is
+  declared unusable system-wide, falling back to a slower tick-based source) rather than by switching to a
+  sibling source from inside `recover()`.
+
+Opt in by having your own `time_manager_clock_failure_policy<Tag>` specialization inherit from whichever
+fits, rather than reimplementing the same trap/retry loop by hand -- a custom policy (e.g. an x86 one-shot
+`switch_source()` retry) can also fall back to `trap_time_failure_policy` as a last resort once it has
+genuinely exhausted its own recovery options. Because this inheritance is explicit, both policies are only
+ever instantiated for a `Tag` that actually asks for one -- never implicitly for every `Tag` in existence.
+See the header's own file-level docs for worked ARM/x86 examples.
 
 ### Why not `RELOCO_INSTANT_CLOCK_TAG`/`reloco::instant::now()`?
 
@@ -340,7 +351,8 @@ binary would also risk an ODR violation on `reloco::instant`'s own inline method
 `tests/test_instant_clock_traits.cpp` supplies the test binary's one definition of `kernel_time_manager()`
 (via a test-settable static slot) and exercises: `trap_time_failure_policy` trapping (`EXPECT_DEATH`) both
 directly and through the real tags' `instant_clock_traits` specializations on failure; both real tags reading
-through a started `time_manager` on success; and a custom bounded-retry ("spin") failure policy.
+through a started `time_manager` on success; and `retry_spin_timer_policy`'s `recover()` against an
+already-working `time_manager`.
 
 ## See also
 
