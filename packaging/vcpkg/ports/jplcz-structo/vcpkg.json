@@ -1,6 +1,6 @@
 {
   "name": "jplcz-structo",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Header-only OS/kernel/hypervisor building blocks (device-tree decoding, physical memory region management) built on jplcz-reloco and jplcz-microfmt",
   "homepage": "https://github.com/jplcz/structo",
   "license": "BSD-2-Clause",
