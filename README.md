@@ -6,6 +6,8 @@ SPDX-License-Identifier: BSD-2-Clause
 
 # jplcz_structo
 
+<img src="assets/logo/structo-logo-small.png" alt="structo logo" width="200">
+
 `structo` is a header-only C++17 library of OS kernel/hypervisor/trusted-
 boundary building blocks: Flattened Device Tree (DTB) decoding and
 physical memory region management, built directly on

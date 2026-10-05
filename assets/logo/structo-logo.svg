@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 Jarosław Pelczar <jarek@jpelczar.com>
+
+SPDX-License-Identifier: BSD-2-Clause
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 260" width="420" height="260">
+  <defs>
+    <linearGradient id="body-top" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#2dd4bf"/>
+    </linearGradient>
+    <linearGradient id="body-left" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0b1220"/>
+    </linearGradient>
+    <linearGradient id="body-right" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#334155"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="accent-top" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fde68a"/>
+      <stop offset="100%" stop-color="#fbbf24"/>
+    </linearGradient>
+    <linearGradient id="accent-left" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <linearGradient id="accent-right" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#92400e"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <polygon points="118,150 164,173 118,196 72,173" fill="url(#body-top)" stroke="#0b1220" stroke-width="2" stroke-linejoin="round"/>
+    <polygon points="72,173 118,196 118,238 72,215" fill="url(#body-left)" stroke="#0b1220" stroke-width="2" stroke-linejoin="round"/>
+    <polygon points="118,196 164,173 164,215 118,238" fill="url(#body-right)" stroke="#0b1220" stroke-width="2" stroke-linejoin="round"/>
+  </g>
+  <g>
+    <polygon points="210,150 256,173 210,196 164,173" fill="url(#body-top)" stroke="#0b1220" stroke-width="2" stroke-linejoin="round"/>
+    <polygon points="164,173 210,196 210,238 164,215" fill="url(#body-left)" stroke="#0b1220" stroke-width="2" stroke-linejoin="round"/>
+    <polygon points="210,196 256,173 256,215 210,238" fill="url(#body-right)" stroke="#0b1220" stroke-width="2" stroke-linejoin="round"/>
+  </g>
+  <g>
+    <polygon points="302,150 348,173 302,196 256,173" fill="url(#body-top)" stroke="#0b1220" stroke-width="2" stroke-linejoin="round"/>
+    <polygon points="256,173 302,196 302,238 256,215" fill="url(#body-left)" stroke="#0b1220" stroke-width="2" stroke-linejoin="round"/>
+    <polygon points="302,196 348,173 348,215 302,238" fill="url(#body-right)" stroke="#0b1220" stroke-width="2" stroke-linejoin="round"/>
+  </g>
+  <g>
+    <polygon points="164,85 210,108 164,131 118,108" fill="url(#body-top)" stroke="#0b1220" stroke-width="2" stroke-linejoin="round"/>
+    <polygon points="118,108 164,131 164,173 118,150" fill="url(#body-left)" stroke="#0b1220" stroke-width="2" stroke-linejoin="round"/>
+    <polygon points="164,131 210,108 210,150 164,173" fill="url(#body-right)" stroke="#0b1220" stroke-width="2" stroke-linejoin="round"/>
+  </g>
+  <g>
+    <polygon points="256,85 302,108 256,131 210,108" fill="url(#body-top)" stroke="#0b1220" stroke-width="2" stroke-linejoin="round"/>
+    <polygon points="210,108 256,131 256,173 210,150" fill="url(#body-left)" stroke="#0b1220" stroke-width="2" stroke-linejoin="round"/>
+    <polygon points="256,131 302,108 302,150 256,173" fill="url(#body-right)" stroke="#0b1220" stroke-width="2" stroke-linejoin="round"/>
+  </g>
+  <g>
+    <polygon points="210,20 256,43 210,66 164,43" fill="url(#accent-top)" stroke="#0b1220" stroke-width="2" stroke-linejoin="round"/>
+    <polygon points="164,43 210,66 210,108 164,85" fill="url(#accent-left)" stroke="#0b1220" stroke-width="2" stroke-linejoin="round"/>
+    <polygon points="210,66 256,43 256,85 210,108" fill="url(#accent-right)" stroke="#0b1220" stroke-width="2" stroke-linejoin="round"/>
+  </g>
+</svg>
