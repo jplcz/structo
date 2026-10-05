@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: 2026 Jarosław Pelczar <jarek@jpelczar.com>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+
+# Verifies that duplicated "single source of truth" values marked with
+# `ssot: <KEY>` comments (see scripts/check-ssot-markers.py) stay consistent
+# across the repository, e.g. a version/limit duplicated between a C header
+# and a packaging .spec or shell script because the two cannot share one
+# literal definition.
+name: SSOT marker check
+
+on:
+  push:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - converted_to_draft
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ssot-check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.draft == false
+    name: "Check ssot: markers"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Run scripts/check-ssot-markers.py
+        run: python3 scripts/check-ssot-markers.py --root .

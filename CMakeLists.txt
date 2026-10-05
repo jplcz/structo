@@ -34,6 +34,23 @@ glibc-dependent std:: facilities outside explicitly marked interop points \
 option(JPLCZ_STRUCTO_INSTALL
     "Install jplcz_structo headers and CMake package metadata"
     ${JPLCZ_STRUCTO_IS_TOP_LEVEL})
+option(JPLCZ_STRUCTO_INSTALL_HEADERS_ONLY
+    "When JPLCZ_STRUCTO_INSTALL is enabled, install only the public \
+headers and skip everything else this project would otherwise install: \
+README/LICENSE/docs/ and the CMake package (install(TARGETS ... EXPORT \
+...), install(EXPORT ...), Config/ConfigVersion files). Also forces its \
+fetched jplcz_reloco/jplcz_microfmt dependencies' own \
+JPLCZ_RELOCO_INSTALL_HEADERS_ONLY/JPLCZ_MICROFMT_INSTALL_HEADERS_ONLY to \
+match. Needed when jplcz_structo is pulled in via FetchContent/\
+add_subdirectory by a larger build (e.g. an embedded/kernel tree) that \
+defines its own targets depending on jplcz_structo (and jplcz_reloco/\
+jplcz_microfmt) and performs its own single, consolidated \
+install(EXPORT) for all of them -- CMake forbids an exported target from \
+depending on another target that is itself exported under more than one \
+export set/namespace, so jplcz_structo must not also export itself (or \
+its dependencies) on its own in that situation; the caller remains \
+responsible for installing/exporting those targets (and their CMake \
+packages) itself." OFF)
 
 # Included unconditionally (not only under JPLCZ_STRUCTO_INSTALL), and
 # harmlessly idempotent if a parent build already included it, purely to
@@ -141,6 +158,7 @@ if(NOT TARGET jplcz_reloco::reloco)
     set(JPLCZ_RELOCO_BUILD_HEADER_CHECKS OFF CACHE BOOL "" FORCE)
     set(JPLCZ_RELOCO_ENABLE_STRICT_WARNINGS OFF CACHE BOOL "" FORCE)
     set(JPLCZ_RELOCO_INSTALL ${JPLCZ_STRUCTO_INSTALL} CACHE BOOL "" FORCE)
+    set(JPLCZ_RELOCO_INSTALL_HEADERS_ONLY ${JPLCZ_STRUCTO_INSTALL_HEADERS_ONLY} CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(jplcz_reloco)
 endif()
 
@@ -200,6 +218,7 @@ if(NOT TARGET jplcz_microfmt::microfmt)
     set(JPLCZ_MICROFMT_BUILD_MANPAGES OFF CACHE BOOL "" FORCE)
     set(JPLCZ_MICROFMT_ENABLE_STRICT_WARNINGS OFF CACHE BOOL "" FORCE)
     set(JPLCZ_MICROFMT_INSTALL ${JPLCZ_STRUCTO_INSTALL} CACHE BOOL "" FORCE)
+    set(JPLCZ_MICROFMT_INSTALL_HEADERS_ONLY ${JPLCZ_STRUCTO_INSTALL_HEADERS_ONLY} CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(jplcz_microfmt)
 endif()
 
@@ -330,6 +349,10 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_queue_spin_lock.cpp
         tests/test_rw_spin_lock.cpp
         tests/test_queue_rw_spin_lock.cpp
+        tests/test_irq_spin_lock.cpp
+        tests/test_irq_rw_spin_lock.cpp
+        tests/test_guarded_spin_mutex.cpp
+        tests/test_guarded_rw_spin_mutex.cpp
         tests/test_lock_striping.cpp
         tests/test_per_cpu_ptr.cpp
         tests/test_per_thread_ptr.cpp
@@ -480,11 +503,13 @@ if(JPLCZ_STRUCTO_INSTALL)
     include(GNUInstallDirs)
     include(CMakePackageConfigHelpers)
 
-    install(
-        TARGETS jplcz_structo
-        EXPORT jplcz_structoTargets
-        INCLUDES DESTINATION "${JPLCZ_STRUCTO_INSTALL_INCLUDEDIR}"
-    )
+    if(NOT JPLCZ_STRUCTO_INSTALL_HEADERS_ONLY)
+        install(
+            TARGETS jplcz_structo
+            EXPORT jplcz_structoTargets
+            INCLUDES DESTINATION "${JPLCZ_STRUCTO_INSTALL_INCLUDEDIR}"
+        )
+    endif()
 
     install(
         DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/"
@@ -492,53 +517,55 @@ if(JPLCZ_STRUCTO_INSTALL)
         COMPONENT Development
     )
 
-    install(
-        FILES
-            "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
-            "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
-        DESTINATION "${JPLCZ_STRUCTO_INSTALL_DOCDIR}"
-        COMPONENT Documentation
-    )
+    if(NOT JPLCZ_STRUCTO_INSTALL_HEADERS_ONLY)
+        install(
+            FILES
+                "${CMAKE_CURRENT_SOURCE_DIR}/README.md"
+                "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
+            DESTINATION "${JPLCZ_STRUCTO_INSTALL_DOCDIR}"
+            COMPONENT Documentation
+        )
 
-    install(
-        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/docs/"
-        DESTINATION "${JPLCZ_STRUCTO_INSTALL_DOCDIR}/docs"
-        COMPONENT Documentation
-    )
+        install(
+            DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/docs/"
+            DESTINATION "${JPLCZ_STRUCTO_INSTALL_DOCDIR}/docs"
+            COMPONENT Documentation
+        )
 
-    configure_package_config_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/jplcz_structoConfig.cmake.in"
-        "${CMAKE_CURRENT_BINARY_DIR}/jplcz_structoConfig.cmake"
-        INSTALL_DESTINATION "${JPLCZ_STRUCTO_INSTALL_CMAKEDIR}"
-        NO_SET_AND_CHECK_MACRO
-        NO_CHECK_REQUIRED_COMPONENTS_MACRO
-    )
-
-    # Header-only INTERFACE library: the package config is architecture
-    # independent (no compiled binaries to match ABI/bitness against), so
-    # skip the platform check and install under share/, not lib/.
-    write_basic_package_version_file(
-        "${CMAKE_CURRENT_BINARY_DIR}/jplcz_structoConfigVersion.cmake"
-        VERSION "${PROJECT_VERSION}"
-        COMPATIBILITY SameMajorVersion
-        ARCH_INDEPENDENT
-    )
-
-    install(
-        EXPORT jplcz_structoTargets
-        FILE jplcz_structoTargets.cmake
-        NAMESPACE jplcz_structo::
-        DESTINATION "${JPLCZ_STRUCTO_INSTALL_CMAKEDIR}"
-        COMPONENT Development
-    )
-
-    install(
-        FILES
+        configure_package_config_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/cmake/jplcz_structoConfig.cmake.in"
             "${CMAKE_CURRENT_BINARY_DIR}/jplcz_structoConfig.cmake"
+            INSTALL_DESTINATION "${JPLCZ_STRUCTO_INSTALL_CMAKEDIR}"
+            NO_SET_AND_CHECK_MACRO
+            NO_CHECK_REQUIRED_COMPONENTS_MACRO
+        )
+
+        # Header-only INTERFACE library: the package config is architecture
+        # independent (no compiled binaries to match ABI/bitness against), so
+        # skip the platform check and install under share/, not lib/.
+        write_basic_package_version_file(
             "${CMAKE_CURRENT_BINARY_DIR}/jplcz_structoConfigVersion.cmake"
-        DESTINATION "${JPLCZ_STRUCTO_INSTALL_CMAKEDIR}"
-        COMPONENT Development
-    )
+            VERSION "${PROJECT_VERSION}"
+            COMPATIBILITY SameMajorVersion
+            ARCH_INDEPENDENT
+        )
+
+        install(
+            EXPORT jplcz_structoTargets
+            FILE jplcz_structoTargets.cmake
+            NAMESPACE jplcz_structo::
+            DESTINATION "${JPLCZ_STRUCTO_INSTALL_CMAKEDIR}"
+            COMPONENT Development
+        )
+
+        install(
+            FILES
+                "${CMAKE_CURRENT_BINARY_DIR}/jplcz_structoConfig.cmake"
+                "${CMAKE_CURRENT_BINARY_DIR}/jplcz_structoConfigVersion.cmake"
+            DESTINATION "${JPLCZ_STRUCTO_INSTALL_CMAKEDIR}"
+            COMPONENT Development
+        )
+    endif()
 endif()
 
 if(JPLCZ_STRUCTO_IS_TOP_LEVEL AND JPLCZ_STRUCTO_INSTALL)
