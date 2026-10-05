@@ -126,7 +126,8 @@ TEST(TimerRefTest, UnboundRefFailsEveryOperation) {
   EXPECT_FALSE(unbound.try_wait().has_value());
   EXPECT_FALSE(unbound.remaining().has_value());
   EXPECT_FALSE(unbound.capabilities().has_value());
-  EXPECT_FALSE(unbound.set_callback([]() noexcept {}).has_value());
+  auto noop_cb = []() noexcept {};
+  EXPECT_FALSE(unbound.set_callback(noop_cb).has_value());
   EXPECT_FALSE(unbound.clear_callback().has_value());
 
   auto r = unbound.wait();
@@ -323,7 +324,8 @@ TEST(TimerRefTest, SetCallbackUnsupportedOnBareBackend) {
   bare_timer bare;
   timer_ref ref(bare);
 
-  auto r = ref.set_callback([]() noexcept {});
+  auto noop_cb = []() noexcept {};
+  auto r = ref.set_callback(noop_cb);
   ASSERT_FALSE(r.has_value());
   EXPECT_EQ(r.error(), error::unsupported_operation);
 
