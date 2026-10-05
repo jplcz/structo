@@ -208,8 +208,8 @@ private:
  * @return The cycle count, or `error::integer_overflow` if it would not
  * fit in a `std::uint64_t`.
  */
-[[nodiscard]] RELOCO_CONSTEXPR20 result<cycles> checked_duration_to_cycles(duration d,
-                                                                           std::uint64_t clock_hz) noexcept {
+[[nodiscard]] inline RELOCO_CONSTEXPR20 result<cycles> checked_duration_to_cycles(duration d,
+                                                                                  std::uint64_t clock_hz) noexcept {
   if (clock_hz == 0)
     return unexpected(error::invalid_argument);
 
@@ -246,8 +246,8 @@ private:
  * where `(c.raw() % clock_hz) * duration::nanos_per_sec` would not fit
  * in a `std::uint64_t`.
  */
-[[nodiscard]] RELOCO_CONSTEXPR20 result<duration> checked_cycles_to_duration(cycles c,
-                                                                             std::uint64_t clock_hz) noexcept {
+[[nodiscard]] inline RELOCO_CONSTEXPR20 result<duration> checked_cycles_to_duration(cycles c,
+                                                                                    std::uint64_t clock_hz) noexcept {
   if (clock_hz == 0)
     return unexpected(error::invalid_argument);
 
