@@ -73,22 +73,17 @@
  * doesn't want a fallback cache pays no cost for one, and nothing is implicitly instantiated for a `Tag`
  * behind the embedding kernel's back.
  *
- * One ready-made policy implementing both is provided for convenience, @ref trap_time_failure_policy --
- * opt into it by having your own `time_manager_clock_failure_policy<Tag>` specialization inherit from it,
- * rather than reimplementing the same trap by hand:
+ * One ready-made policy implementing both is provided for convenience, @ref trap_time_failure_policy, and
+ * another, @ref retry_spin_timer_policy -- opt into either by having your own
+ * `time_manager_clock_failure_policy<Tag>` specialization inherit from it, rather than reimplementing the
+ * same trap/retry loop by hand:
  *
  * @code
- * // ARM: an exhausted seqlock retry or not-yet-started manager is assumed transient; spin until the
- * // next attempt succeeds rather than ever return a value that could violate monotonicity elsewhere.
- * template <> struct structo::hw::time_manager_clock_failure_policy<structo::hw::kernel_monotonic_clock_tag> {
- *   static void observe(reloco::duration) noexcept {}
- *   static reloco::duration recover(structo::hw::time_manager &mgr, reloco::error) noexcept {
- *     for (;;) {
- *       if (auto now = mgr.try_monotonic_now())
- *         return *now;
- *     }
- *   }
- * };
+ * // ARM/RISC-V: an exhausted seqlock retry or not-yet-started manager is assumed transient, and there is
+ * // no sibling clock source to fail over to in the first place -- spin until the next attempt succeeds
+ * // rather than ever return a value that could violate monotonicity elsewhere.
+ * template <> struct structo::hw::time_manager_clock_failure_policy<structo::hw::kernel_monotonic_clock_tag>
+ *     : structo::hw::retry_spin_timer_policy<structo::hw::kernel_monotonic_clock_tag> {};
  *
  * // x86: an unstable TSC occasionally needs a one-shot fallback switch before it is trustworthy
  * // again; fall back to the built-in trap if even that does not recover -- there is no sane substitute
@@ -115,6 +110,8 @@
 #include <reloco/error.hpp>
 #include <reloco/expected.hpp>
 #include <reloco/instant.hpp>
+
+#include <type_traits>
 
 namespace structo {
 namespace hw {
@@ -174,6 +171,46 @@ template <typename Tag> struct trap_time_failure_policy {
                           "time_manager_clock_failure_policy<Tag> resolved to trap_time_failure_policy, "
                           "which has no recovery path by design");
     return reloco::duration{};
+  }
+};
+
+/**
+ * @brief Ready-made @ref time_manager_clock_failure_policy implementation: @ref recover retries
+ * `time_manager::try_monotonic_now()`/`try_realtime_now()` in a tight loop until it succeeds, never
+ * fabricating or caching a substitute duration. Appropriate for an architecture whose counter read
+ * essentially cannot fail except transiently (e.g. a momentarily-exhausted seqlock retry bound racing a
+ * writer) and that has no real sibling clock source to fail over to in the first place (see the
+ * @file-level docs' ARM/RISC-V discussion) -- any value other than "the real reading, eventually" could
+ * violate monotonic invariants other subsystems assert on.
+ *
+ * Opt in the same way any other policy would:
+ *
+ * @code
+ * template <> struct structo::hw::time_manager_clock_failure_policy<structo::hw::kernel_monotonic_clock_tag>
+ *     : structo::hw::retry_spin_timer_policy<structo::hw::kernel_monotonic_clock_tag> {};
+ * @endcode
+ *
+ * @warning This spins with no bound and no backoff; it is only appropriate when the underlying failure
+ * really is expected to be transient (a losing seqlock race, not a genuinely broken/absent counter). A
+ * `Tag` backed by a counter that can fail for longer or permanently should instead use (or fall back to)
+ * @ref trap_time_failure_policy.
+ */
+template <typename Tag> struct retry_spin_timer_policy {
+  /** @brief No-op: this policy has no fallback cache to maintain. */
+  static void observe(reloco::duration) noexcept {}
+
+  /** @brief Retries the failed read in a tight loop, unconditionally, until it succeeds -- see the
+   * class-level docs and warning. */
+  [[nodiscard]] static reloco::duration recover(time_manager &mgr, reloco::error) noexcept {
+    for (;;) {
+      if constexpr (std::is_same_v<Tag, kernel_realtime_clock_tag>) {
+        if (auto now = mgr.try_realtime_now())
+          return *now;
+      } else {
+        if (auto now = mgr.try_monotonic_now())
+          return *now;
+      }
+    }
   }
 };
 
