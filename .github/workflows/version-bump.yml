@@ -5,8 +5,8 @@
 name: Version bump
 
 # Manual-only: never triggers on push/PR/schedule, since bumping the
-# version and pushing a tag is a deliberate release-management action,
-# not something that should ever happen implicitly from routine CI.
+# version is a deliberate release-management action, not something that
+# should ever happen implicitly from routine CI.
 on:
   workflow_dispatch:
     inputs:
@@ -19,14 +19,10 @@ on:
           - minor
           - major
         default: patch
-      tag:
-        description: Also create and push the resulting vX.Y.Z git tag
-        required: false
-        type: boolean
-        default: true
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: version-bump-${{ github.workflow }}
@@ -34,32 +30,32 @@ concurrency:
 
 jobs:
   bump:
-    name: Bump version
+    name: Open version bump pull request
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Configure git identity
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Bump version in CMakeLists.txt/conanfile.py/vcpkg.json
         id: bump
         run: python3 scripts/bump-version.py --bump "${{ inputs.bump }}"
 
-      - name: Commit version bump
-        run: |
-          git add CMakeLists.txt conanfile.py packaging/vcpkg/ports/*/vcpkg.json
-          git commit -m "chore: bump version to v${{ steps.bump.outputs.new_version }}"
-          git push origin "HEAD:${{ github.ref_name }}"
+      # Branch-protected default branches reject a direct push, so the
+      # bump is proposed as a pull request instead of being committed
+      # straight to ${{ github.ref_name }}. Run the Release workflow
+      # (workflow_dispatch) after merging to tag the merge commit and
+      # publish a GitHub release.
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "chore: bump version to v${{ steps.bump.outputs.new_version }}"
+          title: "chore: bump version to v${{ steps.bump.outputs.new_version }}"
+          body: |
+            Automated version bump: v${{ steps.bump.outputs.old_version }} -> v${{ steps.bump.outputs.new_version }}.
 
-      - name: Create and push tag
-        if: ${{ inputs.tag }}
-        run: |
-          git tag -a "v${{ steps.bump.outputs.new_version }}" -m "v${{ steps.bump.outputs.new_version }}"
-          git push origin "v${{ steps.bump.outputs.new_version }}"
+            After merging, run the **Release** workflow (`workflow_dispatch`) to tag this commit and publish a GitHub release.
+          branch: version-bump/v${{ steps.bump.outputs.new_version }}
+          base: ${{ github.ref_name }}
+          delete-branch: true
+          labels: version-bump
