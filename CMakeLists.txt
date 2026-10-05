@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 cmake_minimum_required(VERSION 3.20)
-project(jplcz_structo VERSION 0.1.0 LANGUAGES CXX)
+project(jplcz_structo VERSION 0.2.0 LANGUAGES CXX)
 
 if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     set(JPLCZ_STRUCTO_IS_TOP_LEVEL ON)
