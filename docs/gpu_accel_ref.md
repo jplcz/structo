@@ -92,6 +92,10 @@ operation directly to a bound `framebuffer` backend and observing the
 expected pixels; and a minimal backend implementing only the mandatory
 members correctly receiving synthesized `draw_rect`/`put_pixel` calls.
 
+[`examples/sdl3_gpu_accel_demo.cpp`](../examples/sdl3_gpu_accel_demo.cpp)
+exercises the default `framebuffer` backend end-to-end against a real
+SDL3 window (only built when SDL3 is found).
+
 ## See also
 
 - [`framebuffer.md`](framebuffer.md) -- the concrete, non-type-erased

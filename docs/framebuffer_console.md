@@ -90,3 +90,4 @@ can be layered on by a caller drawing directly onto `pixels()`).
 - [`framebuffer.md`](framebuffer.md) -- the pixel-level framebuffer this backend rasterizes onto
 - [`vga_text_console.md`](vga_text_console.md) -- the VGA/CGA text-mode alternative backend
 - [`vt100.md`](vt100.md) -- the VT100/ANSI escape-sequence interpreter that can drive this backend
+- [`examples/sdl3_vt100_framebuffer_console_demo.cpp`](../examples/sdl3_vt100_framebuffer_console_demo.cpp) -- renders this backend with a real bitmap font (`examples/fonts/dejavu_sans_mono_8x16_font.hpp`, not `block_font_8x8`) through a real SDL3 window (only built when SDL3 is found)

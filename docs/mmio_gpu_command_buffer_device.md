@@ -149,6 +149,12 @@ discarding pending commands through the MMIO window; `is_available()`
 reflecting the bound target; and `decode_gpu_command`/
 `encode_gpu_command`/`pack_gpu_color`/`unpack_gpu_color` round-tripping.
 
+[`examples/sdl3_gpu_accel_demo.cpp`](../examples/sdl3_gpu_accel_demo.cpp)
+drives this device against a real SDL3 window -- an animated "ball"
+re-staged and re-executed every frame via the `execute` doorbell,
+presented through an `mmio_framebuffer_device`-owned pixel buffer (only
+built when SDL3 is found; see `examples/CMakeLists.txt`).
+
 ## See also
 
 - [`gpu_accel_ref.md`](gpu_accel_ref.md) -- the type-erased drawing

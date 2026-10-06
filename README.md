@@ -48,11 +48,25 @@ demonstrated in [examples/](examples):
   `reloco::c_tailq`/`structo::callout`'s `hook_type` customization point,
   driving a periodic and a one-shot `structo::callout` off a simulated
   software clock.
+- **[`sdl3_gpu_accel_demo.cpp`](examples/sdl3_gpu_accel_demo.cpp)** --
+  a windowed demo wiring `hypervisor::mmio_framebuffer_device` and
+  `hypervisor::mmio_gpu_command_buffer_device` (dispatching through
+  `hw::gpu_accel_ref`) straight to a real SDL3 window; only built when
+  SDL3 development files are found, since it is the one example with a
+  real external dependency.
+- **[`sdl3_vt100_framebuffer_console_demo.cpp`](examples/sdl3_vt100_framebuffer_console_demo.cpp)**
+  -- a windowed demo driving `hw::vt100_terminal`/`microfmt::format_to`
+  through `hw::console_ref` onto `hw::framebuffer_console` (rendered
+  with the real DejaVu Sans Mono bitmap font in
+  [`examples/fonts/`](examples/fonts), not `block_font_8x8`'s
+  solid-block placeholder), presented via the same SDL3 window
+  pipeline; also only built when SDL3 is found.
 
-All three build on this library's own building blocks (typed physical
+All five build on this library's own building blocks (typed physical
 addresses/pages and the Flattened Device Tree reader/writer/index moved
-in from `jplcz_reloco`; `async_kernel_object`/`callout` native to
-`structo` itself), each documented on its own [docs/](docs) page.
+in from `jplcz_reloco`; `async_kernel_object`/`callout`/the hypervisor
+MMIO emulation headers native to `structo` itself), each documented on
+its own [docs/](docs) page.
 
 ## Using structo
 

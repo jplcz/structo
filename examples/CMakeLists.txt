@@ -11,9 +11,34 @@ add_jplcz_structo_example(boot_memory_map_demo)
 add_jplcz_structo_example(device_tree_demo)
 add_jplcz_structo_example(callout_scheduler_demo)
 
+set(JPLCZ_STRUCTO_EXAMPLE_TARGETS
+    boot_memory_map_demo
+    device_tree_demo
+    callout_scheduler_demo
+)
+
+# Optional: a windowed demo rendering `gpu_accel_ref`/`mmio_gpu_command_buffer_device`-
+# dispatched drawing commands onto an `mmio_framebuffer_device`-owned pixel buffer, presented
+# via SDL3 -- only built when an SDL3 development package is actually available, since
+# (unlike every other example above) it is the one example with a real external dependency.
+find_package(SDL3 QUIET CONFIG)
+if(SDL3_FOUND)
+    add_executable(sdl3_gpu_accel_demo sdl3_gpu_accel_demo.cpp)
+    target_link_libraries(sdl3_gpu_accel_demo PRIVATE jplcz_structo jplcz_structo_warnings SDL3::SDL3)
+    list(APPEND JPLCZ_STRUCTO_EXAMPLE_TARGETS sdl3_gpu_accel_demo)
+
+    # Optional: a windowed demo driving `hw::vt100_terminal` through `hw::console_ref` onto
+    # `hw::framebuffer_console` (using the real `examples/fonts` DejaVu Sans Mono bitmap, not
+    # `block_font_8x8`'s solid-block placeholder), presented via SDL3 the same way.
+    add_executable(sdl3_vt100_framebuffer_console_demo sdl3_vt100_framebuffer_console_demo.cpp)
+    target_link_libraries(sdl3_vt100_framebuffer_console_demo PRIVATE
+        jplcz_structo jplcz_structo_warnings SDL3::SDL3)
+    list(APPEND JPLCZ_STRUCTO_EXAMPLE_TARGETS sdl3_vt100_framebuffer_console_demo)
+else()
+    message(STATUS "jplcz_structo: SDL3 not found, skipping sdl3_gpu_accel_demo/\
+sdl3_vt100_framebuffer_console_demo examples")
+endif()
+
 add_custom_target(jplcz_structo_examples
-    DEPENDS
-        boot_memory_map_demo
-        device_tree_demo
-        callout_scheduler_demo
+    DEPENDS ${JPLCZ_STRUCTO_EXAMPLE_TARGETS}
 )

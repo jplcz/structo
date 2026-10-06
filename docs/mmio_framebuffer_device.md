@@ -141,6 +141,10 @@ binding over caller-owned external memory without this device ever
 freeing it; respecting a byte offset into the external buffer; and
 rejecting a too-small external buffer.
 
+[`examples/sdl3_gpu_accel_demo.cpp`](../examples/sdl3_gpu_accel_demo.cpp)
+presents this device's owned pixel buffer through a real SDL3 window
+every frame (only built when SDL3 is found).
+
 ## See also
 
 - [`framebuffer.md`](framebuffer.md) -- the non-owning pixel-buffer
