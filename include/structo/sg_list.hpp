@@ -6,6 +6,8 @@
 
 #include "phys_addr.hpp"
 #include <cstddef>
+#include <reloco/concepts.hpp>
+#include <reloco/default_allocator.hpp>
 #include <reloco/error.hpp>
 #include <reloco/lifetime.hpp>
 #include <reloco/type_id.hpp>
@@ -47,6 +49,72 @@ public:
 
   constexpr sg_list() = default;
   constexpr explicit sg_list(Container &&c) noexcept : c_(std::move(c)) {}
+
+  /**
+   * @brief Constructs an empty list using an explicit allocator. Only
+   * participates in overload resolution when `Container` itself accepts
+   * one (i.e. `reloco::vector`/`reloco::inline_vector`, not `std::vector`).
+   */
+  template <typename C = Container, typename = std::enable_if_t<std::is_constructible_v<C, allocator_ref>>>
+  constexpr explicit sg_list(allocator_ref alloc) noexcept : c_(alloc) {}
+
+  /**
+   * @brief Builds, optionally reserving capacity, using an explicit
+   * allocator. Only available when `Container::try_allocate` exists.
+   */
+  template <typename C = Container, typename = std::enable_if_t<has_try_allocate_v<C, size_t>>>
+  [[nodiscard]] static result<sg_list> try_allocate(allocator_ref alloc, size_t initial_cap = 0) noexcept {
+    auto container_res = Container::try_allocate(alloc, initial_cap);
+    if (!container_res)
+      return unexpected(container_res.error());
+    return sg_list(std::move(*container_res));
+  }
+
+  /**
+   * @brief Builds, optionally reserving capacity, using
+   * `default_allocator()`. Only available when `Container::try_create`
+   * exists.
+   */
+  template <typename C = Container, typename = std::enable_if_t<has_try_create_v<C, size_t>>>
+  [[nodiscard]] static result<sg_list> try_create(size_t initial_cap = 0) noexcept {
+    return try_allocate(default_allocator(), initial_cap);
+  }
+
+  /**
+   * @brief Performs a deep copy using a specific allocator. Only available
+   * when `Container::try_clone(allocator_ref)` exists.
+   */
+  template <typename C = Container, typename = std::enable_if_t<has_try_clone_allocator_aware_v<C>>>
+  [[nodiscard]] result<sg_list> try_clone(allocator_ref alloc) const noexcept {
+    auto cloned = c_.try_clone(alloc);
+    if (!cloned)
+      return unexpected(cloned.error());
+    return sg_list(std::move(*cloned));
+  }
+
+  /**
+   * @brief Performs a deep copy, delegating to `Container::try_clone()`
+   * for the allocator choice (the container's own bound allocator for
+   * `reloco::vector`, `default_allocator()` for `reloco::inline_vector`).
+   * Only available when `Container::try_clone()` exists.
+   */
+  template <typename C = Container, typename = std::enable_if_t<has_try_clone_self_contained_v<C>>>
+  [[nodiscard]] result<sg_list> try_clone() const noexcept {
+    auto cloned = c_.try_clone();
+    if (!cloned)
+      return unexpected(cloned.error());
+    return sg_list(std::move(*cloned));
+  }
+
+  /**
+   * @brief Returns the bound allocator. Only available when `Container`
+   * itself exposes one (i.e. `reloco::vector`/`reloco::inline_vector`, not
+   * `std::vector`).
+   */
+  template <typename C = Container>
+  [[nodiscard]] auto get_allocator() const noexcept -> decltype(std::declval<const C &>().get_allocator()) {
+    return c_.get_allocator();
+  }
 
   [[nodiscard]] bool empty() const noexcept { return c_.empty(); }
   [[nodiscard]] size_t size() const noexcept { return c_.size(); }

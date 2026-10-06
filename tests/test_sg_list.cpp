@@ -4,6 +4,7 @@
 
 #if !defined(_MSC_VER) && defined(__LP64__)
 #include <gtest/gtest.h>
+#include <reloco/heap_allocator.hpp>
 #include <structo/sg_list.hpp>
 
 using dynamic_sg_list = structo::sg_list<>;
@@ -11,6 +12,87 @@ using dynamic_sg_list = structo::sg_list<>;
 RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
 
 using namespace structo;
+
+namespace {
+/** @brief Wraps `reloco::heap_allocator_tag`, counting `allocate()` calls, to verify that an
+ * explicitly-passed allocator (rather than the process-wide default) is the one actually used. */
+struct counting_allocator_tag {};
+std::size_t g_counting_allocate_calls = 0;
+} // namespace
+
+template <> struct reloco::allocator_traits<counting_allocator_tag> {
+  using context_type = void;
+
+  static reloco::result<reloco::mem_block> allocate(std::size_t bytes, std::size_t alignment) noexcept {
+    ++g_counting_allocate_calls;
+    return reloco::allocator_traits<reloco::heap_allocator_tag>::allocate(bytes, alignment);
+  }
+
+  static reloco::result<reloco::mem_block> reallocate(void *ptr, std::size_t old_size, std::size_t new_size,
+                                                      std::size_t alignment) noexcept {
+    return reloco::allocator_traits<reloco::heap_allocator_tag>::reallocate(ptr, old_size, new_size, alignment);
+  }
+
+  static void deallocate(void *ptr, std::size_t bytes) noexcept {
+    reloco::allocator_traits<reloco::heap_allocator_tag>::deallocate(ptr, bytes);
+  }
+};
+
+TEST(SgListAllocatorTest, TryAllocateUsesTheGivenAllocator) {
+  g_counting_allocate_calls = 0;
+  reloco::allocator_ref counting = reloco::allocator<counting_allocator_tag>::ref();
+
+  auto sgl_res = dynamic_sg_list::try_allocate(counting, 4);
+  ASSERT_TRUE(sgl_res.has_value());
+  dynamic_sg_list sgl = std::move(*sgl_res);
+
+  EXPECT_GE(g_counting_allocate_calls, 1u);
+  EXPECT_TRUE(sgl.try_push_back(phys_addr<void, dma_bus_space>(0x1000), 4096).has_value());
+  EXPECT_EQ(sgl.size(), 1u);
+}
+
+TEST(SgListAllocatorTest, ExplicitAllocatorConstructorBindsTheGivenAllocator) {
+  g_counting_allocate_calls = 0;
+  reloco::allocator_ref counting = reloco::allocator<counting_allocator_tag>::ref();
+
+  dynamic_sg_list sgl(counting);
+  EXPECT_TRUE(sgl.try_push_back(phys_addr<void, dma_bus_space>(0x1000), 4096).has_value());
+  EXPECT_GE(g_counting_allocate_calls, 1u);
+}
+
+TEST(SgListAllocatorTest, TryCloneWithExplicitAllocatorUsesIt) {
+  dynamic_sg_list sgl;
+  ASSERT_TRUE(sgl.try_push_back(phys_addr<void, dma_bus_space>(0x1000), 4096).has_value());
+
+  g_counting_allocate_calls = 0;
+  reloco::allocator_ref counting = reloco::allocator<counting_allocator_tag>::ref();
+  auto clone_res = sgl.try_clone(counting);
+  ASSERT_TRUE(clone_res.has_value());
+  EXPECT_GE(g_counting_allocate_calls, 1u);
+  EXPECT_EQ(clone_res->size(), 1u);
+}
+
+TEST(SgListAllocatorTest, TryCloneWithoutArgumentsReusesBoundAllocator) {
+  reloco::allocator_ref counting = reloco::allocator<counting_allocator_tag>::ref();
+  auto sgl_res = dynamic_sg_list::try_allocate(counting, 4);
+  ASSERT_TRUE(sgl_res.has_value());
+  dynamic_sg_list sgl = std::move(*sgl_res);
+  ASSERT_TRUE(sgl.try_push_back(phys_addr<void, dma_bus_space>(0x1000), 4096).has_value());
+
+  auto clone_res = sgl.try_clone();
+  ASSERT_TRUE(clone_res.has_value());
+  EXPECT_EQ(clone_res->size(), 1u);
+}
+
+TEST(SgListAllocatorTest, GetAllocatorExposesTheBoundAllocator) {
+  reloco::allocator_ref counting = reloco::allocator<counting_allocator_tag>::ref();
+  auto sgl_res = dynamic_sg_list::try_allocate(counting);
+  ASSERT_TRUE(sgl_res.has_value());
+
+  // Round-tripping the bound allocator through get_allocator() must stay usable.
+  reloco::allocator_ref reused = sgl_res->get_allocator();
+  EXPECT_TRUE(reused.allocate(64, alignof(std::max_align_t)).has_value());
+}
 
 TEST(SgListTest, PushBackDistinct) {
   dynamic_sg_list sgl;

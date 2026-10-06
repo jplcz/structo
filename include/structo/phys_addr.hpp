@@ -8,6 +8,7 @@
 #include <reloco/detail/assert.hpp>
 #include <reloco/detail/compat.hpp>
 #include <reloco/error.hpp>
+#include <reloco/int_ops.hpp>
 #include <reloco/lifetime.hpp>
 #include <type_traits>
 #include <utility>
@@ -71,8 +72,21 @@ struct phys_addr {
   constexpr phys_addr(std::nullptr_t) noexcept {}
   constexpr explicit phys_addr(address_type val) noexcept : value(val) {}
 
-  [[nodiscard]] constexpr bool is_null() const noexcept { return value == ~PhysInt(0); }
-  constexpr explicit operator bool() const noexcept { return value != ~PhysInt(0); }
+  /**
+   * @brief Whether this address is null.
+   *
+   * Both the default-constructed sentinel (`~PhysInt(0)`, all-bits-set)
+   * and a literal `0` count as null. Physical address `0` is reserved/
+   * unmapped on virtually every real platform (the null page, the real-mode
+   * IVT on x86, ...), so treating it as a distinct "valid" address was an
+   * easy way to inject a bug: any `phys_addr` that ends up zero-initialized
+   * by something other than this type's own default constructor -- e.g.
+   * `memset`, a zeroed/`{}`-aggregate-initialized struct, or a POD field
+   * shared with C-interop code -- would otherwise be silently accepted as
+   * a legitimate address instead of being caught as "not set".
+   */
+  [[nodiscard]] constexpr bool is_null() const noexcept { return value == 0 || value == ~PhysInt(0); }
+  constexpr explicit operator bool() const noexcept { return !is_null(); }
 
   // Cast the pointed-to type (e.g., void -> acpi_header), staying in the same space
   template <typename U> [[nodiscard]] constexpr phys_addr<U, SpaceTag, PhysInt> cast_type() const noexcept {
@@ -92,6 +106,43 @@ struct phys_addr {
   }
   [[nodiscard]] friend constexpr bool operator!=(const phys_addr &lhs, const phys_addr &rhs) noexcept {
     return lhs.value != rhs.value;
+  }
+
+  // --------------------------------------------------------------------------
+  // Checked Math (never wraps/UBs; see reloco/int_ops.hpp)
+  // --------------------------------------------------------------------------
+
+  /**
+   * @brief Advances this address by @p offset bytes, failing with
+   * `error::integer_overflow` instead of wrapping past the integer's range.
+   */
+  [[nodiscard]] constexpr result<phys_addr> try_add(address_type offset) const noexcept {
+    auto added = checked_add(value, offset);
+    if (!added.has_value())
+      return unexpected(added.error());
+    return phys_addr{added.value()};
+  }
+
+  /**
+   * @brief Retreats this address by @p offset bytes, failing with
+   * `error::integer_overflow` instead of underflowing past zero.
+   */
+  [[nodiscard]] constexpr result<phys_addr> try_sub(address_type offset) const noexcept {
+    auto subtracted = checked_sub(value, offset);
+    if (!subtracted.has_value())
+      return unexpected(subtracted.error());
+    return phys_addr{subtracted.value()};
+  }
+
+  /**
+   * @brief Computes the byte distance from @p other to `*this` (i.e.
+   * `this->value - other.value`), failing with `error::integer_overflow`
+   * if @p other is further along than `*this` (the subtraction would
+   * underflow). Both operands must share the same `SpaceTag`/`PhysInt`,
+   * enforced by the parameter type.
+   */
+  [[nodiscard]] constexpr result<address_type> try_diff(const phys_addr &other) const noexcept {
+    return checked_sub(value, other.value);
   }
 };
 

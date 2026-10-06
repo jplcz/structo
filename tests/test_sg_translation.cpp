@@ -294,11 +294,13 @@ TEST(CompactSgCodecTest, DecodesATableSpanningMultiplePagesViaABarePointerMapper
   // the second page) carries `last_flag`.
   reloco::array<packed_type, entries_per_page> page0{};
   reloco::array<packed_type, entries_per_page> page1{};
+  // PFNs start at 1, not 0: physical frame 0 is reserved/null, so a decoded
+  // descriptor pointing at it would (correctly) be rejected by sg_list.
   for (size_t i = 0; i < entries_per_page; ++i) {
-    page0[i].truncating_set<pfn_field>(i);
+    page0[i].truncating_set<pfn_field>(i + 1);
     page0[i].truncating_set<length_field>(1);
   }
-  page1[0].truncating_set<pfn_field>(entries_per_page);
+  page1[0].truncating_set<pfn_field>(entries_per_page + 1);
   page1[0].truncating_set<length_field>(1);
   page1[0].truncating_set<last_field>(1);
 
@@ -316,9 +318,9 @@ TEST(CompactSgCodecTest, DecodesATableSpanningMultiplePagesViaABarePointerMapper
   // pfn-aligned descriptor, so sg_list cannot coalesce them: every
   // descriptor on both table pages must have been visited individually.
   ASSERT_EQ(decoded.size(), entries_per_page + 1);
-  EXPECT_EQ(decoded.begin()->addr.value, 0u);
+  EXPECT_EQ(decoded.begin()->addr.value, 4096u);
   EXPECT_EQ(decoded.begin()->length, 1u);
-  EXPECT_EQ(decoded.base().back().addr.value, entries_per_page * 4096u);
+  EXPECT_EQ(decoded.base().back().addr.value, (entries_per_page + 1) * 4096u);
   EXPECT_EQ(decoded.base().back().length, 1u);
 }
 
@@ -335,11 +337,13 @@ TEST(CompactSgCodecTest, DecodesATableSpanningMultiplePagesViaASingleSlotRaiiMap
 
   auto *page0 = reinterpret_cast<packed_type *>(hooks::backing + 0x1000);
   auto *page1 = reinterpret_cast<packed_type *>(hooks::backing + 0x2000);
+  // PFNs start at 1, not 0: physical frame 0 is reserved/null, so a decoded
+  // descriptor pointing at it would (correctly) be rejected by sg_list.
   for (size_t i = 0; i < entries_per_page; ++i) {
-    page0[i].truncating_set<pfn_field>(i);
+    page0[i].truncating_set<pfn_field>(i + 1);
     page0[i].truncating_set<length_field>(1);
   }
-  page1[0].truncating_set<pfn_field>(entries_per_page);
+  page1[0].truncating_set<pfn_field>(entries_per_page + 1);
   page1[0].truncating_set<length_field>(1);
   page1[0].truncating_set<last_field>(1);
 
@@ -354,9 +358,9 @@ TEST(CompactSgCodecTest, DecodesATableSpanningMultiplePagesViaASingleSlotRaiiMap
   sg_list<inline_vector<compact_codec::entry_type, 600>> decoded;
   ASSERT_TRUE(compact_codec::decode(paddr_type{0x1000}, 2, decoded, map_page));
   ASSERT_EQ(decoded.size(), entries_per_page + 1);
-  EXPECT_EQ(decoded.begin()->addr.value, 0u);
+  EXPECT_EQ(decoded.begin()->addr.value, 4096u);
   EXPECT_EQ(decoded.begin()->length, 1u);
-  EXPECT_EQ(decoded.base().back().addr.value, entries_per_page * 4096u);
+  EXPECT_EQ(decoded.base().back().addr.value, (entries_per_page + 1) * 4096u);
   EXPECT_EQ(decoded.base().back().length, 1u);
   EXPECT_EQ(hooks::program_calls, 2);
   EXPECT_EQ(hooks::unprogram_calls, 2);

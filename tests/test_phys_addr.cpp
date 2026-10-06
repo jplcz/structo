@@ -37,6 +37,60 @@ TEST(PhysAddrTest, NullAddressIsTildeZero) {
   EXPECT_EQ(p3.value, 0x1000);
 }
 
+TEST(PhysAddrTest, ZeroValueIsAlsoNull) {
+  // Physical address 0 is reserved/unmapped on virtually every real
+  // platform, so it must be rejected just like the all-ones sentinel --
+  // otherwise an accidentally zero-initialized phys_addr (memset, a
+  // zeroed aggregate, a POD field shared with C code, ...) would be
+  // silently treated as a legitimate, non-null address.
+  phys_addr<void, host_phys_space> p(uint64_t(0));
+  EXPECT_TRUE(p.is_null());
+  EXPECT_FALSE(static_cast<bool>(p));
+  EXPECT_EQ(p.value, 0u);
+
+  phys_addr<void, host_phys_space> p2(0x1000);
+  EXPECT_FALSE(p2.is_null());
+  EXPECT_TRUE(static_cast<bool>(p2));
+}
+
+TEST(PhysAddrTest, TryAddSucceedsAndFailsOnOverflow) {
+  phys_addr<void, host_phys_space> p(0x1000);
+
+  auto added = p.try_add(0x2000);
+  ASSERT_TRUE(added.has_value());
+  EXPECT_EQ(added->value, 0x3000u);
+
+  phys_addr<void, host_phys_space> near_max(~uint64_t(1)); // one below the null sentinel
+  auto overflowed = near_max.try_add(0x10);
+  EXPECT_FALSE(overflowed.has_value());
+  EXPECT_EQ(overflowed.error(), error::integer_overflow);
+}
+
+TEST(PhysAddrTest, TrySubSucceedsAndFailsOnUnderflow) {
+  phys_addr<void, host_phys_space> p(0x3000);
+
+  auto subtracted = p.try_sub(0x1000);
+  ASSERT_TRUE(subtracted.has_value());
+  EXPECT_EQ(subtracted->value, 0x2000u);
+
+  auto underflowed = p.try_sub(0x4000);
+  EXPECT_FALSE(underflowed.has_value());
+  EXPECT_EQ(underflowed.error(), error::integer_overflow);
+}
+
+TEST(PhysAddrTest, TryDiffSucceedsAndFailsWhenOtherIsFurtherAlong) {
+  phys_addr<void, host_phys_space> lo(0x1000);
+  phys_addr<void, host_phys_space> hi(0x4000);
+
+  auto diff = hi.try_diff(lo);
+  ASSERT_TRUE(diff.has_value());
+  EXPECT_EQ(diff.value(), 0x3000u);
+
+  auto negative_diff = lo.try_diff(hi);
+  EXPECT_FALSE(negative_diff.has_value());
+  EXPECT_EQ(negative_diff.error(), error::integer_overflow);
+}
+
 TEST(PhysAddrTest, TagAndTypeCasting) {
   phys_addr<void, host_phys_space> void_ptr(0x4000);
 
