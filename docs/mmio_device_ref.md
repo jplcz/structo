@@ -144,4 +144,8 @@ trivially.
   assumes has been decoded.
 - [`mmio_print_device.md`](mmio_print_device.md) -- a complete, ready-to-use
   `mmio_device_traits` backend built on this header.
+- [`mmio_text_console.md`](mmio_text_console.md) -- a more elaborate
+  `mmio_device_traits` backend built on this header, pairing the
+  trapped control window with a directly-mapped, allocator-owned
+  framebuffer.
 - [`reference.md`](reference.md) -- the full per-header API map.
