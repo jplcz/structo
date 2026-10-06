@@ -389,6 +389,8 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_vcpu_state_guard.cpp
         tests/test_vm_exit_dispatcher.cpp
         tests/test_hypercall_dispatcher.cpp
+        tests/test_mmio_device_ref.cpp
+        tests/test_mmio_print_device.cpp
     )
     target_link_libraries(jplcz_structo_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)
