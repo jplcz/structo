@@ -390,6 +390,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_vm_exit_dispatcher.cpp
         tests/test_hypercall_dispatcher.cpp
         tests/test_arm_smccc.cpp
+        tests/test_arm_psci.cpp
         tests/test_mmio_device_ref.cpp
         tests/test_mmio_print_device.cpp
         tests/test_mmio_text_console.cpp
