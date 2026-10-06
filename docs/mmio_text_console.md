@@ -142,4 +142,7 @@ the live cell data being zeroed.
   sibling example (one write-only byte, no allocation).
 - [`console_ref.md`](console_ref.md) -- the trait this console also
   adapts to, for the hypervisor's own rendering.
+- [`mmio_framebuffer_device.md`](mmio_framebuffer_device.md) -- the
+  same owned-allocation/page-alignment/trapped-control-window split
+  applied to raw pixels instead of text cells.
 - [`reference.md`](reference.md) -- the full per-header API map.

@@ -148,4 +148,6 @@ trivially.
   `mmio_device_traits` backend built on this header, pairing the
   trapped control window with a directly-mapped, allocator-owned
   framebuffer.
+- [`mmio_framebuffer_device.md`](mmio_framebuffer_device.md) -- the
+  same split applied to raw pixels instead of text cells.
 - [`reference.md`](reference.md) -- the full per-header API map.
