@@ -167,7 +167,7 @@ public:
 
       // Find the largest properly-aligned order that fits
       while (order > 0) {
-        size_t block_pages = 1ULL << order;
+        size_t block_pages = size_t{1} << order;
         bool is_aligned = (current.pfn() % block_pages) == 0;
         bool fits = (remaining >= block_pages);
 
@@ -178,7 +178,7 @@ public:
       }
 
       if (order > 0) {
-        auto zone_check = current.try_add((1ULL << order) - 1);
+        auto zone_check = current.try_add((size_t{1} << order) - 1);
         if (!zone_check) {
           return unexpected(zone_check.error());
         }
@@ -188,10 +188,10 @@ public:
       current.set_buddy_free(true);
       free_areas_[order].push_front(current.get_os_page());
 
-      remaining -= (1ULL << order);
+      remaining -= (size_t{1} << order);
 
       if (remaining > 0) {
-        auto next_res = current.try_add(1ULL << order);
+        auto next_res = current.try_add(size_t{1} << order);
         if (!next_res)
           return unexpected(next_res.error());
         current = *next_res;
@@ -226,7 +226,7 @@ public:
     while (current_order > order) {
       current_order--;
 
-      auto buddy_res = block.try_add(1ULL << current_order);
+      auto buddy_res = block.try_add(size_t{1} << current_order);
       if (!buddy_res)
         return unexpected(buddy_res.error()); // Unreachable if OS layout is sane
 
@@ -304,7 +304,7 @@ public:
     // Standard split down to the bounding 'order'
     while (current_order > order) {
       current_order--;
-      auto buddy_res = block.try_add(1ULL << current_order);
+      auto buddy_res = block.try_add(size_t{1} << current_order);
       if (!buddy_res)
         return unexpected(buddy_res.error());
 
@@ -321,7 +321,7 @@ public:
 
     while (remaining_needed > 0 && chunk_order > 0) {
       chunk_order--;
-      size_t half_size = 1ULL << chunk_order;
+      size_t half_size = size_t{1} << chunk_order;
 
       auto buddy_res = current_chunk.try_add(half_size);
       if (!buddy_res)
@@ -370,7 +370,7 @@ public:
       // Find the maximum order that fits in the remaining space AND
       // strictly maintains natural power-of-two physical alignment.
       while (order < MaxOrder) {
-        size_t next_order_pages = 1ULL << (order + 1);
+        size_t next_order_pages = size_t{1} << (order + 1);
 
         // Must fit in the remaining requested pages
         if (next_order_pages > remaining)
@@ -385,10 +385,10 @@ public:
 
       free(current, order);
 
-      remaining -= (1ULL << order);
+      remaining -= (size_t{1} << order);
 
       if (remaining > 0) {
-        auto next_res = current.try_add(1ULL << order);
+        auto next_res = current.try_add(size_t{1} << order);
         RELOCO_ASSERT(next_res.has_value(), "buddy_allocator: free_n crossed illegal zone boundary");
         current = *next_res;
       }
@@ -421,7 +421,7 @@ public:
 
     size_t order = MaxOrder;
     while (true) {
-      size_t block_pages = 1ULL << order;
+      size_t block_pages = size_t{1} << order;
 
       for (auto os_page : free_areas_[order]) {
         page_type block = page_type::from_os_page(os_page);
@@ -443,7 +443,7 @@ public:
         size_t current_order = order;
         while (current_order > 0) {
           current_order--;
-          size_t half_pages = 1ULL << current_order;
+          size_t half_pages = size_t{1} << current_order;
 
           auto buddy_res = current.try_add(half_pages);
           RELOCO_ASSERT(buddy_res.has_value(), "buddy_allocator: reserve split crossed illegal zone boundary");
@@ -546,7 +546,7 @@ public:
           auto alloc_page = block.try_add(front_padding).value();
 
           // Carve out the back padding and return it to the buddy system
-          size_t back_padding = (1ULL << order) - front_padding - num_pages;
+          size_t back_padding = (size_t{1} << order) - front_padding - num_pages;
           if (back_padding > 0) {
             auto back_page = alloc_page.try_add(num_pages).value();
             free_n(back_page, back_padding);
@@ -608,7 +608,7 @@ public:
         block.set_buddy_order(static_cast<uint16_t>(order));
 
         // We found a smaller, but perfectly contiguous power-of-two block!
-        return range_allocation{block, 1ULL << order};
+        return range_allocation{block, size_t{1} << order};
       }
       if (order == 0)
         break;
