@@ -106,6 +106,10 @@ TEST(FramebufferConsoleTest, SpaceGlyphRendersBlank) {
       framebuffer_console<xrgb8888>::try_create(*fb, reloco::span<console_cell>(cell_storage, kCols * kRows));
   ASSERT_TRUE(console);
 
+  // Cell (0, 0) is where the (visible-by-default) emulated cursor
+  // starts; hide it so this test observes the glyph's plain colors
+  // rather than the cursor's reverse video.
+  console->set_cursor_visible(false);
   console->put_cell(0, 0, ' ', console_color::white, console_color::blue);
   rgb_color expected_bg = console_color_to_rgb(console_color::blue);
   for (std::size_t row = 0; row < block_font_8x8::glyph_height; ++row) {
@@ -113,6 +117,76 @@ TEST(FramebufferConsoleTest, SpaceGlyphRendersBlank) {
       EXPECT_EQ(px(console->pixels(), col, row), expected_bg);
     }
   }
+}
+
+TEST(FramebufferConsoleTest, CursorIsVisibleAtOriginByDefaultInReverseVideo) {
+  std::byte fb_storage[kFbWidth * kFbHeight * 4]{};
+  auto fb = framebuffer<xrgb8888>::try_create(reloco::span<std::byte>(fb_storage, sizeof(fb_storage)), kFbWidth,
+                                              kFbHeight, kFbWidth * 4);
+  ASSERT_TRUE(fb);
+  console_cell cell_storage[kCols * kRows]{};
+  auto console =
+      framebuffer_console<xrgb8888>::try_create(*fb, reloco::span<console_cell>(cell_storage, kCols * kRows));
+  ASSERT_TRUE(console);
+
+  // Cell (0, 0) was cleared to space/light_gray-on-black by try_create,
+  // but the cursor defaults to visible there, so it should rasterize
+  // in reverse video: black foreground on light_gray background.
+  rgb_color expected_cursor_bg = console_color_to_rgb(console_color::light_gray);
+  for (std::size_t row = 0; row < block_font_8x8::glyph_height; ++row) {
+    for (std::size_t col = 0; col < block_font_8x8::glyph_width; ++col) {
+      EXPECT_EQ(px(console->pixels(), col, row), expected_cursor_bg);
+    }
+  }
+}
+
+TEST(FramebufferConsoleTest, MoveCursorRestoresOldCellAndReversesNewCell) {
+  std::byte fb_storage[kFbWidth * kFbHeight * 4]{};
+  auto fb = framebuffer<xrgb8888>::try_create(reloco::span<std::byte>(fb_storage, sizeof(fb_storage)), kFbWidth,
+                                              kFbHeight, kFbWidth * 4);
+  ASSERT_TRUE(fb);
+  console_cell cell_storage[kCols * kRows]{};
+  auto console =
+      framebuffer_console<xrgb8888>::try_create(*fb, reloco::span<console_cell>(cell_storage, kCols * kRows));
+  ASSERT_TRUE(console);
+
+  console->put_cell(1, 0, 'A', console_color::white, console_color::black);
+  console->move_cursor(1, 0);
+
+  // Old cursor cell (0, 0) should now show its normal (space/light_gray
+  // on black) colors, not reverse video.
+  rgb_color expected_old_bg = console_color_to_rgb(console_color::black);
+  EXPECT_EQ(px(console->pixels(), 0, 0), expected_old_bg);
+
+  // New cursor cell (1, 0) holds 'A' (white-on-black); block_font_8x8
+  // renders every printable non-space char as a solid block of `fg`,
+  // so in reverse video (fg/bg swapped: black-on-white) every pixel
+  // should be the swapped foreground color, black.
+  rgb_color expected_new_fg = console_color_to_rgb(console_color::black);
+  for (std::size_t row = 0; row < block_font_8x8::glyph_height; ++row) {
+    for (std::size_t col = 0; col < block_font_8x8::glyph_width; ++col) {
+      EXPECT_EQ(px(console->pixels(), 1 * block_font_8x8::glyph_width + col, row), expected_new_fg);
+    }
+  }
+}
+
+TEST(FramebufferConsoleTest, SetCursorVisibleFalseRestoresNormalColors) {
+  std::byte fb_storage[kFbWidth * kFbHeight * 4]{};
+  auto fb = framebuffer<xrgb8888>::try_create(reloco::span<std::byte>(fb_storage, sizeof(fb_storage)), kFbWidth,
+                                              kFbHeight, kFbWidth * 4);
+  ASSERT_TRUE(fb);
+  console_cell cell_storage[kCols * kRows]{};
+  auto console =
+      framebuffer_console<xrgb8888>::try_create(*fb, reloco::span<console_cell>(cell_storage, kCols * kRows));
+  ASSERT_TRUE(console);
+
+  console->set_cursor_visible(false);
+  rgb_color expected_bg = console_color_to_rgb(console_color::black);
+  EXPECT_EQ(px(console->pixels(), 0, 0), expected_bg);
+
+  console->set_cursor_visible(true);
+  rgb_color expected_cursor_bg = console_color_to_rgb(console_color::light_gray);
+  EXPECT_EQ(px(console->pixels(), 0, 0), expected_cursor_bg);
 }
 
 TEST(FramebufferConsoleTest, AdaptsToConsoleRefAndSupportsScrollViaShadowGetCell) {
@@ -137,6 +211,28 @@ TEST(FramebufferConsoleTest, AdaptsToConsoleRefAndSupportsScrollViaShadowGetCell
   auto c = ref.get_char(0, 0);
   ASSERT_TRUE(c);
   EXPECT_EQ(c->ch, 'B');
+}
+
+TEST(FramebufferConsoleTest, ConsoleRefSetCursorForwardsToSoftwareCursor) {
+  std::byte fb_storage[kFbWidth * kFbHeight * 4]{};
+  auto fb = framebuffer<xrgb8888>::try_create(reloco::span<std::byte>(fb_storage, sizeof(fb_storage)), kFbWidth,
+                                              kFbHeight, kFbWidth * 4);
+  ASSERT_TRUE(fb);
+  console_cell cell_storage[kCols * kRows]{};
+  auto backend =
+      framebuffer_console<xrgb8888>::try_create(*fb, reloco::span<console_cell>(cell_storage, kCols * kRows));
+  ASSERT_TRUE(backend);
+
+  console_ref ref(*backend);
+  ref.set_cursor(2, 0);
+
+  rgb_color expected_origin_bg = console_color_to_rgb(console_color::black);
+  EXPECT_EQ(px(*fb, 0, 0), expected_origin_bg);
+  rgb_color expected_cursor_bg = console_color_to_rgb(console_color::light_gray);
+  EXPECT_EQ(px(*fb, 2 * block_font_8x8::glyph_width, 0), expected_cursor_bg);
+
+  ref.set_cursor_visible(false);
+  EXPECT_EQ(px(*fb, 2 * block_font_8x8::glyph_width, 0), expected_origin_bg);
 }
 
 TEST(ConsoleColorToRgbTest, MapsAllSixteenColorsToDistinctRgbValues) {

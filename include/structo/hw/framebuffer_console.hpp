@@ -46,6 +46,24 @@
  * legible text; `block_font_8x8` only proves the rendering pipeline
  * works and is good enough for cursor/cell-geometry testing.
  *
+ * ## Software cursor
+ *
+ * Unlike `vga_text_console` (a real CRTC hardware cursor register this
+ * backend has no equivalent of), `framebuffer_console` *emulates* a
+ * visible cursor entirely in software: it implements the optional
+ * `console_traits::move_cursor`/`set_cursor_visible` customization
+ * points (see `console_ref.hpp`'s own docs) by rendering the cursor
+ * cell's glyph in reverse video (foreground/background swapped) --
+ * exactly what a classic "block cursor" terminal looks like -- rather
+ * than drawing a separate overlay shape. Whichever cell currently holds
+ * the logical cursor position is kept in reverse video automatically:
+ * moving the cursor (`console_ref::set_cursor`) restores the old cell's
+ * normal colors and reverses the new one, `set_cursor_visible(false)`
+ * restores normal colors without forgetting the position, and writing
+ * new content *at* the current cursor cell (`write_char`, `scroll_up`
+ * shifting a row through it, ...) keeps rendering it reversed rather
+ * than momentarily flashing normal colors.
+ *
  * @code
  * std::byte fb_memory[640 * 480 * 4];
  * auto fb = structo::hw::framebuffer<structo::hw::xrgb8888>::try_create(
@@ -177,15 +195,49 @@ public:
 
   /** @brief Writes `ch`/`fg`/`bg` at `(x, y)`: updates the shadow cell
    * and rasterizes the glyph. UB if out of bounds; callers normally
-   * reach this only through a bounds-checked @ref console_ref. */
+   * reach this only through a bounds-checked @ref console_ref. If
+   * `(x, y)` is the current (visible) cursor cell, rasterizes it in
+   * reverse video instead, so writing at the cursor never momentarily
+   * "erases" it. */
   void put_cell(std::size_t x, std::size_t y, char ch, console_color fg, console_color bg) noexcept {
     cell_storage_[y * columns_ + x] = {ch, fg, bg};
-    draw_glyph(x, y, ch, fg, bg);
+    draw_cell(x, y, ch, fg, bg);
   }
 
   /** @brief Reads the shadow cell at `(x, y)`. UB if out of bounds. */
   [[nodiscard]] console_cell get_cell(std::size_t x, std::size_t y) const noexcept {
     return cell_storage_[y * columns_ + x];
+  }
+
+  /** @brief Moves the emulated software cursor to `(x, y)`: restores
+   * the previous cursor cell's normal colors and, if the cursor is
+   * currently visible, rasterizes the new cell in reverse video. UB if
+   * out of bounds. */
+  void move_cursor(std::size_t x, std::size_t y) noexcept {
+    if (x == cursor_x_ && y == cursor_y_) {
+      return;
+    }
+    std::size_t old_x = cursor_x_;
+    std::size_t old_y = cursor_y_;
+    // Update the cursor position *before* redrawing the old cell, so
+    // that redraw -- which checks "is this the cursor cell?" -- sees
+    // the old cell as no longer current and renders it in normal
+    // colors rather than re-triggering reverse video.
+    cursor_x_ = x;
+    cursor_y_ = y;
+    redraw_cell(old_x, old_y);
+    redraw_cell(cursor_x_, cursor_y_);
+  }
+
+  /** @brief Shows/hides the emulated software cursor, redrawing the
+   * cursor cell either in reverse video (visible) or its normal colors
+   * (hidden). */
+  void set_cursor_visible(bool visible) noexcept {
+    if (visible == cursor_visible_) {
+      return;
+    }
+    cursor_visible_ = visible;
+    redraw_cell(cursor_x_, cursor_y_);
   }
 
 private:
@@ -198,6 +250,24 @@ private:
       for (std::size_t x = 0; x < columns_; ++x) {
         put_cell(x, y, ' ', console_color::light_gray, console_color::black);
       }
+    }
+  }
+
+  /** @brief Rasterizes `(x, y)` using its current shadow cell content,
+   * in reverse video if it is the visible cursor cell, normally
+   * otherwise. */
+  void redraw_cell(std::size_t x, std::size_t y) noexcept {
+    console_cell cell = cell_storage_[y * columns_ + x];
+    draw_cell(x, y, cell.ch, cell.fg, cell.bg);
+  }
+
+  /** @brief Rasterizes `ch`/`fg`/`bg` at `(x, y)`, swapping `fg`/`bg`
+   * if `(x, y)` is the current cell and the cursor is visible. */
+  void draw_cell(std::size_t x, std::size_t y, char ch, console_color fg, console_color bg) noexcept {
+    if (cursor_visible_ && x == cursor_x_ && y == cursor_y_) {
+      draw_glyph(x, y, ch, bg, fg);
+    } else {
+      draw_glyph(x, y, ch, fg, bg);
     }
   }
 
@@ -221,6 +291,9 @@ private:
   std::size_t columns_ = 0;
   std::size_t rows_ = 0;
   span<console_cell> cell_storage_{};
+  std::size_t cursor_x_ = 0;
+  std::size_t cursor_y_ = 0;
+  bool cursor_visible_ = true;
 };
 
 /** @brief Adapts @ref framebuffer_console to @ref console_ref. */
@@ -235,6 +308,8 @@ template <typename PixelFormat, typename Font> struct console_traits<framebuffer
   }
   static std::size_t columns(const backend &b) noexcept { return b.columns(); }
   static std::size_t rows(const backend &b) noexcept { return b.rows(); }
+  static void move_cursor(backend &b, std::size_t x, std::size_t y) noexcept { b.move_cursor(x, y); }
+  static void set_cursor_visible(backend &b, bool visible) noexcept { b.set_cursor_visible(visible); }
 };
 
 } // namespace hw
