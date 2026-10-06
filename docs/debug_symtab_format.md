@@ -504,38 +504,3 @@ standalone (no fallback needed, at the cost of the duplicated
 (dynamic symbols excluded) requires pairing it with the fallback above to
 cover the whole address space.
 
-## Testing plan (once implemented)
-
-* Round-trip: a small synthetic ELF (or a hand-built in-memory blob
-  matching the spec) decoded back to the expected `(address, name)`
-  pairs, including truncation and `repeat_previous` cases.
-* Boundary addresses: before the first symbol, exactly on a symbol,
-  between two symbols, after the last symbol, on the last entry of a
-  group, on the first entry of a non-first group (checkpoint-boundary
-  coverage).
-* Corrupt/short blob rejection (bad magic, truncated header, bad
-  `addr_width`, CRC mismatch).
-* Build-ID correlation: matching bytes accepted, mismatched bytes
-  rejected, absent build-ID (`build_id_size == 0`) always accepted.
-* Huffman decode correctness: a multi-symbol alphabet round-trips
-  exactly; the degenerate `huffman_symbol_count == 0` raw-fallback path
-  (empty blob, or every kept name reducing to fewer than 2 distinct
-  bytes); `repeat_previous` interacting correctly with Huffman-coded
-  literal names; a name whose bit-packed encoding crosses one or more
-  byte boundaries; a maximal `length == 127` name; a corrupt/truncated
-  Huffman table (bad `max_code_len`, `huffman_table_size` mismatch,
-  `length_counts` not summing to `huffman_symbol_count`) rejected by
-  `try_create()`.
-* `elf_symtab_to_blob.py` against a real small compiled ELF fixture,
-  asserting the filter/truncation/merge rules above -- in particular that
-  `STB_LOCAL`/hidden-visibility symbols are kept by default and only
-  dropped with `--drop-local`/`--drop-hidden-visibility`, and that a
-  `.dynsym`-exported address is excluded by default and only kept with
-  `--keep-dynamic` -- run as part of the existing test suite (`tests/`)
-  the same way other generated-asset tooling is exercised.
-
----
-
-Please review/edit this document; implementation (`debug_symtab.hpp`,
-`debug_symtab_format.hpp` internal codec primitives, the encoder script,
-and tests) starts once it is approved.
