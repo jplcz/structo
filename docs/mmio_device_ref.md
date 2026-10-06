@@ -150,4 +150,8 @@ trivially.
   framebuffer.
 - [`mmio_framebuffer_device.md`](mmio_framebuffer_device.md) -- the
   same split applied to raw pixels instead of text cells.
+- [`mmio_gpu_command_buffer_device.md`](mmio_gpu_command_buffer_device.md)
+  -- a pseudo hardware-accelerated 2D drawing device built the same
+  way: a directly-mapped command buffer plus a trapped "execute"
+  doorbell.
 - [`reference.md`](reference.md) -- the full per-header API map.

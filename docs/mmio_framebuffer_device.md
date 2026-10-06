@@ -150,4 +150,7 @@ rejecting a too-small external buffer.
 - [`mmio_text_console.md`](mmio_text_console.md) -- the same
   "plain-memory data plane, trapped control plane" split, for a
   character-cell text console instead of raw pixels.
+- [`mmio_gpu_command_buffer_device.md`](mmio_gpu_command_buffer_device.md)
+  -- a pseudo hardware-accelerated 2D drawing device typically paired
+  with this device as its `gpu_accel_ref` rendering target.
 - [`reference.md`](reference.md) -- the full per-header API map.

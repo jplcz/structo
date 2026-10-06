@@ -393,6 +393,8 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_mmio_print_device.cpp
         tests/test_mmio_text_console.cpp
         tests/test_mmio_framebuffer_device.cpp
+        tests/test_gpu_accel_ref.cpp
+        tests/test_mmio_gpu_command_buffer_device.cpp
     )
     target_link_libraries(jplcz_structo_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)

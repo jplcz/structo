@@ -98,4 +98,5 @@ independent of any particular `PixelFormat`'s in-memory encoding, with
 
 See also: [`uart_ref.md`](uart_ref.md), [`timer_ref.md`](timer_ref.md),
 [`framebuffer_console.md`](framebuffer_console.md) (rasterizes a text
-console onto a `framebuffer<PixelFormat>`).
+console onto a `framebuffer<PixelFormat>`), [`gpu_accel_ref.md`](gpu_accel_ref.md)
+(type-erases this drawing vocabulary over a customizable backend).
