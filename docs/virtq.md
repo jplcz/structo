@@ -26,7 +26,7 @@ Contents:
 6. [Integration: hypervisor and guest](#6-integration-hypervisor--guest)
 7. [Integration: user space and kernel (software only)](#7-integration-user-space--kernel-software-only)
 8. [Integration: two devices over a PCIe BAR](#8-integration-two-devices-over-a-pcie-bar)
-9. [Linux kernel virtio on one side, structo on the other](#9-linux-kernel-virtio-on-one-side-structo-on-the-other)
+9. [Linux and FreeBSD guests on one side, structo on the other](#9-linux-and-freebsd-guests-on-one-side-structo-on-the-other)
 10. [Example: forwarding hypervisor logs to a Linux guest](#10-example-forwarding-hypervisor-logs-to-a-linux-guest)
 11. [Hostile-peer rules](#11-hostile-peer-rules)
 
@@ -1558,17 +1558,20 @@ sequenceDiagram
 
 ---
 
-## 9. Linux kernel virtio on one side, structo on the other
+## 9. Linux and FreeBSD guests on one side, structo on the other
 
-**What this is, and why.** Most real virtio traffic has a Linux guest on one
-end. Linux ships a mature *driver-side* API (`virtqueue_*`) and a
-virtio-mmio/virtio-pci *transport*. structo's device classes can sit on the
-other end (a VMM, a firmware device, a user-space backend) and speak to an
-unmodified Linux guest. This section maps one API onto the other.
+**What this is, and why.** Most real virtio traffic has a Linux or FreeBSD
+guest on one end. Both ship a mature *driver-side* API (Linux `virtqueue_*`,
+FreeBSD `virtqueue_*` plus `sglist(9)`) and a virtio-mmio/virtio-pci
+*transport*. structo's device classes can sit on the other end (a VMM, a
+firmware device, a user-space backend) and speak to an unmodified guest. This
+section maps these APIs onto structo's, with a Linux and a FreeBSD driver for
+each example (9.3 and 9.3.1, 10.3 and 10.3.1).
 
-> The Linux snippets below are **illustrative** (written from the in-tree
-> API, not built here; names and signatures change between kernel versions,
-> notably `virtio_find_vqs`). The structo snippets were compiled with
+> The Linux and FreeBSD snippets below are **illustrative** (written from the
+> in-tree APIs, not built here; names and signatures change between kernel
+> versions, notably Linux `virtio_find_vqs`). The structo snippets were
+> compiled with
 > `-Wall -Wextra -Wpedantic -Wshadow -Wconversion` and run under
 > ASan/UBSan against a simulated guest that performs the Linux handshake.
 > The virtio-mmio *transport* glue (registers below) is user code: the library
@@ -1680,6 +1683,131 @@ MODULE_LICENSE("GPL");
 Tell the guest the device exists, either with a device-tree node
 (`compatible = "virtio,mmio"; reg = <base size>; interrupts = <...>;`) or on
 the kernel command line: `virtio_mmio.device=0x200@0xd0000000:5`.
+
+#### 9.3.1 FreeBSD guest driver (sketch)
+
+**What this is:** the same private "echo" driver for FreeBSD. **Why:** a
+FreeBSD guest produces exactly the same descriptors, so the structo device
+model in 9.4 serves both unchanged. Only the guest-side calls differ:
+
+| Linux | FreeBSD (`dev/virtio/virtqueue.h`, `sglist(9)`) |
+|---|---|
+| `virtio_driver` + `module_virtio_driver` | newbus `driver_t` + `VIRTIO_DRIVER_MODULE` (attaches under `virtio_mmio` and `virtio_pci`) |
+| `virtio_find_single_vq(vdev, cb, name)` | `VQ_ALLOC_INFO_INIT` + `virtio_alloc_virtqueues` + `virtio_setup_intr` |
+| `sg_init_one` + `virtqueue_add_sgs` | `sglist_append` + `virtqueue_enqueue(vq, cookie, sg, readable, writable)` |
+| `virtqueue_kick` | `virtqueue_notify` |
+| `virtqueue_get_buf` | `virtqueue_dequeue` |
+| `virtqueue_disable_cb` / `enable_cb` | `virtqueue_disable_intr` / `virtqueue_enable_intr` |
+| `virtio_device_ready` | done by the bus after attach; use `virtio_attach_completed` to act afterwards |
+
+```c
+#include <sys/param.h>
+#include <sys/systm.h>
+#include <sys/kernel.h>
+#include <sys/module.h>
+#include <sys/malloc.h>
+#include <sys/bus.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
+#include <sys/sglist.h>
+#include <dev/virtio/virtio.h>
+#include <dev/virtio/virtqueue.h>
+
+#define ECHO_DEVICE_ID 0x4242            /* private; real IDs are assigned by OASIS */
+
+struct echo_softc {
+  device_t          dev;
+  struct virtqueue *vq;
+  struct mtx        mtx;                 /* protects the virtqueue */
+  struct sglist    *sg;                  /* scratch scatter/gather list: 2 segments */
+  char             *req, *rsp;           /* malloc(9) memory: the guest-physical addresses of these are what the device sees */
+};
+
+static int echo_probe(device_t dev) {
+  if (virtio_get_device_type(dev) != ECHO_DEVICE_ID)   /* the DeviceID register (0x008) */
+    return ENXIO;
+  device_set_desc(dev, "VirtIO echo");
+  return BUS_PROBE_DEFAULT;
+}
+
+static void echo_intr(void *arg) {                     /* arg = the softc passed to VQ_ALLOC_INFO_INIT; runs on the device IRQ */
+  struct echo_softc *sc = arg;
+  uint32_t len;                                        /* out: bytes the device wrote */
+  mtx_lock(&sc->mtx);
+  while (virtqueue_dequeue(sc->vq, &len) != NULL)      /* returns the cookie given to enqueue; NULL = nothing completed */
+    device_printf(sc->dev, "echo: %s\n", sc->rsp);
+  mtx_unlock(&sc->mtx);
+}
+
+static int echo_attach(device_t dev) {
+  struct echo_softc *sc = device_get_softc(dev);
+  struct vq_alloc_info vq_info;
+  int error;
+
+  sc->dev = dev;
+  mtx_init(&sc->mtx, "echo", NULL, MTX_DEF);
+  virtio_negotiate_features(dev, 0);                   /* (dev, features we support): offer none beyond the transport's */
+  /* (info, nsegs, intr, arg, vqp, fmt, ...):
+       nsegs = max scatter/gather segments per request; > 1 asks for indirect descriptors if the
+               device offers them (0 = never use indirect; see the pitfalls in 9.6)
+       intr  = interrupt handler for this queue, arg = its argument
+       vqp   = where the allocated virtqueue pointer is stored
+       fmt   = queue name, shown in interrupt statistics */
+  VQ_ALLOC_INFO_INIT(&vq_info, 0, echo_intr, sc, &sc->vq, "%s request", device_get_nameunit(dev));
+  error = virtio_alloc_virtqueues(dev, 0, 1, &vq_info); /* (dev, flags, number of queues, info array) */
+  if (error) return error;
+  error = virtio_setup_intr(dev, INTR_TYPE_MISC);      /* hooks the interrupt; the bus sets DRIVER_OK after attach */
+  if (error) return error;
+
+  sc->req = malloc(64, M_DEVBUF, M_WAITOK | M_ZERO);   /* malloc(9) memory; sglist_append resolves the physical pages */
+  sc->rsp = malloc(64, M_DEVBUF, M_WAITOK | M_ZERO);
+  sc->sg  = sglist_alloc(2, M_WAITOK);                 /* room for 2 segments */
+  return 0;
+}
+
+static void echo_attach_completed(device_t dev) {      /* the device is now live (DRIVER_OK is set): safe to submit */
+  struct echo_softc *sc = device_get_softc(dev);
+
+  strlcpy(sc->req, "ping from guest", 64);
+  sglist_reset(sc->sg);
+  sglist_append(sc->sg, sc->req, 64);                  /* (sglist, kernel virtual address, length): device-readable first */
+  sglist_append(sc->sg, sc->rsp, 64);                  /* then device-writable */
+  mtx_lock(&sc->mtx);
+  /* (vq, cookie, sglist, readable_segments, writable_segments):
+       cookie   = returned by virtqueue_dequeue (structo's "token");
+       readable = how many leading segments the device may READ (1: req);
+       writable = how many following segments the device may WRITE (1: rsp). */
+  (void)virtqueue_enqueue(sc->vq, sc, sc->sg, 1, 1);
+  virtqueue_notify(sc->vq);                            /* QueueNotify if the device wants it */
+  mtx_unlock(&sc->mtx);
+}
+
+static int echo_detach(device_t dev) {
+  struct echo_softc *sc = device_get_softc(dev);
+  virtio_stop(dev);                                    /* reset the device, then free its queues */
+  if (sc->vq != NULL) virtqueue_free(sc->vq);
+  if (sc->sg != NULL) sglist_free(sc->sg);
+  free(sc->req, M_DEVBUF); free(sc->rsp, M_DEVBUF);
+  mtx_destroy(&sc->mtx);
+  return 0;
+}
+
+static device_method_t echo_methods[] = {
+  DEVMETHOD(device_probe,           echo_probe),
+  DEVMETHOD(device_attach,          echo_attach),
+  DEVMETHOD(device_detach,          echo_detach),
+  DEVMETHOD(virtio_attach_completed, echo_attach_completed),
+  DEVMETHOD_END
+};
+static driver_t echo_driver = { "virtio_echo", echo_methods, sizeof(struct echo_softc) };
+VIRTIO_DRIVER_MODULE(virtio_echo, echo_driver, NULL, NULL);
+MODULE_VERSION(virtio_echo, 1);
+MODULE_DEPEND(virtio_echo, virtio, 1, 1, 1);
+```
+
+Discovery is the same device-tree node (`compatible = "virtio,mmio"`) on
+platforms where FreeBSD's `virtio_mmio` attaches via FDT (arm64, RISC-V); with
+virtio-pci the driver is identical, only the transport differs.
 
 ### 9.4 structo device model (virtio-mmio v2)
 
@@ -1794,6 +1922,9 @@ posting; the peer is untrusted for everything it writes back (section 11).
 | **Interrupt re-check** | Linux's `virtqueue_enable_cb()` returning false means more work arrived; it is the same enable → barrier → re-check loop as 7.2. |
 | **DMA-able buffers** | Guest buffers must come from `kmalloc`, not stack or `vmalloc`; otherwise the addresses you receive are garbage. |
 | **Kernel-version drift** | `virtio_find_vqs` and callback signatures changed across releases; check your kernel's headers. |
+| **FreeBSD: no packed ring** | FreeBSD's `virtqueue.c` drives the split ring (check your tree). A structo device may offer packed as an *option*, but must work when the guest does not negotiate it. |
+| **FreeBSD: indirect** | The `nsegs` argument of `VQ_ALLOC_INFO_INIT` decides whether the guest uses indirect descriptors (when the device offers them). Same rule as above: `try_pop(storage, buf_mem)` or don't offer the feature. |
+| **FreeBSD: `DRIVER_OK` timing** | The bus sets `DRIVER_OK` after `device_attach` returns. Do not wait for the device inside attach; start I/O from `virtio_attach_completed`. |
 | **Transport is yours** | No virtio-mmio / virtio-pci transport ships in the library; the register glue above is application code. |
 
 ---
@@ -1952,6 +2083,70 @@ Probe is the same as 9.3: `virtio_find_single_vq(vdev, logq_cb, "log")`,
 allocate the buffers with `kmalloc`, call `logq_post` for each,
 `virtio_device_ready(vdev)`, then `virtqueue_kick`. Expose the text through
 `printk` as above, or a `misc` device or debugfs file if you want a reader.
+
+#### 10.3.1 FreeBSD guest side (sketch, not compiled)
+
+**What this is:** the FreeBSD counterpart of the log receiver above. **Why:**
+the receive-queue pattern is identical; FreeBSD expresses "device-writable
+only" as `virtqueue_enqueue(vq, cookie, sg, 0, 1)` and the callback-suppression
+loop as `virtqueue_disable_intr` / `virtqueue_enable_intr`.
+
+```c
+#define LOGQ_BUFS   16     /* pre-posted receive buffers = queue depth in log records */
+#define LOGQ_BUF_SZ 128    /* size of each buffer in bytes */
+
+struct logq_hdr { uint32_t len; uint32_t dropped; uint64_t seq; };  /* little-endian on the wire */
+
+struct logq_softc {
+  device_t          dev;
+  struct virtqueue *vq;
+  struct mtx        mtx;
+  struct sglist    *sg;               /* scratch list, 1 segment, reused for every post */
+  char             *buf[LOGQ_BUFS];   /* malloc(9) memory */
+};
+
+/* Hand buffer `b` to the device as writable. Used at start-up and to give a buffer back.
+   Caller holds sc->mtx. */
+static int logq_post(struct logq_softc *sc, char *b) {
+  sglist_reset(sc->sg);
+  sglist_append(sc->sg, b, LOGQ_BUF_SZ);               /* (sglist, address, length): one device-writable segment */
+  return virtqueue_enqueue(sc->vq, b, sc->sg, 0, 1);
+  /* (vq, cookie = the buffer itself so dequeue returns it, sglist,
+      readable = 0 segments, writable = 1 segment) */
+}
+
+static void logq_intr(void *arg) {                     /* arg = softc given to VQ_ALLOC_INFO_INIT */
+  struct logq_softc *sc = arg;
+  uint32_t len;                                        /* out: bytes the device wrote */
+  char *b;
+
+  mtx_lock(&sc->mtx);
+again:
+  while ((b = virtqueue_dequeue(sc->vq, &len)) != NULL) {   /* cookie (buffer) or NULL */
+    struct logq_hdr *h = (struct logq_hdr *)b;
+    if (len >= sizeof(*h) && len <= LOGQ_BUF_SZ &&
+        le32toh(h->len) <= len - sizeof(*h)) {         /* validate lengths anyway */
+      if (h->dropped != 0)
+        device_printf(sc->dev, "hv-log: %u records lost\n", le32toh(h->dropped));
+      device_printf(sc->dev, "hv: %.*s\n", (int)le32toh(h->len), b + sizeof(*h));
+    }
+    (void)logq_post(sc, b);                            /* give the buffer back */
+  }
+  if (virtqueue_enable_intr(sc->vq) != 0) {            /* non-zero: more completions arrived meanwhile ... */
+    virtqueue_disable_intr(sc->vq);                    /* ... so suppress again and drain (same re-check as 7.2) */
+    goto again;
+  }
+  virtqueue_notify(sc->vq);                            /* tell the device buffers are free */
+  mtx_unlock(&sc->mtx);
+}
+```
+
+Attach is the same as 9.3.1: `VQ_ALLOC_INFO_INIT(&info, 0, logq_intr, sc, &sc->vq, "%s log", ...)`,
+`virtio_alloc_virtqueues`, `virtio_setup_intr`, allocate `LOGQ_BUFS` buffers
+with `malloc(9)` and a one-segment `sglist_alloc(1, M_WAITOK)`; post every
+buffer from `virtio_attach_completed` with `logq_post`, then
+`virtqueue_notify`. The structo `log_forwarder` from 10.2 serves Linux and
+FreeBSD guests identically.
 
 ### 10.4 Design notes
 
