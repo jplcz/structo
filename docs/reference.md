@@ -27,6 +27,7 @@ have a linked, standalone page going into more depth.
 - [Debugging utilities](#debugging-utilities)
 - [Synchronization & interrupt/preemption guards](#synchronization-interruptpreemption-guards)
 - [Hypervisor: vCPU state & trap/hypercall dispatch](#hypervisor-vcpu-state-traphypercall-dispatch)
+- [VIRTIO virtqueues (`virtio/`)](#virtio-virtqueues-virtio)
 
 ## Boot & devicetree discovery
 
@@ -209,3 +210,18 @@ have a linked, standalone page going into more depth.
 | [`hypervisor/mmio_framebuffer_device.hpp`](mmio_framebuffer_device.md) | `mmio_framebuffer_device<PixelFormat>`, `pixel_format_id<PixelFormat>` (+ its `mmio_device_traits` specialization) | Emulated linear-framebuffer graphics device wrapping `hw::framebuffer<PixelFormat>`: either an allocator-owned, page-aligned pixel buffer a guest can write directly with no VM exit, or bound over caller-supplied external memory (e.g. an SDL texture's locked pixels); a small trapped "virtual GPU control" register window reports geometry/format and exposes a `present` doorbell |
 | [`hypervisor/mmio_gpu_command_buffer_device.hpp`](mmio_gpu_command_buffer_device.md) | `mmio_gpu_command_buffer_device`, `gpu_command`, `gpu_command_opcode` (+ its `mmio_device_traits` specialization) | Pseudo hardware-accelerated 2D drawing device: an allocator-owned, page-aligned command buffer the guest fills directly with no VM exit, executed synchronously against a bound `hw::gpu_accel_ref` target on a single trapped `execute` doorbell write -- `clear`/`fill_rect`/`draw_rect`/`draw_line`/`put_pixel` opcodes, negative/out-of-range operands silently no-op rather than wrapping |
 
+## VIRTIO virtqueues (`virtio/`)
+
+Design: [virtio_queue_design.md](virtio_queue_design.md). Work in progress; transports follow in later phases.
+
+| Header | Type(s) | One-line summary |
+|---|---|---|
+| [`virtio/virtq_types.hpp`](virtq.md) | `virtq_desc`, `virtq_used_elem`, `virtq_packed_desc`, `virtq_packed_event`, `desc_f_*`/`feature_*` constants, `need_event()` | VIRTIO 1.x split/packed ring wire structures (little-endian hosts only, layout `static_assert`ed), flag/feature constants, EVENT_IDX arithmetic |
+| [`virtio/virtq_layout.hpp`](virtq.md) | `try_split_layout`, `try_packed_layout`, `split_ring_addrs<RingSpace>`, `packed_ring_addrs<RingSpace>`, `try_checked_index` | Ring sizing/alignment and address-space-tagged ring-area addresses; speculation-safe peer-index validation |
+| [`virtio/virtq_memory.hpp`](virtq.md) | `virtq_memory_traits<Mem, Space>`, `direct_virtq_memory<Space>`, `try_read_object`, `try_write_object` | Tagged, fallible, copy-out-only access to ring/buffer memory (TOCTOU- and speculation-hardened) |
+| [`virtio/virtq_barrier.hpp`](virtq.md) | `smp_virtq_barriers` | Barrier policy (`wmb`/`rmb`/`mb`) for split-ring publish/consume ordering |
+| [`virtio/virtq_chain.hpp`](virtq.md) | `avail_chain<BufSpace>`, `chain_segment<BufSpace>`, `try_read_chain`, `try_write_chain` | Bounds-checked copy in/out of a popped descriptor chain's readable/writable segments |
+| [`virtio/split_ring.hpp`](virtq.md) | `split_virtq_driver<RingSpace, BufSpace, Mem, Barriers>`, `split_virtq_device<...>` | Split-ring driver (`try_add`/`try_publish`/`try_get_used`) and device (`try_pop`/`try_push_used`) with optional EVENT_IDX and indirect descriptors (`try_add_indirect`, `try_pop(storage, buf_mem)`), hostile-peer validation and sticky broken state |
+| [`virtio/packed_ring.hpp`](virtq.md) | `packed_virtq_driver<RingSpace, BufSpace, Mem, Barriers>`, `packed_virtq_device<...>`, `packed_driver_slot` | Packed-ring driver (`try_add`/`needs_notify`/`try_get_used`) and device (`try_pop`/`try_push_used`/`should_interrupt`): wrap-counter ownership, out-of-order completion, optional EVENT_IDX, hostile-peer validation and sticky broken state |
+| [`virtio/virtq_memory_adapters.hpp`](virtq.md) | `virtq_memory_ref<Space>`, `translating_virtq_memory<Translator, Inner>` | Type-erased ring memory handle and a `phys_translator`-based adapter that maps ring addresses into a host window |
+| [`virtio/virtq_ref.hpp`](virtq.md) | `virtq_driver_ref<BufSpace>`, `virtq_device_ref<BufSpace>`, `virtq_driver_traits`, `virtq_device_traits` | Type-erased driver/device handles usable over split and packed rings |

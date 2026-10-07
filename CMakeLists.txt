@@ -397,6 +397,13 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_mmio_framebuffer_device.cpp
         tests/test_gpu_accel_ref.cpp
         tests/test_mmio_gpu_command_buffer_device.cpp
+        tests/test_virtq_types.cpp
+        tests/test_virtq_layout.cpp
+        tests/test_virtq_memory.cpp
+        tests/test_split_ring.cpp
+        tests/test_split_ring_features.cpp
+        tests/test_packed_ring.cpp
+        tests/test_virtq_ref.cpp
     )
     target_link_libraries(jplcz_structo_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)
@@ -422,7 +429,7 @@ if(JPLCZ_STRUCTO_BUILD_EXAMPLES)
 endif()
 
 if(JPLCZ_STRUCTO_BUILD_HEADER_CHECKS)
-    # Recurse into every public subdirectory (arch/, sync/, hw/, hypervisor/, ...)
+    # Recurse into every public subdirectory (arch/, sync/, hw/, hypervisor/, virtio/, ...)
     # alongside the top-level headers; include/structo/detail/ is
     # deliberately excluded -- it holds private implementation headers,
     # never included directly by consumers, and is not part of the public
@@ -441,6 +448,7 @@ if(JPLCZ_STRUCTO_BUILD_HEADER_CHECKS)
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/sync/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/hw/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/hypervisor/*.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/virtio/*.hpp"
     )
     list(APPEND JPLCZ_STRUCTO_PUBLIC_HEADERS ${JPLCZ_STRUCTO_ARCH_HEADERS})
 
