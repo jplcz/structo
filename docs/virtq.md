@@ -2852,3 +2852,275 @@ static void shm_intr(void) {
 Whichever you choose, section 11 applies unchanged: copy out, validate the
 copy, bound every length, and treat a failed ring operation as the end of that
 queue.
+
+### 12.5 Variable-sized messages with chained buffers
+
+**Situation.** Messages range from a few bytes to several KiB. Fixed 256-byte
+slots (12.2) waste memory for small messages and cannot carry big ones.
+Instead of growing every slot, let one message occupy a *chain* of descriptors:
+the guest hands over a header buffer plus as many payload pieces as needed, and
+the receiver sees one logical byte stream. The structo helpers
+`try_read_chain` / `try_write_chain` take a byte offset into the whole chain
+and cross segment boundaries for you, so the hypervisor does not care how the
+guest cut the message up.
+
+Rules the guest must follow (and the hypervisor enforces):
+
+- Queue size must be at least the longest chain (no INDIRECT_DESC is used here,
+  so each segment costs one ring slot).
+- q0 (guest to hypervisor): the chain is *device-readable*. Header first, then
+  `hdr.len` payload bytes, spread over any number of segments.
+- q1 (hypervisor to guest): the guest posts one chain of *device-writable*
+  segments whose total is the largest message it is willing to receive.
+  `used.len` tells the guest how much of that was actually filled.
+- `kMaxMsg` bounds every message; the hypervisor streams the payload through a
+  small local buffer instead of holding the whole message on its stack.
+
+**Queue layout.** Both queues are ordinary split rings (queue size 8 here).
+The drawing shows q0 carrying one 3-segment message and q1 holding one posted
+4-segment receive chain. A chain is a run of descriptors linked by `next`; the
+`avail` ring only names the *head* of each chain, and the `used` ring reports
+that same head back with the byte count.
+
+```
+q0  guest -> hypervisor   (every descriptor device-READABLE, no F_WRITE)
+
+ descriptor table (16 B each)           avail ring (guest writes)   used ring (hv writes)
+ +-----+----------------------+         +--------------+            +------------------+
+ |  0  | addr=hdr    len=8    |<--------| ring[0] = 0  |            | ring[0].id  = 0  |
+ |     | flags=NEXT next=1    |         | idx     = 1  |            | ring[0].len = 0  |
+ +-----+----------------------+         +--------------+            | idx         = 1  |
+ |  1  | addr=page0  len=4096 |                                     +------------------+
+ |     | flags=NEXT next=2    |  chain of ONE message:              (len 0: hv wrote nothing
+ +-----+----------------------+  hdr(8) + page0 + page1 tail         into a readable chain)
+ |  2  | addr=page1  len=900  |
+ |     | flags=0   (last)     |  logical byte stream the hv sees:
+ +-----+----------------------+  [ msg_hdr | payload ............ ]  = 8 + hdr.len bytes
+ | 3-7 | free                 |    desc0      desc1       desc2
+
+q1  hypervisor -> guest   (every descriptor device-WRITABLE, F_WRITE)
+
+ descriptor table                       avail ring (guest writes)   used ring (hv writes)
+ +-----+----------------------+         +--------------+            +------------------+
+ |  0  | addr=rx0  len=4096   |<--------| ring[0] = 0  |            | ring[0].id  = 0  |
+ |     | flags=NEXT|WRITE n=1 |         | idx     = 1  |            | ring[0].len = 608|
+ +-----+----------------------+         +--------------+            | idx         = 1  |
+ |  1  | addr=rx1  len=4096   |                                     +------------------+
+ |     | flags=NEXT|WRITE n=2 |  ONE receive buffer = 4 chained     (len = bytes actually
+ +-----+----------------------+  descriptors, capacity 16 KiB       written: 8 + 600, so
+ |  2  | addr=rx2  len=4096   |                                     only rx0 holds data;
+ |     | flags=NEXT|WRITE n=3 |  hv fills from byte 0 of the chain: rx1..rx3 stay
+ +-----+----------------------+  [ msg_hdr | payload ... | unused ]  untouched)
+ |  3  | addr=rx3  len=4096   |
+ |     | flags=WRITE (last)   |
+ +-----+----------------------+
+```
+
+Sizing rules that follow from the drawing:
+
+- Ring slots in use = descriptors in all outstanding chains. A 4-segment
+  receive chain plus a 3-segment send already uses 7 of 8 slots, so size the
+  rings for `(max chain length) x (number of messages in flight)`.
+- The hypervisor never sees segment boundaries as message boundaries: one
+  chain is one message, whatever the cut.
+- q1 buffers are consumed in order: an oversized message is not split across
+  two chains by this protocol; if you need that, add `frag_idx` / `more` fields to
+  `msg_hdr` and reassemble in the receiver.
+
+**Hypervisor (structo).** Two free functions, usable with either memory
+backend from 12.2 / 12.3. `Dev` is a `split_virtq_device`, `Mem` its memory
+backend, `segs` the storage the popped chain's segments are described in (it
+must hold at least the longest chain, here 16).
+
+```cpp
+constexpr std::uint32_t kMaxMsg = 4096; // hard cap on one message's payload (also the guest's rx chain size - 8)
+
+// WHAT: receive one chained message from q0 and stream its payload to `sink`.
+// WHY: the payload may be larger than we want on the stack, so it is copied out in 64-byte pieces.
+// sink(type, offset, chunk): type = hdr.type; offset = byte offset of `chunk` inside the payload.
+// Returns false if nothing was pending, true if a message was consumed (valid or rejected).
+template <typename Dev, typename Mem, typename Sink>
+[[nodiscard]] reloco::result<bool> recv_large(Dev &q, Mem &mem, reloco::span<typename Dev::segment> segs,
+                                              Sink &&sink) noexcept {
+  auto popped = q.try_pop(segs);
+  if (!popped)
+    return reloco::unexpected(popped.error()); // ring protocol violation: the queue is now latched broken
+  if (!popped->has_value())
+    return false;
+  const auto &c = **popped;
+
+  // Copy the header out (it may sit in segment 0 alone or share it with payload bytes: we do not care),
+  // then validate the COPY. readable_bytes is the sum of the segment lengths computed by the library.
+  msg_hdr h{};
+  if (c.readable_bytes < sizeof(h))
+    return reloco::unexpected(reloco::error::security_violation);
+  if (auto r = try_read_chain(mem, c.readable, 0,
+                              reloco::span<std::byte>(reinterpret_cast<std::byte *>(&h), sizeof(h)));
+      !r)
+    return reloco::unexpected(r.error());
+  if (h.len > kMaxMsg || h.len > c.readable_bytes - sizeof(h)) { // the length lies: drop the message, keep the queue
+    if (auto r = q.try_push_used(c, 0); !r)
+      return reloco::unexpected(r.error());
+    return true;
+  }
+
+  reloco::array<std::byte, 64> chunk{};
+  for (std::uint32_t off = 0; off < h.len;) {
+    const std::uint32_t n = h.len - off < chunk.size() ? h.len - off : static_cast<std::uint32_t>(chunk.size());
+    // (memory, segments, byte offset into the whole chain, local destination): header bytes are skipped
+    if (auto r = try_read_chain(mem, c.readable, sizeof(h) + off, reloco::span<std::byte>(chunk.data(), n)); !r)
+      return reloco::unexpected(r.error());
+    sink(h.type, off, reloco::span<const std::byte>(chunk.data(), n));
+    off += n;
+  }
+  // Give the whole chain back in one go (len 0: nothing was written into it).
+  if (auto r = q.try_push_used(c, 0); !r)
+    return reloco::unexpected(r.error());
+  return true;
+}
+
+// WHAT: send one message into the guest's next posted receive chain on q1.
+// type/payload: the msg_hdr type and the bytes. Returns false (no error) if the guest has posted no
+// buffer, or the one it posted is too small: queue the message and retry later.
+template <typename Dev, typename Mem>
+[[nodiscard]] reloco::result<bool> send_large(Dev &q, Mem &mem, reloco::span<typename Dev::segment> segs,
+                                              std::uint32_t type, reloco::span<const std::byte> payload) noexcept {
+  if (payload.size() > kMaxMsg)
+    return reloco::unexpected(reloco::error::invalid_argument);
+  auto popped = q.try_pop(segs);
+  if (!popped)
+    return reloco::unexpected(popped.error());
+  if (!popped->has_value())
+    return false;
+  const auto &c = **popped;
+  const msg_hdr h{type, static_cast<std::uint32_t>(payload.size())};
+  const std::uint64_t total = sizeof(h) + payload.size();
+  if (c.writable_bytes < total) { // too small for this message: return it unused so the guest can re-post
+    if (auto r = q.try_push_used(c, 0); !r)
+      return reloco::unexpected(r.error());
+    return false;
+  }
+  // Header at chain offset 0, payload right after it; the library splits the writes across segments.
+  if (auto r = try_write_chain(mem, c.writable, 0,
+                               reloco::span<const std::byte>(reinterpret_cast<const std::byte *>(&h), sizeof(h)));
+      !r)
+    return reloco::unexpected(r.error());
+  if (!payload.empty())
+    if (auto r = try_write_chain(mem, c.writable, sizeof(h), payload); !r)
+      return reloco::unexpected(r.error());
+  // len = bytes actually written: the guest's completion reports exactly this, not the chain capacity.
+  if (auto r = q.try_push_used(c, static_cast<std::uint32_t>(total)); !r)
+    return reloco::unexpected(r.error());
+  return true; // (then should_interrupt() / irq_() exactly as in hv_endpoint::send)
+}
+```
+
+(Compiled and run under ASan/UBSan with the library's own split driver as the
+guest: a 1000-byte message cut into 4 segments arrives intact, and a 600-byte
+reply fills a 3-segment receive chain with `used.len == 608`.)
+
+**Guest, Linux.** `virtqueue_add_outbuf` / `virtqueue_add_inbuf` take a
+scatterlist, and every scatterlist entry becomes one chained descriptor. So
+"chained buffers" means filling a multi-entry scatterlist. Continues the
+bare-`vring` setup from 12.3.
+
+```c
+/* Illustrative sketch, not compiled. Reuses g_tx / g_rx from 12.3. */
+#define RX_SEGS 4                      /* receive chain: 4 pages = up to 16 KiB; must be <= ring size (8) */
+
+struct shm_msg_tx {
+  struct msg_hdr hdr;                  /* WHAT: separate header buffer. WHY: the payload can then be any existing buffer. */
+  void *payload;                       /* vmalloc/kmalloc memory holding hdr.len bytes */
+};
+
+/* WHAT: send hdr + payload as ONE message over several descriptors.
+ * m: header and payload pointer; the payload may span many pages. */
+static int shm_send_large(struct shm_msg_tx *m) {
+  unsigned nents = 1 + DIV_ROUND_UP(offset_in_page(m->payload) + m->hdr.len, PAGE_SIZE);
+  struct scatterlist *sg = kmalloc_array(nents, sizeof(*sg), GFP_ATOMIC);
+  if (!sg) return -ENOMEM;
+  sg_init_table(sg, nents);
+  sg_set_buf(&sg[0], &m->hdr, sizeof(m->hdr));            /* entry 0: the 8-byte header */
+  unsigned i = 1, left = m->hdr.len;
+  char *p = m->payload;
+  while (left) {                                           /* entries 1..n: one per page of payload */
+    unsigned n = min_t(unsigned, left, PAGE_SIZE - offset_in_page(p));
+    sg_set_page(&sg[i++], is_vmalloc_addr(p) ? vmalloc_to_page(p) : virt_to_page(p), n, offset_in_page(p));
+    p += n; left -= n;
+  }
+  /* (queue, scatterlist, number of device-READABLE entries, number of writable = 0 via add_outbuf,
+   *  token returned by get_buf (we free the sg array with it), gfp) */
+  int r = virtqueue_add_outbuf(g_tx, sg, i, sg, GFP_ATOMIC);
+  if (r) { kfree(sg); return r; }
+  virtqueue_kick(g_tx);
+  return 0;                            /* shm_reap() calls kfree(token) when the hypervisor completes it */
+}
+
+/* WHAT: post one receive chain of RX_SEGS pages. WHY: the hypervisor fills as many as the message needs;
+ * the rest stay untouched. pages: the buffers, kept by the caller to read the message afterwards. */
+static int shm_post_rx_chain(void *pages[RX_SEGS]) {
+  struct scatterlist sg[RX_SEGS];
+  sg_init_table(sg, RX_SEGS);
+  for (int i = 0; i < RX_SEGS; i++)
+    sg_set_buf(&sg[i], pages[i], PAGE_SIZE);
+  /* all entries are device-WRITABLE: add_inbuf. Token = pages, returned by virtqueue_get_buf(). */
+  int r = virtqueue_add_inbuf(g_rx, sg, RX_SEGS, pages, GFP_ATOMIC);
+  if (!r) virtqueue_kick(g_rx);
+  return r;
+}
+
+/* WHAT: reap one received message. `len` (from virtqueue_get_buf) = bytes the hypervisor wrote, so only
+ * the first DIV_ROUND_UP(len, PAGE_SIZE) pages hold data. Validate hdr.len against len before using it. */
+static void shm_rx_done(void **pages, unsigned len) {
+  struct msg_hdr *h = pages[0];        /* the header always sits at the start of page 0 */
+  if (len < sizeof(*h) || h->len > len - sizeof(*h) || h->len > KMAX_MSG) return;   /* hostile/buggy peer */
+  /* payload byte k lives at pages[(8 + k) / PAGE_SIZE] + (8 + k) % PAGE_SIZE */
+}
+```
+
+**Guest, FreeBSD.** `sglist(9)` builds the segment list, and
+`virtqueue_enqueue(vq, cookie, sg, readable, writable)` takes how many of its
+segments the device may read, then how many it may write. `sglist_append()`
+splits a buffer on page boundaries by itself, so count segments from the
+sglist, not from your buffers.
+
+```c
+/* Illustrative sketch, not compiled. Reuses g_tx / g_rx from 12.3. */
+#define RX_SEGS 4
+
+/* WHAT: send header + payload as one message. hdr/payload/plen: the msg_hdr and the plen payload bytes
+ * (wired kernel memory). The cookie is the sglist itself so the interrupt handler can free it. */
+static int shm_send_large(struct msg_hdr *hdr, void *payload, size_t plen) {
+  struct sglist *sg = sglist_alloc(1 + howmany(plen, PAGE_SIZE) + 1, M_NOWAIT);
+  if (sg == NULL) return ENOMEM;
+  sglist_append(sg, hdr, sizeof(*hdr));               /* segment(s) for the header */
+  sglist_append(sg, payload, plen);                   /* one segment per physically contiguous run / page */
+  /* (queue, cookie, sglist, device-readable segs = ALL of them, device-writable segs = 0) */
+  int error = virtqueue_enqueue(g_tx, sg, sg, sg->sg_nseg, 0);
+  if (error) { sglist_free(sg); return error; }
+  virtqueue_notify(g_tx);
+  return 0;
+}
+
+/* WHAT: post one receive chain: RX_SEGS wired buffers of PAGE_SIZE, all device-writable. */
+static int shm_post_rx_chain(void *bufs[RX_SEGS]) {
+  struct sglist *sg = sglist_alloc(2 * RX_SEGS, M_NOWAIT);   /* room for page-splitting */
+  if (sg == NULL) return ENOMEM;
+  for (int i = 0; i < RX_SEGS; i++)
+    sglist_append(sg, bufs[i], PAGE_SIZE);
+  /* (queue, cookie, sglist, readable = 0, writable = every segment) */
+  int error = virtqueue_enqueue(g_rx, sg, sg, 0, sg->sg_nseg);
+  if (error) { sglist_free(sg); return error; }
+  virtqueue_notify(g_rx);
+  return 0;
+}
+
+/* In the interrupt handler: virtqueue_dequeue(g_rx, &len) returns the cookie and the number of bytes the
+ * hypervisor wrote. Check hdr.len <= len - 8 and hdr.len <= KMAX_MSG exactly as in the Linux version before
+ * reading the payload, then free (or re-post) the sglist. */
+```
+
+Whichever the OS, a chain costs one ring slot per segment, so choose segment
+sizes with that in mind: a few large segments (pages) rather than many small
+ones, or negotiate `VIRTIO_F_INDIRECT_DESC` (split rings only, see 9.4.1) so a
+whole chain uses a single ring slot.
