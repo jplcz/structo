@@ -4627,3 +4627,5 @@ struct window_display {
 - **Not offered:** 3D (virgl), blob resources, EDID, multiple capsets, resource UUIDs and
   `GET_CAPSET_INFO` (answered `ERR_UNSPEC`).
 - Tests: `tests/test_virtio_gpu.cpp`, driving the device with the library's own `split_virtq_driver`.
+- Demo: `examples/sdl3_virtio_gpu_demo.cpp` runs a tiny in-process guest driver against the device and
+  shows the result in an SDL3 window (built only when SDL3 is found).

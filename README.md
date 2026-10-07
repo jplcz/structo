@@ -61,8 +61,15 @@ demonstrated in [examples/](examples):
   [`examples/fonts/`](examples/fonts), not `block_font_8x8`'s
   solid-block placeholder), presented via the same SDL3 window
   pipeline; also only built when SDL3 is found.
+- **[`sdl3_virtio_gpu_demo.cpp`](examples/sdl3_virtio_gpu_demo.cpp)** --
+  a windowed demo of `virtio::virtio_gpu_function`: a tiny in-process
+  "guest" driver talks to it over `virtio_mmio_device` and a split
+  virtqueue (scatter-gather backing, partial `TRANSFER_TO_HOST_2D` +
+  `RESOURCE_FLUSH`), and the flushed pixels reach an SDL3 window through
+  `framebuffer_accel_display`; also only built when SDL3 is found
+  (`--frames N` exits after N frames, e.g. with `SDL_VIDEODRIVER=dummy`).
 
-All five build on this library's own building blocks (typed physical
+All six build on this library's own building blocks (typed physical
 addresses/pages and the Flattened Device Tree reader/writer/index moved
 in from `jplcz_reloco`; `async_kernel_object`/`callout`/the hypervisor
 MMIO emulation headers native to `structo` itself), each documented on

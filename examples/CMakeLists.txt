@@ -34,9 +34,15 @@ if(SDL3_FOUND)
     target_link_libraries(sdl3_vt100_framebuffer_console_demo PRIVATE
         jplcz_structo jplcz_structo_warnings SDL3::SDL3)
     list(APPEND JPLCZ_STRUCTO_EXAMPLE_TARGETS sdl3_vt100_framebuffer_console_demo)
+
+    # Optional: a windowed demo of the virtio-gpu device (`virtio_gpu_function`) driven by a tiny
+    # in-process "guest" driver over a virtio-mmio transport, presented via SDL3.
+    add_executable(sdl3_virtio_gpu_demo sdl3_virtio_gpu_demo.cpp)
+    target_link_libraries(sdl3_virtio_gpu_demo PRIVATE jplcz_structo jplcz_structo_warnings SDL3::SDL3)
+    list(APPEND JPLCZ_STRUCTO_EXAMPLE_TARGETS sdl3_virtio_gpu_demo)
 else()
     message(STATUS "jplcz_structo: SDL3 not found, skipping sdl3_gpu_accel_demo/\
-sdl3_vt100_framebuffer_console_demo examples")
+sdl3_vt100_framebuffer_console_demo/sdl3_virtio_gpu_demo examples")
 endif()
 
 add_custom_target(jplcz_structo_examples
