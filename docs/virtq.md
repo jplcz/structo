@@ -32,6 +32,7 @@ Contents:
 11. [Hostile-peer rules](#11-hostile-peer-rules)
 12. [Direct virtqueues over shared memory, without a virtio bus](#12-direct-virtqueues-over-shared-memory-without-a-virtio-bus)
 13. [A custom hypercall virtio transport and a structo logger device](#13-a-custom-hypercall-virtio-transport-and-a-structo-logger-device)
+14. [rpmsg: message passing with a Linux or FreeBSD guest](#14-rpmsg-message-passing-with-a-linux-or-freebsd-guest)
 
 ---
 
@@ -4367,3 +4368,83 @@ static driver_t hvlog_driver = { "hvlog", hvlog_methods, sizeof(struct hvlog_sof
   per descriptor, not per message. For a log stream that is negligible. For a
   high-rate device, cache the mapping of the ring pages in the `guest_mapper`
   (12.3, cost model) and keep mapping the data buffers on demand.
+
+---
+
+## 14. rpmsg: message passing with a Linux or FreeBSD guest
+
+**What this is, and why.** rpmsg is the message-passing protocol Linux uses to
+talk to remote processors (`virtio_rpmsg_bus`; OpenAMP implements the other
+end). It is a plain virtio device (ID 7), so structo needs no new transport:
+`include/structo/virtio/virtio_rpmsg.hpp` provides `virtio_rpmsg_function`, a
+`Function` for `virtio_mmio_device` (or the 13.2 `hc_transport`). The guest is
+the driver; structo is the remote side and exposes numbered *endpoints* that
+guest drivers address by number.
+
+### 14.1 Wire format and queues
+
+```text
+  queue 0 (guest rx): guest posts EMPTY buffers      structo fills them  (hypervisor -> guest)
+  queue 1 (guest tx): guest posts FILLED buffers     structo dispatches  (guest -> hypervisor)
+
+  one buffer (Linux: 512 bytes in total):
+  +---------+---------+----------+---------+---------+--------------------+
+  | src le32| dst le32| rsvd le32| len le16|flags le16| payload (len bytes)|
+  +---------+---------+----------+---------+---------+--------------------+
+  name service (feature bit 0), sent to endpoint 53:  { char name[32]; le32 addr; le32 flags }
+                                                      flags: 0 = create, 1 = destroy
+```
+
+### 14.2 Using it from the hypervisor
+
+```cpp
+using rpmsg_t = structo::virtio::virtio_rpmsg_function<guest_space>; // 8 endpoints, 496-byte payload, 8 staged messages
+rpmsg_t rpmsg;                                                       // offers VIRTIO_RPMSG_F_NS
+structo::virtio::virtio_mmio_device<guest_space, mem_t, rpmsg_t> dev(mem, rpmsg);
+
+// WHAT: an endpoint; guest messages whose dst is 0x400 call the function.
+// WHY a plain function pointer + ctx: no allocation, usable from a kernel.
+// The payload span is a device-owned COPY (the guest cannot change it under you)
+// and is valid only during the call.
+(void)rpmsg.try_bind(0x400,
+    [](void *ctx, std::uint32_t src, std::uint32_t dst, reloco::span<const std::byte> payload) noexcept {
+      auto *self = static_cast<rpmsg_t *>(ctx);
+      (void)self->try_send(dst, src, payload);            // echo: stage a reply to the sender
+    }, &rpmsg);
+
+// WHAT: tell the guest a service named "structo-echo" lives at endpoint 0x400, so
+// Linux creates an rpmsg channel (and a driver that matches the name probes).
+(void)rpmsg.try_announce("structo-echo", 0x400);
+
+// Delivery. Staged messages sit in a bounded queue and are written into guest rx buffers when
+// queue 0 is serviced; sending never touches guest memory. The transport calls the function:
+//   guest kicks queue 1 -> handlers run; replies they stage are pending()
+//   you / the guest kick queue 0 -> staged messages are written to guest buffers
+(void)dev.try_kick(1);                    // normally driven by the guest's QueueNotify write
+if (rpmsg.pending() != 0)
+  (void)dev.try_kick(0);                  // flush replies, then inject dev.irq_asserted() into the guest
+```
+
+### 14.3 Behaviour and limits
+
+- **Hostile guest.** The header is copied out once; `len` must fit the buffer
+  and `MaxPayload` (else the message is dropped and counted in `stats()`:
+  `rx_malformed`, `rx_oversize`, `rx_unrouted`). The buffer is always returned
+  to the guest, so a bad message never wedges the queue.
+- **Backpressure.** `try_send` returns `error::try_again` when the staging
+  queue is full and `invalid_argument` when the payload exceeds `MaxPayload`. A
+  message that finds no posted rx buffer stays staged until the guest posts one
+  and kicks queue 0. A guest buffer smaller than the message drops it
+  (`tx_lost`), since a buffer cannot be returned half-used.
+- **Payload size.** Match `MaxPayload` to the guest's buffer size minus 16
+  (Linux default 512 -> 496). A guest that is configured with bigger buffers
+  can send larger payloads than you accept; they are counted, not delivered.
+- **Locking.** Like the transport, the function takes no lock: serialise
+  `try_bind`/`try_send`/`try_kick` per device.
+- **Guest side.** Nothing to write: Linux loads `virtio_rpmsg_bus` for device
+  ID 7 and `rpmsg_char`/your own `rpmsg_driver` binds to the announced name. A
+  guest that sends to endpoint 53 reaches your handler if you `try_bind(53, ...)`
+  and decode with `rpmsg::try_decode_ns`.
+- **Verification.** `tests/test_virtio_rpmsg.cpp` (11 tests) drives the
+  function through `virtio_mmio_device` with the library's own
+  `split_virtq_driver` as the guest.
