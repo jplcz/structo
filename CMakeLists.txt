@@ -407,6 +407,10 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_virtio_blk.cpp
         tests/test_virtio_mmio.cpp
         tests/test_virtio_rpmsg.cpp
+        tests/test_virtio_rng.cpp
+        tests/test_virtio_console.cpp
+        tests/test_virtio_balloon.cpp
+        tests/test_virtio_gpu.cpp
     )
     target_link_libraries(jplcz_structo_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)

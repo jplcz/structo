@@ -4448,3 +4448,182 @@ if (rpmsg.pending() != 0)
 - **Verification.** `tests/test_virtio_rpmsg.cpp` (11 tests) drives the
   function through `virtio_mmio_device` with the library's own
   `split_virtq_driver` as the guest.
+
+---
+
+## 16. Console, rng and balloon devices
+
+Three more `Function`s for `virtio_mmio_device` (or the 13.2 `hc_transport`),
+all following the contract described in `virtio_mmio.hpp` and the pattern of
+`virtio_blk_function`: copy-out of guest data, every buffer returned to the guest,
+bad input counted instead of trusted. Each has tests in
+`tests/test_virtio_{rng,console,balloon}.cpp` using the library's own
+`split_virtq_driver` as the guest.
+
+### 16.1 virtio-rng (device ID 4)
+
+One queue. The guest posts empty buffers; the device fills them from a `Source`
+(`try_fill(span<byte>)`), which `structo::hw::hw_rng_ref` satisfies unchanged.
+
+```cpp
+structo::hw::hw_rng_ref rng(my_rdrand);                  // any hw_rng_traits backend
+using rng_t = structo::virtio::virtio_rng_function<guest_space, structo::hw::hw_rng_ref>;
+rng_t fn(rng);                                           // Source must outlive the function
+structo::virtio::virtio_mmio_device<guest_space, mem_t, rng_t> dev(mem, fn);
+```
+
+A buffer receives at most `rng::max_request_bytes` (4096) bytes; the guest asks
+again for more. If the source fails part-way, the bytes produced so far are returned
+(zero is a valid answer), so a flaky source cannot wedge the queue. Linux's
+`virtio_rng` driver reads the device through `/dev/hwrng`.
+
+### 16.2 virtio-console (device ID 3, single port)
+
+Queue 0 is guest input (device writes), queue 1 is guest output (device reads).
+
+```cpp
+struct uart_sink {                                       // WHAT: where guest output goes
+  structo::console_ref *term;                            // e.g. your framebuffer/serial console
+  reloco::result<void> try_write(reloco::span<const std::byte> bytes) noexcept;  // consume ALL of it
+};
+using con_t = structo::virtio::virtio_console_function<guest_space, uart_sink, 4096>;
+con_t con(sink, 80, 25);          // columns/rows non-zero: offers VIRTIO_CONSOLE_F_SIZE
+
+// Host -> guest: stage input, then service queue 0. try_input returns how many bytes it took
+// (the 4096-byte FIFO may be full), so keep the rest and retry after the guest has drained it.
+std::size_t taken = con.try_input(key_bytes);
+if (con.pending_input() != 0)
+  (void)dev.try_kick(0);           // writes staged bytes into posted buffers, raises the IRQ
+```
+
+- Input never touches guest memory when staged; if the guest has posted no
+  buffers the bytes wait in the FIFO and are delivered when it does (the guest's
+  kick of queue 0 services it).
+- A `Sink` failure drops that chunk and counts it (`stats().output_dropped`); the
+  guest buffer is still completed.
+- `set_size(cols, rows)` plus `dev.notify_config_changed()` informs a running guest
+  of a resize. The emergency-write feature and multiport are not offered (the
+  transport's config space is read-only).
+- Linux binds `virtio_console`, which exposes `/dev/hvc0`; boot with
+  `console=hvc0`.
+
+### 16.3 virtio-balloon (device ID 5)
+
+Queue 0 inflates, queue 1 deflates. Messages are arrays of little-endian 32-bit
+page frame numbers in **4 KiB units regardless of the guest's page size**, so a
+guest address is `pfn << 12`.
+
+```cpp
+struct vmm_host {                                        // WHAT: what "taking a page away" means for YOU
+  reloco::result<void> try_reclaim(phys_addr<void, guest_space> first, std::uint32_t count) noexcept; // e.g. unmap/madvise(DONTNEED)
+  reloco::result<void> try_restore(phys_addr<void, guest_space> first, std::uint32_t count) noexcept; // guest deflated
+};
+using bal_t = structo::virtio::virtio_balloon_function<guest_space, vmm_host>;
+bal_t balloon(host, guest_ram_bytes >> 12);              // guest RAM in pages: frames at/after it are refused
+
+balloon.set_target(256 * 1024 * 1024 / 4096);            // ask the guest to give back 256 MiB
+dev.notify_config_changed();                             // config interrupt: the guest re-reads num_pages
+// Progress: balloon.inflated() pages are reclaimed so far; the guest reads it as `actual`.
+```
+
+- Contiguous frames are coalesced, so `Host` is called once per run, not per page.
+- **The device reports `actual` itself** (pages inflated minus pages deflated).
+  The specification has the guest write it, but config space is read-only in this
+  transport, so a guest write is ignored and the value the guest reads back is the
+  device's.
+- **Hostile guest.** Frames at or beyond `guest_pages`, messages that are not a
+  multiple of 4 bytes or have more than `max_pfns_per_message` (1024) frames, and
+  deflating more than was inflated are dropped or clamped and counted in
+  `stats().bad_messages`. The device never dereferences a ballooned page. A guest that
+  inflates the same frame twice only distorts its own accounting, because the `Host`
+  must treat reclaim of an already reclaimed page as a no-op; track the set in
+  your `Host` if you need an exact count.
+- **Not offered:** statistics, free-page hinting and free-page reporting queues, and
+  `DEFLATE_ON_OOM` / `MUST_TELL_HOST`; Linux works without them.
+
+---
+
+## 17. GPU device (2D)
+
+`virtio_gpu_function` (device ID 16) is a 2D-only virtio-gpu: enough for Linux's
+`virtio_gpu` DRM driver to give a framebuffer console or a software-rendered desktop.
+No 3D/virgl, blob resources or EDID are offered.
+
+```
+guest pages --TRANSFER_TO_HOST_2D--> host resource --RESOURCE_FLUSH--> Display (your binding)
+(ATTACH_BACKING scatter list)        (device-owned copy)               (e.g. a hw::framebuffer)
+```
+
+### 17.1 Binding to structo framebuffers
+
+```cpp
+// Any hw::framebuffer works: here the pixels of an mmio_framebuffer_device, so the hypervisor's
+// own drawing and the guest's picture share one surface.
+auto screen = structo::hypervisor::mmio_framebuffer_device<structo::hw::xrgb8888>::try_create(1024, 768);
+structo::virtio::framebuffer_display<structo::hw::xrgb8888> display(screen->pixels());
+
+using gpu_t = structo::virtio::virtio_gpu_function<guest_space, decltype(display)>;
+gpu_t gpu(display);                   // host copies come from reloco::default_allocator(); pass another
+                                      // allocator_ref and a gpu::limits{max_total_bytes, max_backing_entries} to bound them
+structo::virtio::virtio_mmio_device<guest_space, mem_t, gpu_t> dev(mem, gpu);
+
+// Hot-plug / resize: change what the display reports, then tell the guest.
+gpu.notify_display_changed();
+dev.notify_config_changed();          // the guest re-runs GET_DISPLAY_INFO (which also clears the event)
+```
+
+A device that has both a scanout framebuffer and a `hw::gpu_accel_ref` over it binds both with
+`framebuffer_accel_display` (`virtio_gpu_accel.hpp`):
+
+```cpp
+structo::hw::gpu_accel_ref accel(fb);                    // software framebuffer or an adapted renderer
+structo::virtio::framebuffer_accel_display<structo::hw::xrgb8888> display(fb, accel);
+```
+
+Guest pixels go into the framebuffer (`gpu_accel_ref` has no raw-pixel upload and the framebuffer is
+what the scanout reads); fills go through the accel ref so a hardware backend does them (an unbound ref
+falls back to the framebuffer). `gpu_accel_ref` is not extended, so no cursor overlay is offered.
+
+`framebuffer_display` serves scanout 0 only and converts the guest's B,G,R,X bytes per pixel,
+so the framebuffer's own format does not matter. Clipping at the framebuffer edge is silent.
+
+### 17.2 Writing your own `Display`
+
+Implement `try_display_size(scanout)` and `try_present(scanout, surface, src_rect, dst_x, dst_y)`;
+`scanout_disabled`, `cursor_update` and `cursor_move` are optional (detected at compile time).
+
+```cpp
+struct window_display {
+  // Called for GET_DISPLAY_INFO. An error (or a zero size) reports the output as disconnected.
+  reloco::result<structo::virtio::gpu::extent> try_display_size(std::uint32_t scanout) noexcept;
+
+  // Called on RESOURCE_FLUSH for every scanout showing the resource, with the flushed rectangle
+  // already clipped to the scanout. `src.pixels` is the device's host copy (bytes B,G,R,A/X,
+  // `src.stride` bytes per row); it is valid ONLY during this call, so upload or copy it now.
+  reloco::result<void> try_present(std::uint32_t scanout, const structo::virtio::gpu::surface &src,
+                                   const structo::virtio::gpu::rect &src_rect, std::uint32_t dst_x,
+                                   std::uint32_t dst_y) noexcept;
+};
+```
+
+### 17.3 Behaviour and limits
+
+- **Formats:** `B8G8R8A8_UNORM` and `B8G8R8X8_UNORM` only (what DRM's XRGB8888/ARGB8888 map to on
+  little-endian); anything else gets `ERR_INVALID_PARAMETER`, and Linux then falls back.
+- **Transfers copy straight from guest memory into the host resource;** flushes never touch guest
+  memory. A guest rewriting its pages mid-transfer only tears its own picture.
+- **Hostile guest:** resource ids are looked up in a fixed table (`MaxResources`, default 16);
+  total host pixel memory is capped (`limits::max_total_bytes`, default 64 MiB); a resource is at
+  most 16384 x 16384; `ATTACH_BACKING` accepts at most `limits::max_backing_entries` (default 16384)
+  entries and rejects ones whose `addr + len` wraps; every rectangle and the transfer offset are
+  bounds-checked in 64-bit before any pixel moves. Bad commands get an `ERR_*` response and
+  `stats().errors` counts them. Destroying a resource disables any scanout showing it.
+- **Fences:** a request with `VIRTIO_GPU_FLAG_FENCE` has its fence id echoed in the response; since
+  commands complete synchronously, that is the whole implementation.
+- **Config writes:** the transport's config space is read-only, so the guest cannot write
+  `events_clear`; the device clears `events_read` itself on `GET_DISPLAY_INFO`.
+- **Cursor queue:** commands never get a response. Without `cursor_update`/`cursor_move` in your
+  `Display` they are ignored. `framebuffer_display` does not draw a hardware cursor.
+- **Not offered:** 3D (virgl), blob resources, EDID, multiple capsets, resource UUIDs and
+  `GET_CAPSET_INFO` (answered `ERR_UNSPEC`).
+- Tests: `tests/test_virtio_gpu.cpp`, driving the device with the library's own `split_virtq_driver`.
