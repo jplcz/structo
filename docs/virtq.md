@@ -1574,8 +1574,11 @@ each example (9.3 and 9.3.1, 10.3 and 10.3.1).
 > compiled with
 > `-Wall -Wextra -Wpedantic -Wshadow -Wconversion` and run under
 > ASan/UBSan against a simulated guest that performs the Linux handshake.
-> The virtio-mmio *transport* glue (registers below) is user code: the library
-> provides the queues, not the transport.
+> The registers below are implemented in the library for split rings as
+> `virtio/virtio_mmio.hpp` (`virtio_mmio_device`, pluggable into
+> `hypervisor::mmio_device_ref`) with a block function in
+> `virtio/virtio_blk.hpp`; the hand-written model in 9.4 shows what that
+> transport does internally and remains the template for other device types.
 
 ### 9.1 Overview
 

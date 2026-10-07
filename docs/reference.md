@@ -212,7 +212,7 @@ have a linked, standalone page going into more depth.
 
 ## VIRTIO virtqueues (`virtio/`)
 
-Design: [virtio_queue_design.md](virtio_queue_design.md). Work in progress; transports follow in later phases.
+Design: [virtio_queue_design.md](virtio_queue_design.md). Work in progress; packed-ring transport wiring follows later.
 
 | Header | Type(s) | One-line summary |
 |---|---|---|
@@ -225,3 +225,6 @@ Design: [virtio_queue_design.md](virtio_queue_design.md). Work in progress; tran
 | [`virtio/packed_ring.hpp`](virtq.md) | `packed_virtq_driver<RingSpace, BufSpace, Mem, Barriers>`, `packed_virtq_device<...>`, `packed_driver_slot` | Packed-ring driver (`try_add`/`needs_notify`/`try_get_used`) and device (`try_pop`/`try_push_used`/`should_interrupt`): wrap-counter ownership, out-of-order completion, optional EVENT_IDX, hostile-peer validation and sticky broken state |
 | [`virtio/virtq_memory_adapters.hpp`](virtq.md) | `virtq_memory_ref<Space>`, `translating_virtq_memory<Translator, Inner>` | Type-erased ring memory handle and a `phys_translator`-based adapter that maps ring addresses into a host window |
 | [`virtio/virtq_ref.hpp`](virtq.md) | `virtq_driver_ref<BufSpace>`, `virtq_device_ref<BufSpace>`, `virtq_driver_traits`, `virtq_device_traits` | Type-erased driver/device handles usable over split and packed rings |
+| [`virtio/le_bytes.hpp`](virtq.md) | `load_le<T>`, `store_le<T>` | Little-endian integer encode/decode over byte spans |
+| [`virtio/virtio_mmio.hpp`](virtq.md) | `virtio_mmio_device<GuestSpace, Mem, Function, MaxQueues>`, `mmio_reg::*` | virtio-mmio v2 device transport (split rings): register file, feature negotiation (VERSION_1 required), queue bring-up, notify/interrupt status, NEEDS_RESET; plugs into `mmio_device_ref` |
+| [`virtio/virtio_blk.hpp`](virtq.md) | `virtio_blk_function<GuestSpace, Store>`, `blk::*` | virtio-blk function (IN/OUT/FLUSH, RO) with copy-out header parsing and overflow-safe sector validation over a `Store` trait |
