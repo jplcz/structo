@@ -8,7 +8,8 @@ SPDX-License-Identifier: BSD-2-Clause
 
 Headers: `virtq_types.hpp`, `virtq_layout.hpp`, `virtq_memory.hpp`,
 `virtq_barrier.hpp`, `virtq_chain.hpp`, `split_ring.hpp`, `packed_ring.hpp`,
-`virtq_memory_adapters.hpp`, `virtq_ref.hpp`.
+`virtq_memory_adapters.hpp`, `virtq_ref.hpp`; transport and device:
+`virtio_mmio.hpp`, `virtio_blk.hpp`, `le_bytes.hpp`.
 
 A **virtqueue** is a shared-memory queue through which a **driver** hands
 buffers to a **device** and gets them back. It is a transport-independent
@@ -29,6 +30,7 @@ Contents:
 9. [Linux and FreeBSD guests on one side, structo on the other](#9-linux-and-freebsd-guests-on-one-side-structo-on-the-other)
 10. [Example: forwarding hypervisor logs to a Linux guest](#10-example-forwarding-hypervisor-logs-to-a-linux-guest)
 11. [Hostile-peer rules](#11-hostile-peer-rules)
+12. [Direct virtqueues over shared memory, without a virtio bus](#12-direct-virtqueues-over-shared-memory-without-a-virtio-bus)
 
 ---
 
@@ -1905,6 +1907,62 @@ Run against a simulated guest the model prints
 `token=7 len=16 'ping from guest' irqs=1 status=0xf`, and a driver that
 requests an unoffered feature is refused.
 
+### 9.4.1 The library transport: `virtio_mmio_device` and `virtio_blk_function`
+
+The model above is what `virtio/virtio_mmio.hpp` implements for you. It
+handles the registers, feature negotiation, queue bring-up (split **or**
+packed rings, `EVENT_IDX`, and `INDIRECT_DESC` on split rings), interrupt
+status and `DEVICE_NEEDS_RESET`. It offers `RING_PACKED`, `EVENT_IDX` and
+`INDIRECT_DESC` itself; a driver that negotiates PACKED together with
+INDIRECT_DESC is refused at `FEATURES_OK`. You supply only the device type
+(a *function*) and the guest memory backend.
+
+```cpp
+#include <structo/virtio/virtio_blk.hpp>
+#include <structo/virtio/virtio_mmio.hpp>
+
+using namespace structo; // virtio::, hypervisor::, phys_addr
+
+struct guest_space {}; // WHAT: tag for guest-physical addresses. WHY: keeps them from mixing with host pointers.
+
+// WHAT: a backing store for the block device. WHY: the function only knows sectors;
+// where the bytes live (RAM, file, NVMe) is your decision.
+struct ram_store {
+  std::uint64_t capacity_sectors() const noexcept { return 2048; } // size in 512-byte sectors (1 MiB)
+  bool read_only() const noexcept { return false; }               // true => offers VIRTIO_BLK_F_RO, refuses writes
+  // sector: first sector; buf: bytes to fill (non-zero multiple of 512, range pre-validated)
+  reloco::result<void> try_read(std::uint64_t sector, reloco::span<std::byte> buf) noexcept;
+  // sector: first sector; buf: bytes to store
+  reloco::result<void> try_write(std::uint64_t sector, reloco::span<const std::byte> buf) noexcept;
+  reloco::result<void> try_flush() noexcept; // make previous writes durable
+};
+
+using guest_mem = virtio::direct_virtq_memory<guest_space>; // WHAT: how to reach guest memory
+
+void create_disk(guest_mem &guest_ram, ram_store &store) {
+  // WHAT: the device function. WHY: supplies device ID 2, features, config space, request handling.
+  static virtio::virtio_blk_function<guest_space, ram_store> blk(store);
+  // WHAT: the transport. WHY: one object per MMIO window; it owns all queue state.
+  // Args: guest memory backend, then the function. Both must outlive it.
+  static virtio::virtio_mmio_device<guest_space, guest_mem, decltype(blk)> disk(guest_ram, blk);
+
+  // WHAT: hook the device into the VM-exit dispatcher. WHY: guest accesses to the MMIO
+  // window arrive as try_read/try_write at window-relative offsets.
+  hypervisor::mmio_device_ref window(disk);
+
+  // After every guest access (or try_kick) drive the interrupt line from the device state.
+  // set_irq_line is your interrupt controller hook.
+  // set_irq_line(disk.irq_asserted());
+  (void)window;
+}
+```
+
+To add another device type, write a function with the interface in the
+`virtio_mmio.hpp` header comment: `device_id`, `queue_count`, `queue_max_size`,
+`device_features()`, `config_size()`, `try_read_config()` and
+`process(mem, qidx, queue_view)`. The `queue_view` hides split/packed and
+indirect handling, so one `process` body serves every ring type.
+
 ### 9.5 The reverse direction
 
 If Linux is the *device* and structo is the *driver*, Linux offers
@@ -2189,6 +2247,608 @@ class:
   arithmetic, so they can cause at worst extra or missing notifications, never
   memory unsafety.
 
-Not covered by this library: lifetime of the shared mapping, transport
-(virtio-mmio / PCI) register handling, feature negotiation, and the
-kick/interrupt delivery mechanism.
+Not covered by this library: lifetime of the shared mapping, feature
+negotiation for custom transports, and the kick/interrupt delivery mechanism.
+(The virtio-mmio transport in `virtio_mmio.hpp` covers the register handling
+and negotiation for that one transport; see 9.4.1.)
+
+
+---
+
+## 12. Direct virtqueues over shared memory, without a virtio bus
+
+Sections 9 and 10 put a complete virtio device (registers, feature bits, bus
+probe) between the guest and structo. That is the right choice when you want
+stock drivers. This section is for the other case: you control **both ends**,
+you only need *message passing*, and all you have is
+
+- one block of memory both sides can reach, and
+- some mechanism to poke the other side (a hypercall, a doorbell register, an
+  interrupt line, a mailbox: **unspecified here on purpose**).
+
+A virtqueue is exactly the data structure you need on top of that: it gives you
+lock-free, bounded, multi-message queues with flow control. You do not need the
+virtio *device model* around it. Two queues give bidirectional messaging:
+
+```mermaid
+flowchart LR
+  subgraph Guest["Guest: Linux or FreeBSD (driver of both queues)"]
+    G["your driver"]
+  end
+  subgraph HV["structo hypervisor (device of both queues)"]
+    H["hv_endpoint"]
+  end
+  G -- "q0 'to-hv': guest posts a FULL buffer (header + payload)" --> H
+  H -- "q1 'to-guest': guest pre-posts EMPTY buffers, hv fills them" --> G
+  G -. "doorbell: shm_ring_doorbell() (unspecified)" .-> H
+  H -. "interrupt: inject_irq() (unspecified)" .-> G
+```
+
+Both queues have the guest as *driver* and structo as *device*. Receiving is
+done the usual virtio way: the guest keeps empty buffers posted on q1, and the
+hypervisor completes one whenever it has a message. No buffers posted means
+"the guest is not ready", and the hypervisor must cope (see `send` below).
+
+### 12.1 The protocol and the structo endpoint (shared by both examples)
+
+The endpoint below does not know *how* the guest's memory is reached; that is
+the `Mem` template parameter, and the two examples differ only in that.
+
+```cpp
+// WHAT: the message every buffer starts with. WHY: a virtqueue moves raw bytes;
+// the receiver needs to know what they are and how many are valid.
+struct msg_hdr {
+  std::uint32_t type; // application-defined message kind (little-endian on the wire)
+  std::uint32_t len;  // number of payload bytes that follow this header
+};
+constexpr std::uint32_t kMaxPayload = 248; // WHY: bounds every local copy; also the guest's buffer size - 8
+constexpr std::uint32_t kQ = 8;            // queue size: power of two, same on both sides
+enum : std::uint32_t { msg_ping = 1, msg_pong = 2 };
+
+// WHAT: the hypervisor's side of the two queues.
+// Space = address-space tag the guest's descriptor/ring addresses are written in.
+// Mem   = how this side reaches that memory (examples 1 and 2 differ here).
+// Irq   = callable that injects the guest interrupt (unspecified mechanism).
+template <typename Space, typename Mem, typename Irq> class hv_endpoint {
+public:
+  using device = split_virtq_device<Space, Space, Mem>;
+
+  // from_guest = q0 (guest -> hv), to_guest = q1 (hv -> guest). Both created by the caller
+  // with try_create(), which also validates the guest-supplied ring addresses.
+  hv_endpoint(Mem &mem, device from_guest, device to_guest, Irq irq) noexcept
+      : mem_(&mem), from_guest_(from_guest), to_guest_(to_guest), irq_(irq) {}
+
+  // WHAT: handle a guest doorbell. WHY: the guest only tells us "look at q0"; we pop everything pending.
+  [[nodiscard]] reloco::result<void> on_doorbell() noexcept {
+    for (;;) {
+      auto popped = from_guest_.try_pop(segs_.as_span()); // segs_: storage the popped chain views
+      if (!popped)
+        return reloco::unexpected(popped.error()); // protocol violation: the queue is now latched broken
+      if (!popped->has_value())
+        break; // nothing pending
+      const auto &c = **popped;
+
+      // Copy the header OUT of guest memory once, then validate the COPY (the guest may
+      // change its memory at any time, so never check-then-use in place).
+      msg_hdr h{};
+      if (c.readable_bytes < sizeof(h))
+        return reloco::unexpected(reloco::error::security_violation);
+      auto hdr_bytes = reloco::span<std::byte>(reinterpret_cast<std::byte *>(&h), sizeof(h));
+      if (auto r = try_read_chain(*mem_, c.readable, 0, hdr_bytes); !r)
+        return r;
+      if (h.len > kMaxPayload || h.len > c.readable_bytes - sizeof(h)) {
+        // A lying length is the guest's bug, not ours: complete the buffer and move on.
+        if (auto r = from_guest_.try_push_used(c, 0); !r)
+          return r;
+        continue;
+      }
+      reloco::array<std::byte, kMaxPayload> payload{};
+      if (h.len) // (memory, segments, byte offset into the chain, local destination)
+        if (auto r = try_read_chain(*mem_, c.readable, sizeof(h), reloco::span<std::byte>(payload.data(), h.len)); !r)
+          return r;
+      // Done with the guest's buffer: hand it back (len 0: the hv wrote nothing into it).
+      if (auto r = from_guest_.try_push_used(c, 0); !r)
+        return r;
+
+      if (h.type == msg_ping) // application logic: answer every ping with a pong carrying the same bytes
+        if (auto r = send(msg_pong, reloco::span<const std::byte>(payload.data(), h.len)); !r)
+          return reloco::unexpected(r.error());
+    }
+    auto want = from_guest_.should_interrupt(); // once per batch
+    if (!want)
+      return reloco::unexpected(want.error());
+    if (*want)
+      irq_();
+    return {};
+  }
+
+  // WHAT: send one message to the guest. Returns false if the guest has no empty buffer posted
+  // (not an error: queue the message and retry after the next doorbell) or the buffer is too small.
+  [[nodiscard]] reloco::result<bool> send(std::uint32_t type, reloco::span<const std::byte> payload) noexcept {
+    if (payload.size() > kMaxPayload)
+      return reloco::unexpected(reloco::error::invalid_argument);
+    auto popped = to_guest_.try_pop(rx_segs_.as_span());
+    if (!popped)
+      return reloco::unexpected(popped.error());
+    if (!popped->has_value())
+      return false; // guest has not posted a receive buffer
+    const auto &c = **popped;
+    const msg_hdr h{type, static_cast<std::uint32_t>(payload.size())};
+    const std::size_t total = sizeof(h) + payload.size();
+    if (c.writable_bytes < total) { // guest buffer too small: give it back empty so the guest notices
+      if (auto r = to_guest_.try_push_used(c, 0); !r)
+        return reloco::unexpected(r.error());
+      return false;
+    }
+    auto hdr_bytes = reloco::span<const std::byte>(reinterpret_cast<const std::byte *>(&h), sizeof(h));
+    if (auto r = try_write_chain(*mem_, c.writable, 0, hdr_bytes); !r)
+      return reloco::unexpected(r.error());
+    if (!payload.empty())
+      if (auto r = try_write_chain(*mem_, c.writable, sizeof(h), payload); !r)
+        return reloco::unexpected(r.error());
+    // len = bytes written into the guest's buffer = what the guest's get-used call will report.
+    if (auto r = to_guest_.try_push_used(c, static_cast<std::uint32_t>(total)); !r)
+      return reloco::unexpected(r.error());
+    auto want = to_guest_.should_interrupt();
+    if (!want)
+      return reloco::unexpected(want.error());
+    if (*want)
+      irq_();
+    return true;
+  }
+
+private:
+  Mem *mem_;
+  device from_guest_, to_guest_;
+  Irq irq_;
+  reloco::array<typename device::segment, kQ> segs_{}, rx_segs_{};
+};
+```
+
+(Compiled and run, with a simulated guest, under ASan/UBSan: a `ping "hello"`
+comes back as a `pong "hello"`, two interrupts, no errors.)
+
+### 12.2 Example 1: one shared region, everything inside it
+
+**Situation.** The guest and the hypervisor share exactly one block of memory
+(a reserved carve-out, a PCI BAR, an ivshmem-like device). *Everything* lives
+in it: a control page, both rings, all buffers. Neither side may point outside
+the block, and the block may be mapped at *different* addresses on each side,
+so descriptor addresses are **byte offsets from the start of the region**, not
+pointers or physical addresses.
+
+```
+offset 0x0000  control page   (struct shm_ctl: handshake, ring offsets)
+offset 0x1000  q0 rings       (desc 0x1000, avail 0x1080, used 0x1094 for 8 entries)
+offset 0x3000  q1 rings
+offset 0x8000  q0 buffers     (8 slots x 256 bytes, slot i at 0x8000 + 256*i)
+offset 0xC000  q1 buffers     (8 slots x 256 bytes)
+```
+
+**Hypervisor (structo).** The address-space tag `shm` means "an offset inside
+the region". The memory backend is the plain `direct_virtq_memory`: base 0 means
+offset 0 *is* the first byte of our mapping, and every access is bounds-checked
+against the region size, so an offset past the end fails before touching memory.
+
+```cpp
+struct shm {};                                  // tag: "offset inside the shared region"
+using shm_addr = phys_addr<void, shm>;
+using shm_mem = direct_virtq_memory<shm>;       // offset -> pointer inside OUR mapping, bounds-checked
+
+// WHAT: the control page the guest fills in. WHY: both sides must agree on where
+// the rings are; the guest chooses, the hypervisor validates (never trusts).
+struct shm_ctl {
+  std::uint32_t magic;       // kShmMagic: "this region is initialised"
+  std::uint32_t version;     // protocol version, 1
+  std::uint32_t queue_size;  // entries per queue (power of two)
+  std::uint32_t guest_ready; // set to 1 LAST, after everything else is written
+  std::uint32_t tx_desc, tx_avail, tx_used; // q0 ring areas, as offsets from region start
+  std::uint32_t rx_desc, rx_avail, rx_used; // q1 ring areas
+};
+constexpr std::uint32_t kShmMagic = 0x4d485353;
+
+void hv_attach(std::byte *region, std::size_t region_size /* our mapping of the shared block */) {
+  // (pointer to our mapping, its size in bytes, address of byte 0). Offsets ARE the addresses.
+  static shm_mem mem(region, region_size, shm_addr{std::uint64_t{0}});
+
+  // Copy the control page out once (the guest can rewrite it under us), then validate the copy.
+  auto ctl = try_read_object<shm_ctl>(mem, shm_addr{std::uint64_t{0}});
+  if (!ctl || ctl->magic != kShmMagic || ctl->version != 1 || !ctl->guest_ready)
+    return; // guest not ready yet; try again on the next doorbell
+  auto at = [](std::uint32_t off) { return shm_addr{std::uint64_t{off}}; };
+  split_ring_addrs<shm> q0{at(ctl->tx_desc), at(ctl->tx_avail), at(ctl->tx_used)};
+  split_ring_addrs<shm> q1{at(ctl->rx_desc), at(ctl->rx_avail), at(ctl->rx_used)};
+
+  // try_create validates alignment/bounds of the guest-chosen areas and initialises the used rings.
+  auto from_guest = split_virtq_device<shm, shm, shm_mem>::try_create(mem, q0, ctl->queue_size);
+  auto to_guest = split_virtq_device<shm, shm, shm_mem>::try_create(mem, q1, ctl->queue_size);
+  if (!from_guest || !to_guest)
+    return; // refuse: the guest handed us a bad layout
+
+  // inject_irq() = YOUR mechanism for interrupting the guest (a mailbox write, a virtual IRQ, ...).
+  static hv_endpoint<shm, shm_mem, void (*)()> hv(mem, *from_guest, *to_guest, [] { /* inject_irq(); */ });
+  // On every guest doorbell:  (void)hv.on_doorbell();   (an error means: stop serving this guest)
+  (void)hv;
+}
+```
+
+**Guest (Linux or FreeBSD, plain C).** Neither OS's native virtqueue library
+can place the rings *inside a region you give it*: FreeBSD's `virtqueue(9)`
+allocates the ring memory itself, and Linux's `vring` stores DMA/physical
+addresses, not offsets (making it store offsets needs a custom
+`dma_map_ops`; see Example 2 for the native APIs). The split ring is a
+dozen lines, so the simplest portable choice is to drive it directly. The same
+file builds on both; only the three `SHM_*` macros differ.
+
+```c
+#include <stdint.h>
+#include <string.h>
+
+/* WHY per-OS macros: the hypervisor runs on another CPU, so we need SMP (not just compiler) barriers. */
+#if defined(__linux__)
+#  define SHM_WMB() virt_wmb()                          /* order: payload + descriptors before avail.idx */
+#  define SHM_RMB() virt_rmb()                          /* order: read used.idx before the used entry */
+#  define SHM_MB()  virt_mb()                           /* full: avail.idx store before reading NO_NOTIFY */
+#else /* FreeBSD kernel */
+#  define SHM_WMB() atomic_thread_fence_rel()
+#  define SHM_RMB() atomic_thread_fence_acq()
+#  define SHM_MB()  atomic_thread_fence_seq_cst()
+#endif
+
+#define VQ_N          8     /* queue size; must equal shm_ctl.queue_size */
+#define VQ_BUF        256   /* bytes per buffer slot: 8 header + 248 payload */
+#define F_NEXT 1u
+#define F_WRITE 2u          /* descriptor is device-writable (a receive buffer) */
+#define USED_F_NO_NOTIFY 1u
+
+struct vq_desc  { uint64_t addr; uint32_t len; uint16_t flags; uint16_t next; };  /* addr = OFFSET in region */
+struct vq_avail { uint16_t flags; uint16_t idx; uint16_t ring[VQ_N]; };
+struct vq_used  { uint16_t flags; uint16_t idx; struct { uint32_t id; uint32_t len; } ring[VQ_N]; };
+
+/* WHAT: one queue living entirely inside the shared region. */
+struct shm_vq {
+  volatile struct vq_desc  *desc;   /* guest-virtual pointers into OUR mapping of the region ...  */
+  volatile struct vq_avail *avail;
+  volatile struct vq_used  *used;
+  volatile uint8_t         *buf;    /* ... of the buffer pool for this queue */
+  uint32_t buf_off;                 /* the same pool as an OFFSET from the region start: what the device sees */
+  uint16_t avail_idx;               /* our private copy of avail.idx (we are its only writer) */
+  uint16_t used_seen;               /* how far into the used ring we have consumed */
+  uint32_t free_slots;              /* bit i set = slot i is ours to fill (tx queue bookkeeping) */
+};
+
+/* WHAT: wire slot i to its permanent buffer. WHY: with fixed buffers per slot there is no free list. */
+static void vq_init(struct shm_vq *q, int rx) {
+  for (unsigned i = 0; i < VQ_N; i++) {
+    q->desc[i].addr  = q->buf_off + (uint64_t)i * VQ_BUF;
+    q->desc[i].len   = VQ_BUF;
+    q->desc[i].flags = rx ? F_WRITE : 0;
+    q->desc[i].next  = 0;
+  }
+  q->avail_idx = q->used_seen = 0;
+  q->free_slots = (1u << VQ_N) - 1;
+}
+
+/* WHAT: make slot `slot` visible to the hypervisor. */
+static void vq_publish(struct shm_vq *q, uint16_t slot) {
+  q->avail->ring[q->avail_idx % VQ_N] = slot;
+  SHM_WMB();                          /* descriptor + payload must be visible BEFORE the index */
+  q->avail->idx = ++q->avail_idx;
+}
+
+/* WHAT: send one message. type/payload/len: the msg_hdr fields and the bytes. Returns 0, or -1 if no free slot. */
+int shm_send(struct shm_vq *tx, uint32_t type, const void *payload, uint32_t len) {
+  if (len > VQ_BUF - 8 || tx->free_slots == 0) return -1;
+  unsigned slot = __builtin_ctz(tx->free_slots);
+  tx->free_slots &= ~(1u << slot);
+  volatile uint8_t *b = tx->buf + (size_t)slot * VQ_BUF;
+  uint32_t hdr[2] = { type, len };    /* little-endian host assumed (the project does not support big-endian) */
+  memcpy((void *)b, hdr, 8);
+  memcpy((void *)(b + 8), payload, len);
+  tx->desc[slot].len = 8 + len;       /* only the bytes the hypervisor should read */
+  vq_publish(tx, (uint16_t)slot);
+  SHM_MB();                           /* store avail.idx BEFORE reading the device's no-notify flag */
+  if (!(tx->used->flags & USED_F_NO_NOTIFY))
+    shm_ring_doorbell();              /* YOUR doorbell mechanism: hypercall, register write, mailbox, ... */
+  return 0;
+}
+
+/* WHAT: call from your interrupt handler (the hypervisor's inject_irq lands here). Reaps both queues.
+ * on_msg(type, payload, len) is invoked for every received message. */
+void shm_irq(struct shm_vq *tx, struct shm_vq *rx, void (*on_msg)(uint32_t, const void *, uint32_t)) {
+  /* tx: just recycle completed slots */
+  while (tx->used_seen != tx->used->idx) {
+    SHM_RMB();
+    uint32_t id = tx->used->ring[tx->used_seen++ % VQ_N].id;
+    if (id < VQ_N) tx->free_slots |= 1u << id;      /* the device is trusted less than we are: range-check */
+  }
+  /* rx: deliver, then re-post the same buffer so the hypervisor can send again */
+  while (rx->used_seen != rx->used->idx) {
+    SHM_RMB();
+    uint32_t id  = rx->used->ring[rx->used_seen % VQ_N].id;
+    uint32_t len = rx->used->ring[rx->used_seen % VQ_N].len;
+    rx->used_seen++;
+    if (id >= VQ_N || len < 8 || len > VQ_BUF) continue;
+    uint32_t hdr[2];
+    memcpy(hdr, (const void *)(rx->buf + (size_t)id * VQ_BUF), 8);
+    if (hdr[1] <= len - 8) on_msg(hdr[0], (const void *)(rx->buf + (size_t)id * VQ_BUF + 8), hdr[1]);
+    vq_publish(rx, (uint16_t)id);
+  }
+}
+```
+
+Bring-up order on the guest: map the region, `vq_init` both queues, post all
+eight q1 slots with `vq_publish`, fill every field of `shm_ctl` **except**
+`guest_ready`, then set `guest_ready = 1` after a `SHM_WMB()`, and ring the
+doorbell once so the hypervisor attaches.
+
+### 12.3 Example 2: the hypervisor maps guest memory on demand
+
+**Situation.** There is no shared block. The guest owns all of its RAM and uses
+ordinary guest-physical addresses everywhere (rings, buffers, anywhere). The
+hypervisor does *not* keep the guest's RAM mapped; it maps just the bytes it
+needs, when it needs them, and releases them afterwards. This suits
+hypervisors that must not hold long-lived views of guest memory (small
+address spaces, memory that may be ballooned or migrated, strict isolation).
+
+**Hypervisor (structo).** The only new piece is a memory backend: one
+`virtq_memory_traits` specialisation whose every access is
+*map, copy, unmap*. Everything else, including `hv_endpoint` from 12.1, is
+unchanged. The `guest_mapper` is your hypervisor's "map this guest-physical
+range" primitive (a page-table walk plus a temporary mapping, a
+`mmap` of the guest memory file, a Xen/KVM map-foreign call, ...).
+
+```cpp
+struct gpa {};                                    // tag: guest-physical address
+using gpa_addr = phys_addr<void, gpa>;
+
+// WHAT: a temporary host view of some guest bytes. WHY: RAII, so every path (including errors)
+// releases the mapping; the hypervisor never holds a view longer than one access.
+class guest_mapping {
+public:
+  [[nodiscard]] reloco::span<std::byte> bytes() const noexcept; // the mapped bytes
+  ~guest_mapping();                                              // unmaps (real VMM: munmap/release)
+  // movable, not copyable
+};
+
+// WHAT: the hypervisor's guest-memory map. WHY: the ONE place a guest address becomes a host view,
+// and therefore the hostile-guest barrier: an address outside guest RAM must fail here.
+struct guest_mapper {
+  // gpa = guest-physical start (untrusted); len = bytes the caller is about to touch.
+  // Fails with out_of_range unless [gpa, gpa+len) lies entirely inside guest RAM.
+  reloco::result<guest_mapping> try_map(std::uint64_t gpa, std::uint64_t len) noexcept;
+};
+
+// WHAT: the memory backend handed to the queue classes. It only carries the mapper.
+class on_demand_memory {
+public:
+  explicit on_demand_memory(guest_mapper &m) noexcept : m_(&m) {}
+  guest_mapper &mapper() const noexcept { return *m_; }
+private:
+  guest_mapper *m_;
+};
+
+// WHAT: tells the library how to access guest memory through on_demand_memory.
+// All four operations are "map exactly the touched bytes, copy, unmap" (copy-out only: no pointer
+// into guest memory ever escapes, which is what makes the library's TOCTOU rules enforceable).
+template <> struct structo::virtio::virtq_memory_traits<on_demand_memory, gpa> {
+  using addr_type = phys_addr<void, gpa>;
+
+  // a = guest address, dst = local buffer to fill
+  static reloco::result<void> try_read(on_demand_memory &m, addr_type a, reloco::span<std::byte> dst) noexcept {
+    auto map = m.mapper().try_map(a.value, dst.size());
+    if (!map)
+      return reloco::unexpected(map.error());
+    auto b = map->bytes();
+    for (std::size_t i = 0; i < dst.size(); ++i)
+      dst[i] = b[i];
+    return {};
+  }
+  // a = guest address, src = local bytes to store
+  static reloco::result<void> try_write(on_demand_memory &m, addr_type a, reloco::span<const std::byte> src) noexcept {
+    auto map = m.mapper().try_map(a.value, src.size());
+    if (!map)
+      return reloco::unexpected(map.error());
+    auto b = map->bytes();
+    for (std::size_t i = 0; i < src.size(); ++i)
+      b[i] = src[i];
+    return {};
+  }
+  // Ring indices and flags are 16-bit and must be accessed as ONE aligned 16-bit load/store.
+  static reloco::result<std::uint16_t> try_load16(on_demand_memory &m, addr_type a) noexcept;
+  static reloco::result<void> try_store16(on_demand_memory &m, addr_type a, std::uint16_t v) noexcept;
+  // (try_load16/try_store16: reject odd addresses, then read/write 2 bytes little-endian via try_read/try_write.)
+};
+
+void hv_attach_guest(guest_mapper &mapper,
+                     split_ring_addrs<gpa> q0, split_ring_addrs<gpa> q1, std::uint32_t qsize) {
+  // q0/q1/qsize come from the guest's registration call (below). try_create validates them.
+  static on_demand_memory mem(mapper);
+  auto from_guest = split_virtq_device<gpa, gpa, on_demand_memory>::try_create(mem, q0, qsize);
+  auto to_guest = split_virtq_device<gpa, gpa, on_demand_memory>::try_create(mem, q1, qsize);
+  if (!from_guest || !to_guest)
+    return; // refuse the registration
+  static hv_endpoint<gpa, on_demand_memory, void (*)()> hv(mem, *from_guest, *to_guest, [] { /* inject_irq(); */ });
+  // On every doorbell: (void)hv.on_doorbell();
+  (void)hv;
+}
+```
+
+(Compiled and run with a simulated guest and a counting mapper: the same
+ping/pong exchange maps guest memory 17 times, each time for exactly the bytes
+touched. The two `try_load16`/`try_store16` bodies are in the compiled
+version; they are elided above only for length.)
+
+Cost model: every access is a map/unmap, so on-demand mapping trades speed for
+a small, short-lived footprint. If a profile says it matters, cache the
+mapping of the (small, hot) ring pages inside `guest_mapper` and keep mapping
+the *buffers* on demand; the queue code does not change.
+
+**Guest, Linux.** The guest can use Linux's own virtqueue library
+(`vring_create_virtqueue`, `virtqueue_add_*`) directly, with no virtio *bus*:
+it needs only a minimal `struct virtio_device` that carries the feature bits
+the ring code consults. Leaving `VIRTIO_F_ACCESS_PLATFORM` clear makes the
+ring code store plain guest-physical addresses, which is what the hypervisor's
+`gpa` space expects.
+
+```c
+/* Illustrative sketch, not compiled; vring_create_virtqueue()'s signature has changed across kernel
+ * versions: check include/linux/virtio_ring.h for yours. */
+#include <linux/virtio.h>
+#include <linux/virtio_ring.h>
+#include <linux/scatterlist.h>
+
+static struct virtio_device g_vdev;   /* WHAT: the minimum the ring code reads. WHY: no bus, no probe. */
+static struct virtqueue *g_tx, *g_rx; /* g_tx: guest -> hv (q0), g_rx: hv -> guest (q1) */
+
+/* WHAT: called by the ring code to kick the hypervisor after buffers are added.
+ * Must return true on success. */
+static bool shm_notify(struct virtqueue *vq) {
+  hv_doorbell(vq == g_tx ? 0 : 1);    /* YOUR doorbell (hypercall / register write); the arg says which queue */
+  return true;
+}
+/* WHAT: called from vring_interrupt() when the device completed buffers. Do the real work in a bottom half. */
+static void shm_vq_done(struct virtqueue *vq) { /* schedule_work(...) or napi */ }
+
+static int guest_init(struct device *dev /* any struct device usable as a parent */) {
+  g_vdev.dev.parent = dev;
+  g_vdev.features = BIT_ULL(VIRTIO_F_VERSION_1);   /* no ACCESS_PLATFORM: descriptors carry guest-physical addresses */
+
+  /* (index, ring entries, alignment, vdev, weak_barriers, may_reduce_num, context, notify, callback, name) */
+  g_tx = vring_create_virtqueue(0, 8, PAGE_SIZE, &g_vdev, true, false, false, shm_notify, shm_vq_done, "to-hv");
+  g_rx = vring_create_virtqueue(1, 8, PAGE_SIZE, &g_vdev, true, false, false, shm_notify, shm_vq_done, "to-guest");
+  if (!g_tx || !g_rx) return -ENOMEM;
+
+  /* Tell the hypervisor where the rings are: your registration call (hypercall / MMIO / ...).
+   * virtqueue_get_*_addr() return the physical addresses the ring code wrote into its own layout. */
+  hv_register_queue(0, virtqueue_get_desc_addr(g_tx), virtqueue_get_avail_addr(g_tx),
+                    virtqueue_get_used_addr(g_tx), 8);
+  hv_register_queue(1, virtqueue_get_desc_addr(g_rx), virtqueue_get_avail_addr(g_rx),
+                    virtqueue_get_used_addr(g_rx), 8);
+  return 0;
+}
+
+/* WHAT: send one message (hdr_and_payload: struct msg_hdr followed by its payload, in kmalloc'd memory). */
+static int shm_send(void *hdr_and_payload, unsigned total_len) {
+  struct scatterlist sg;
+  sg_init_one(&sg, hdr_and_payload, total_len);
+  /* (queue, scatterlist, number of entries, token returned by get_buf, gfp) */
+  int r = virtqueue_add_outbuf(g_tx, &sg, 1, hdr_and_payload, GFP_ATOMIC);
+  if (r) return r;
+  virtqueue_kick(g_tx);               /* decides whether a doorbell is needed, then calls shm_notify */
+  return 0;
+}
+
+/* WHAT: post an EMPTY receive buffer of 256 bytes (do this for each slot at start-up and after each receive). */
+static int shm_post_rx(void *buf256) {
+  struct scatterlist sg;
+  sg_init_one(&sg, buf256, 256);
+  int r = virtqueue_add_inbuf(g_rx, &sg, 1, buf256, GFP_ATOMIC);
+  if (!r) virtqueue_kick(g_rx);
+  return r;
+}
+
+/* WHAT: bottom half: reap completions. For g_rx, `len` is the byte count the hypervisor wrote. */
+static void shm_reap(void) {
+  unsigned len;
+  void *tok;
+  while ((tok = virtqueue_get_buf(g_tx, &len)) != NULL)
+    kfree(tok);                       /* tx buffer is ours again */
+  while ((tok = virtqueue_get_buf(g_rx, &len)) != NULL) {
+    handle_message(tok, len);         /* validate hdr.len <= len - 8 before use; the hv is trusted less than you think */
+    shm_post_rx(tok);                 /* recycle the buffer */
+  }
+}
+/* Your IRQ handler (the hypervisor's inject_irq lands here) calls vring_interrupt(irq, g_tx) and
+ * vring_interrupt(irq, g_rx), which invoke shm_vq_done() for queues with completed buffers. */
+```
+
+**Guest, FreeBSD.** FreeBSD's `virtqueue(9)` is the equivalent library
+(`virtqueue_alloc`, `virtqueue_enqueue`, `virtqueue_dequeue`). Its one coupling
+to the virtio bus is the kick: `virtqueue_notify()` calls the parent device's
+`virtio_bus_notify_vq` method. To avoid a real virtio bus, make a minimal
+parent device whose only job is to implement that method as your doorbell.
+
+```c
+/* Illustrative sketch, not compiled; virtqueue_alloc()'s parameters differ between FreeBSD versions:
+ * check virtqueue(9) and sys/dev/virtio/virtqueue.h for yours. */
+#include <sys/param.h>
+#include <sys/systm.h>
+#include <sys/bus.h>
+#include <sys/sglist.h>
+#include <dev/virtio/virtio.h>
+#include <dev/virtio/virtqueue.h>
+
+static struct virtqueue *g_tx, *g_rx;
+
+/* WHAT: the parent "bus" method virtqueue_notify() ends up calling. WHY: this is where YOUR doorbell goes.
+ * queue = queue index, offset = notification offset (unused by a custom transport). */
+static void shm_bus_notify_vq(device_t dev, uint16_t queue, bus_size_t offset) {
+  hv_doorbell(queue);
+}
+/* ... kobj method table with DEVMETHOD(virtio_bus_notify_vq, shm_bus_notify_vq) on the parent device ... */
+
+static int shm_vq_setup(device_t dev) {
+  struct vq_alloc_info info[2];
+  /* (info, max scatter-gather segments per request, interrupt handler or NULL, handler arg, &vq, name) */
+  VQ_ALLOC_INFO_INIT(&info[0], 1, NULL, NULL, &g_tx, "to-hv");
+  VQ_ALLOC_INFO_INIT(&info[1], 1, NULL, NULL, &g_rx, "to-guest");
+  int error = virtio_alloc_virtqueues(dev, 0, 2, info);
+  if (error) return error;
+  /* Registration: virtqueue_desc_paddr/avail_paddr/used_paddr give the physical addresses of the ring areas. */
+  hv_register_queue(0, virtqueue_desc_paddr(g_tx), virtqueue_avail_paddr(g_tx), virtqueue_used_paddr(g_tx),
+                    virtqueue_size(g_tx));
+  hv_register_queue(1, virtqueue_desc_paddr(g_rx), virtqueue_avail_paddr(g_rx), virtqueue_used_paddr(g_rx),
+                    virtqueue_size(g_rx));
+  return 0;
+}
+
+/* WHAT: send one message. buf/len = struct msg_hdr + payload in wired kernel memory. */
+static int shm_send(void *buf, size_t len) {
+  struct sglist_seg segs[1];
+  struct sglist sg;
+  sglist_init(&sg, 1, segs);
+  sglist_append(&sg, buf, len);                       /* adds the PHYSICAL address of buf: what the hv expects */
+  /* (queue, cookie returned by dequeue, sglist, number of device-readable segs, number of device-writable segs) */
+  int error = virtqueue_enqueue(g_tx, buf, &sg, 1, 0);
+  if (error == 0) virtqueue_notify(g_tx);             /* -> shm_bus_notify_vq() if the host asked to be kicked */
+  return error;
+}
+
+/* WHAT: post one EMPTY receive buffer (0 readable segs, 1 writable seg). */
+static int shm_post_rx(void *buf, size_t len) {
+  struct sglist_seg segs[1];
+  struct sglist sg;
+  sglist_init(&sg, 1, segs);
+  sglist_append(&sg, buf, len);
+  int error = virtqueue_enqueue(g_rx, buf, &sg, 0, 1);
+  if (error == 0) virtqueue_notify(g_rx);
+  return error;
+}
+
+/* WHAT: your interrupt handler (the hypervisor's inject_irq lands here). */
+static void shm_intr(void) {
+  void *cookie;
+  uint32_t len;
+  while ((cookie = virtqueue_dequeue(g_tx, &len)) != NULL)
+    free_tx_buffer(cookie);
+  while ((cookie = virtqueue_dequeue(g_rx, &len)) != NULL) {
+    handle_message(cookie, len);                      /* validate hdr.len <= len - 8 before use */
+    shm_post_rx(cookie, 256);
+  }
+}
+```
+
+### 12.4 Which example to pick
+
+| | Example 1: one shared region | Example 2: map guest memory on demand |
+|---|---|---|
+| Guest changes needed | own tiny ring code (or `dma_map_ops` on Linux) | none beyond a bare `vring`/`virtqueue` |
+| Hypervisor's exposure | the region only, nothing else of the guest | whatever the mapper allows, per access |
+| Address meaning | offsets inside the region | guest-physical addresses |
+| Memory backend | `direct_virtq_memory<shm>` | your `virtq_memory_traits` over the mapper |
+| Best for | isolated peers, BARs, ivshmem-style links | normal guests, no pre-arranged shared memory |
+
+Whichever you choose, section 11 applies unchanged: copy out, validate the
+copy, bound every length, and treat a failed ring operation as the end of that
+queue.

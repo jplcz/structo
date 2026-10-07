@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: BSD-2-Clause
 
+#include <algorithm>
 #include <gtest/gtest.h>
 #include <reloco/array.hpp>
 #include <structo/virtio/split_ring.hpp>
@@ -29,11 +30,15 @@ struct ram_store {
   std::uint64_t capacity_sectors() const noexcept { return 16; }
   bool read_only() const noexcept { return ro; }
   reloco::result<void> try_read(std::uint64_t sector, reloco::span<std::byte> buf) noexcept {
-    std::memcpy(buf.data(), data.data() + sector * 512, buf.size());
+    auto all = data.as_span();
+    auto src = all.subspan(static_cast<std::size_t>(sector) * 512, buf.size());
+    std::copy(src.begin(), src.end(), buf.begin());
     return {};
   }
   reloco::result<void> try_write(std::uint64_t sector, reloco::span<const std::byte> buf) noexcept {
-    std::memcpy(data.data() + sector * 512, buf.data(), buf.size());
+    auto all = data.as_span();
+    auto dst = all.subspan(static_cast<std::size_t>(sector) * 512, buf.size());
+    std::copy(buf.begin(), buf.end(), dst.begin());
     return {};
   }
   reloco::result<void> try_flush() noexcept {
@@ -57,15 +62,13 @@ protected:
   }
 
   std::uint32_t rd(std::uint64_t off) {
-    std::uint32_t v = 0xdeadbeef;
     reloco::array<std::byte, 4> b{};
     EXPECT_TRUE(ref_.try_read(off, b.as_span()).has_value());
-    std::memcpy(&v, b.data(), 4);
-    return v;
+    return load_le<std::uint32_t>(b.as_span());
   }
   void wr(std::uint64_t off, std::uint32_t v) {
     reloco::array<std::byte, 4> b{};
-    std::memcpy(b.data(), &v, 4);
+    store_le<std::uint32_t>(b.as_span(), v);
     EXPECT_TRUE(ref_.try_write(off, reloco::span<const std::byte>(b.data(), 4)).has_value());
   }
 
@@ -115,10 +118,9 @@ protected:
   std::uint8_t request(std::uint32_t type, std::uint64_t sector, std::uint64_t data_len, bool write_dir,
                        std::uint64_t *used_len = nullptr) {
     reloco::array<std::byte, 16> hdr{};
-    const std::uint32_t reserved = 0;
-    std::memcpy(hdr.data(), &type, 4);
-    std::memcpy(hdr.data() + 4, &reserved, 4);
-    std::memcpy(hdr.data() + 8, &sector, 8);
+    auto hs = hdr.as_span();
+    store_le<std::uint32_t>(hs, type);
+    store_le<std::uint64_t>(hs.subspan(8), sector);
     put(0, hdr.data(), hdr.size());
     const std::byte poison{0x55};
     put(0x1000, &poison, 1);
@@ -163,11 +165,11 @@ TEST_F(VirtioBlkTest, IdentityRegisters) {
   EXPECT_EQ(rd(reg::magic), reg::magic_value);
   EXPECT_EQ(rd(reg::version), 2u);
   EXPECT_EQ(rd(reg::device_id), 2u);
-  EXPECT_EQ(ref_.size(), reg::config + 8u);
+  EXPECT_EQ(ref_.size(), reg::config + blk::config_size);
   EXPECT_EQ(rd(reg::config), 16u); // capacity low
   EXPECT_EQ(rd(reg::config + 4), 0u);
   wr(reg::device_features_sel, 1);
-  EXPECT_EQ(rd(reg::device_features), 1u); // VERSION_1 in the high bank
+  EXPECT_NE(rd(reg::device_features) & 1u, 0u); // VERSION_1 in the high bank
   wr(reg::device_features_sel, 0);
   EXPECT_NE(rd(reg::device_features) & (1u << blk::feature_flush), 0u);
 }
@@ -220,7 +222,7 @@ TEST_F(VirtioBlkTest, ReadRequest) {
   EXPECT_EQ(len, 1025u);
   reloco::array<std::byte, 1024> got{};
   get_bytes(0x100, got.data(), got.size());
-  EXPECT_EQ(std::memcmp(got.data(), store_.data.data() + 2 * 512, 1024), 0);
+  EXPECT_TRUE(std::equal(got.begin(), got.end(), store_.data.begin() + 2 * 512));
   EXPECT_TRUE(dev_.irq_asserted());
   EXPECT_EQ(rd(reg::interrupt_status), reg::irq_used_buffer);
   wr(reg::interrupt_ack, reg::irq_used_buffer);
@@ -236,7 +238,7 @@ TEST_F(VirtioBlkTest, WriteRequest) {
   std::uint64_t len = 0;
   EXPECT_EQ(request(blk::req_out, 5, 512, true, &len), blk::status_ok);
   EXPECT_EQ(len, 1u);
-  EXPECT_EQ(std::memcmp(store_.data.data() + 5 * 512, payload.data(), 512), 0);
+  EXPECT_TRUE(std::equal(payload.begin(), payload.end(), store_.data.begin() + 5 * 512));
 }
 
 TEST_F(VirtioBlkTest, WriteRequestPreservesPayload) {
@@ -255,9 +257,28 @@ TEST_F(VirtioBlkTest, FlushRequest) {
   EXPECT_EQ(store_.flushes, 1);
 }
 
+TEST_F(VirtioBlkTest, ConfigSpaceFields) {
+  EXPECT_EQ(rd(reg::config + 12), 126u); // seg_max
+  EXPECT_EQ(rd(reg::config + 20), 512u); // blk_size
+  wr(reg::device_features_sel, 0);
+  EXPECT_NE(rd(reg::device_features) & (1u << blk::feature_seg_max), 0u);
+  EXPECT_NE(rd(reg::device_features) & (1u << blk::feature_blk_size), 0u);
+}
+
+TEST_F(VirtioBlkTest, GetId) {
+  bring_up();
+  std::uint64_t len = 0;
+  EXPECT_EQ(request(blk::req_get_id, 0, blk::id_size, false, &len), blk::status_ok);
+  EXPECT_EQ(len, blk::id_size + 1);
+  reloco::array<std::byte, 4> id{};
+  get_bytes(0x100, id.data(), id.size());
+  EXPECT_EQ(id[0], std::byte{'s'});
+  EXPECT_EQ(request(blk::req_get_id, 0, 8, false), blk::status_ioerr); // wrong buffer size
+}
+
 TEST_F(VirtioBlkTest, UnsupportedType) {
   bring_up();
-  EXPECT_EQ(request(8, 0, 0, false), blk::status_unsupp);
+  EXPECT_EQ(request(99, 0, 0, false), blk::status_unsupp);
 }
 
 TEST_F(VirtioBlkTest, OutOfRangeSector) {

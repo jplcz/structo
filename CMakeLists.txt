@@ -405,6 +405,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_packed_ring.cpp
         tests/test_virtq_ref.cpp
         tests/test_virtio_blk.cpp
+        tests/test_virtio_mmio.cpp
     )
     target_link_libraries(jplcz_structo_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)

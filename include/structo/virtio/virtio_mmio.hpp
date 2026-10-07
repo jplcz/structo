@@ -15,7 +15,9 @@
  *
  * Ring and buffer memory live in one guest address space `GuestSpace`, accessed
  * through `Mem` (a `virtq_memory_traits<Mem, GuestSpace>` backend, e.g.
- * `virtq_memory_ref<GuestSpace>`). Packed rings are not wired up yet.
+ * `virtq_memory_ref<GuestSpace>`). Split and packed rings are both supported;
+ * the transport offers `RING_PACKED`, `EVENT_IDX` and `INDIRECT_DESC` (split
+ * only: the combination of PACKED and INDIRECT_DESC is refused at FEATURES_OK).
  *
  * Interrupts: the transport is poll-based. After each MMIO access (or
  * `try_kick`) call `irq_asserted()` and drive the interrupt line accordingly;
@@ -34,15 +36,17 @@
  *   // Size of the device config space exposed at offset 0x100.
  *   std::size_t config_size() const noexcept;
  *   reloco::result<void> try_read_config(std::uint64_t offset, reloco::span<std::byte> dst) noexcept;
- *   // Drain queue @p qidx after a guest kick. An error makes the transport
- *   // raise DEVICE_NEEDS_RESET.
- *   template <typename Queue, typename Mem>
- *   reloco::result<void> process(Mem &mem, std::uint32_t qidx, Queue &q) noexcept;
+ *   // Drain queue @p qidx after a guest kick through @p q, a `mmio_queue_view`
+ *   // exposing `segment`, `try_pop(span<segment>)` and `try_push_used(chain, len)`.
+ *   // An error makes the transport raise DEVICE_NEEDS_RESET.
+ *   template <typename QueueView, typename Mem>
+ *   reloco::result<void> process(Mem &mem, std::uint32_t qidx, QueueView &q) noexcept;
  * };
  * @endcode
  */
 
 #include "le_bytes.hpp"
+#include "packed_ring.hpp"
 #include "split_ring.hpp"
 #include "virtq_memory.hpp"
 #include "virtq_types.hpp"
@@ -101,6 +105,36 @@ inline constexpr std::uint32_t irq_config_change = 2;
 } // namespace mmio_reg
 
 /**
+ * @brief Ring-kind-agnostic view handed to `Function::process`.
+ * Pops use the indirect-capable overload only on split rings with
+ * `INDIRECT_DESC` negotiated.
+ */
+template <typename Queue, typename Mem, bool Split> class mmio_queue_view {
+public:
+  using segment = typename Queue::segment;
+  using chain = typename Queue::chain;
+
+  mmio_queue_view(Queue &q, Mem &mem, bool indirect) noexcept : q_(&q), mem_(&mem), indirect_(indirect) {}
+
+  [[nodiscard]] reloco::result<reloco::optional<chain>> try_pop(reloco::span<segment> storage) noexcept {
+    if constexpr (Split) {
+      if (indirect_)
+        return q_->try_pop(storage, *mem_);
+    }
+    return q_->try_pop(storage);
+  }
+
+  [[nodiscard]] reloco::result<void> try_push_used(const chain &c, std::uint32_t written) noexcept {
+    return q_->try_push_used(c, written);
+  }
+
+private:
+  Queue *q_;
+  Mem *mem_;
+  bool indirect_;
+};
+
+/**
  * @brief virtio-mmio v2 device transport.
  * @tparam GuestSpace Address space of guest ring and buffer addresses.
  * @tparam Mem Memory backend for `GuestSpace` (`virtq_memory_traits<Mem, GuestSpace>`).
@@ -111,6 +145,7 @@ template <typename GuestSpace, typename Mem, typename Function, std::size_t MaxQ
 class virtio_mmio_device {
 public:
   using queue = split_virtq_device<GuestSpace, GuestSpace, Mem>;
+  using packed_queue = packed_virtq_device<GuestSpace, GuestSpace, Mem>;
   using guest_addr = phys_addr<void, GuestSpace>;
 
   static_assert(Function::queue_count <= MaxQueues, "MaxQueues too small for Function::queue_count");
@@ -139,22 +174,22 @@ public:
 
   /** @brief Drains queue @p qidx as if the guest had written QueueNotify. */
   [[nodiscard]] reloco::result<void> try_kick(std::uint32_t qidx) noexcept {
-    if (qidx >= Function::queue_count || !queues_[qidx].q.has_value() || !(status_ & mmio_reg::status_driver_ok))
+    if (qidx >= Function::queue_count || !(status_ & mmio_reg::status_driver_ok))
       return reloco::unexpected(reloco::error::invalid_state);
-    auto &q = *queues_[qidx].q;
-    auto r = fn_->process(*mem_, qidx, q);
-    if (!r) {
-      enter_needs_reset();
+    auto &st = queues_[qidx];
+    reloco::result<void> r = reloco::unexpected(reloco::error::invalid_state);
+    if (st.q.has_value()) {
+      mmio_queue_view<queue, Mem, true> view(*st.q, *mem_, has_feature(driver_features_, feature_ring_indirect_desc));
+      r = service(qidx, *st.q, view);
+    } else if (st.pq.has_value()) {
+      mmio_queue_view<packed_queue, Mem, false> view(*st.pq, *mem_, false);
+      r = service(qidx, *st.pq, view);
+    } else {
       return r;
     }
-    auto irq = q.should_interrupt();
-    if (!irq) {
+    if (!r)
       enter_needs_reset();
-      return reloco::unexpected(irq.error());
-    }
-    if (*irq)
-      irq_status_ |= mmio_reg::irq_used_buffer;
-    return {};
+    return r;
   }
 
   /** @brief Resets the device to its power-on state (Status = 0). */
@@ -194,10 +229,34 @@ private:
     std::uint64_t avail = 0;
     std::uint64_t used = 0;
     reloco::optional<queue> q;
+    reloco::optional<packed_queue> pq;
   };
 
+  // Drains the queue, re-enables kicks, drains once more to close the race with
+  // a kick that arrived in between, then raises the used-buffer interrupt if wanted.
+  template <typename Q, typename View>
+  [[nodiscard]] reloco::result<void> service(std::uint32_t qidx, Q &q, View &view) noexcept {
+    if (auto r = fn_->process(*mem_, qidx, view); !r)
+      return r;
+    if (auto r = q.try_set_notify_enabled(true); !r)
+      return r;
+    smp_virtq_barriers::mb();
+    if (auto r = fn_->process(*mem_, qidx, view); !r)
+      return r;
+    auto irq = q.should_interrupt();
+    if (!irq)
+      return reloco::unexpected(irq.error());
+    if (*irq)
+      irq_status_ |= mmio_reg::irq_used_buffer;
+    return {};
+  }
+
+  static constexpr std::uint64_t transport_features =
+      (std::uint64_t{1} << feature_version_1) | (std::uint64_t{1} << feature_ring_event_idx) |
+      (std::uint64_t{1} << feature_ring_packed) | (std::uint64_t{1} << feature_ring_indirect_desc);
+
   [[nodiscard]] std::uint64_t offered() const noexcept {
-    return fn_->device_features() | (std::uint64_t{1} << feature_version_1);
+    return fn_->device_features() | transport_features;
   }
 
   [[nodiscard]] queue_state *selected() noexcept {
@@ -284,7 +343,7 @@ private:
       break;
     case mmio_reg::queue_notify:
       // Notifications for unknown/inactive queues are ignored (guests may kick spuriously).
-      if (v < Function::queue_count && queues_[v].q.has_value() && (status_ & mmio_reg::status_driver_ok))
+      if (v < Function::queue_count && queues_[v].ready && (status_ & mmio_reg::status_driver_ok))
         (void)try_kick(v);
       break;
     case mmio_reg::interrupt_ack:
@@ -310,6 +369,7 @@ private:
     if (!ready) {
       s.ready = false;
       s.q.reset();
+      s.pq.reset();
       return;
     }
     // Queues may only be brought up after FEATURES_OK and before DRIVER_OK.
@@ -317,12 +377,21 @@ private:
       return;
     if (s.num == 0 || s.num > Function::queue_max_size)
       return;
-    split_ring_addrs<GuestSpace> addrs{guest_addr{s.desc}, guest_addr{s.avail}, guest_addr{s.used}};
     const bool event_idx = has_feature(driver_features_, feature_ring_event_idx);
-    auto q = queue::try_create(*mem_, addrs, s.num, event_idx);
-    if (!q)
-      return; // stays not-ready; the guest observes QueueReady == 0
-    s.q = *q;
+    if (has_feature(driver_features_, feature_ring_packed)) {
+      // Packed rings: QueueDriver/QueueDevice are the driver/device event-suppression areas.
+      packed_ring_addrs<GuestSpace> addrs{guest_addr{s.desc}, guest_addr{s.avail}, guest_addr{s.used}};
+      auto q = packed_queue::try_create(*mem_, addrs, s.num, event_idx);
+      if (!q)
+        return; // stays not-ready; the guest observes QueueReady == 0
+      s.pq = *q;
+    } else {
+      split_ring_addrs<GuestSpace> addrs{guest_addr{s.desc}, guest_addr{s.avail}, guest_addr{s.used}};
+      auto q = queue::try_create(*mem_, addrs, s.num, event_idx);
+      if (!q)
+        return;
+      s.q = *q;
+    }
     s.ready = true;
   }
 
@@ -332,7 +401,9 @@ private:
       return;
     }
     if ((v & mmio_reg::status_features_ok) && !(status_ & mmio_reg::status_features_ok)) {
-      const bool ok = (driver_features_ & ~offered()) == 0 && has_feature(driver_features_, feature_version_1);
+      const bool ok = (driver_features_ & ~offered()) == 0 && has_feature(driver_features_, feature_version_1) &&
+                      !(has_feature(driver_features_, feature_ring_packed) &&
+                        has_feature(driver_features_, feature_ring_indirect_desc));
       if (!ok)
         v &= ~mmio_reg::status_features_ok; // the guest reads it back and sees the refusal
     }

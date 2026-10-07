@@ -14,7 +14,9 @@
  * capacity with overflow-safe arithmetic, and a malformed chain is completed
  * with `IOERR`/`UNSUPP` rather than trusted.
  *
- * Supported: `IN`, `OUT`, `FLUSH`; features `FLUSH` and (read-only stores) `RO`.
+ * Supported: `IN`, `OUT`, `FLUSH`, `GET_ID`; features `FLUSH`, `SEG_MAX`,
+ * `BLK_SIZE` and (read-only stores) `RO`. Config space: capacity, size_max,
+ * seg_max, geometry (zero), blk_size.
  *
  * ### Store requirements
  * @code
@@ -50,9 +52,14 @@ namespace blk {
 inline constexpr std::uint32_t device_id = 2;
 inline constexpr unsigned feature_ro = 5;
 inline constexpr unsigned feature_flush = 9;
+inline constexpr unsigned feature_seg_max = 2;
+inline constexpr unsigned feature_blk_size = 6;
 inline constexpr std::uint32_t req_in = 0;
 inline constexpr std::uint32_t req_out = 1;
 inline constexpr std::uint32_t req_flush = 4;
+inline constexpr std::uint32_t req_get_id = 8;
+inline constexpr std::size_t id_size = 20;
+inline constexpr std::size_t config_size = 24;
 inline constexpr std::uint8_t status_ok = 0;
 inline constexpr std::uint8_t status_ioerr = 1;
 inline constexpr std::uint8_t status_unsupp = 2;
@@ -74,31 +81,34 @@ public:
   explicit virtio_blk_function(Store &store) noexcept : store_(&store) {}
 
   [[nodiscard]] std::uint64_t device_features() const noexcept {
-    std::uint64_t f = std::uint64_t{1} << blk::feature_flush;
+    std::uint64_t f = (std::uint64_t{1} << blk::feature_flush) | (std::uint64_t{1} << blk::feature_seg_max) |
+                      (std::uint64_t{1} << blk::feature_blk_size);
     if (store_->read_only())
       f |= std::uint64_t{1} << blk::feature_ro;
     return f;
   }
 
-  [[nodiscard]] std::size_t config_size() const noexcept { return 8; }
+  [[nodiscard]] std::size_t config_size() const noexcept { return blk::config_size; }
 
-  /** @brief Config space: `le64 capacity` (in 512-byte sectors). */
+  /** @brief Config space: capacity(8), size_max(4), seg_max(4), geometry(4, zero), blk_size(4). */
   [[nodiscard]] reloco::result<void> try_read_config(std::uint64_t offset, reloco::span<std::byte> dst) noexcept {
-    if (offset > 8 || dst.size() > 8 - offset)
+    if (offset > blk::config_size || dst.size() > blk::config_size - offset)
       return reloco::unexpected(reloco::error::out_of_range);
-    const std::uint64_t cap = store_->capacity_sectors();
-    reloco::array<std::byte, 8> raw{};
-    store_le<std::uint64_t>(raw.as_span(), cap);
+    reloco::array<std::byte, blk::config_size> raw{};
+    auto rs = raw.as_span();
+    store_le<std::uint64_t>(rs, store_->capacity_sectors());
+    store_le<std::uint32_t>(rs.subspan(12), seg_max());
+    store_le<std::uint32_t>(rs.subspan(20), blk::sector_size);
     for (std::size_t i = 0; i < dst.size(); ++i)
       dst[i] = raw[static_cast<std::size_t>(offset) + i];
     return {};
   }
 
   /** @brief Drains @p q, completing every available request. */
-  template <typename Queue, typename Mem>
-  [[nodiscard]] reloco::result<void> process(Mem &mem, std::uint32_t, Queue &q) noexcept {
+  template <typename QueueView, typename Mem>
+  [[nodiscard]] reloco::result<void> process(Mem &mem, std::uint32_t, QueueView &q) noexcept {
     for (;;) {
-      auto popped = q.try_pop(reloco::span<typename Queue::segment>(segs_.data(), segs_.size()));
+      auto popped = q.try_pop(reloco::span<typename QueueView::segment>(segs_.data(), segs_.size()));
       if (!popped)
         return reloco::unexpected(popped.error());
       if (!popped->has_value())
@@ -119,12 +129,14 @@ private:
     if (!try_read_chain(mem, c.readable, 0, reloco::span<std::byte>(hdr.data(), hdr.size())))
       return 0;
     const reloco::span<const std::byte> h(hdr.data(), hdr.size());
-    const auto type = load_le<std::uint32_t>(h);
+    auto type = load_le<std::uint32_t>(h);
     const auto h_sector = h.subspan(8);
     const auto sector = load_le<std::uint64_t>(h_sector);
 
     std::uint8_t status = blk::status_ok;
     std::uint32_t data_written = 0;
+    if (c.readable.size() + c.writable.size() > std::size_t{seg_max()} + 2)
+      type = ~std::uint32_t{0}; // more data segments than seg_max: refuse
     switch (type) {
     case blk::req_in:
       status = do_in(mem, c, sector, data_written);
@@ -137,6 +149,9 @@ private:
                    ? blk::status_ok
                    : blk::status_ioerr;
       break;
+    case blk::req_get_id:
+      status = do_get_id(mem, c, data_written);
+      break;
     default:
       status = blk::status_unsupp;
       break;
@@ -146,6 +161,22 @@ private:
     if (!try_write_chain(mem, c.writable, c.writable_bytes - 1, reloco::span<const std::byte>(&sb, 1)))
       return data_written;
     return data_written + 1;
+  }
+
+  static constexpr std::uint32_t seg_max() noexcept { return queue_max_size - 2; }
+
+  template <typename Mem, typename Chain>
+  std::uint8_t do_get_id(Mem &mem, const Chain &c, std::uint32_t &written) noexcept {
+    if (c.readable_bytes != blk::header_size || c.writable_bytes != blk::id_size + 1)
+      return blk::status_ioerr;
+    reloco::array<std::byte, blk::id_size> id{}; // NUL-padded serial
+    const reloco::span<const char> name("structo-virtio-blk", 18);
+    for (std::size_t i = 0; i < name.size(); ++i)
+      id[i] = static_cast<std::byte>(name[i]);
+    if (!try_write_chain(mem, c.writable, 0, reloco::span<const std::byte>(id.data(), id.size())))
+      return blk::status_ioerr;
+    written = static_cast<std::uint32_t>(blk::id_size);
+    return blk::status_ok;
   }
 
   [[nodiscard]] bool range_ok(std::uint64_t sector, std::uint64_t bytes) const noexcept {

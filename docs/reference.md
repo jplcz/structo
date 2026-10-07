@@ -212,7 +212,7 @@ have a linked, standalone page going into more depth.
 
 ## VIRTIO virtqueues (`virtio/`)
 
-Design: [virtio_queue_design.md](virtio_queue_design.md). Work in progress; packed-ring transport wiring follows later.
+Usage guide: [virtq.md](virtq.md). Split and packed rings are both supported by the virtio-mmio transport.
 
 | Header | Type(s) | One-line summary |
 |---|---|---|
