@@ -31,6 +31,7 @@ Contents:
 10. [Example: forwarding hypervisor logs to a Linux guest](#10-example-forwarding-hypervisor-logs-to-a-linux-guest)
 11. [Hostile-peer rules](#11-hostile-peer-rules)
 12. [Direct virtqueues over shared memory, without a virtio bus](#12-direct-virtqueues-over-shared-memory-without-a-virtio-bus)
+13. [A custom hypercall virtio transport and a structo logger device](#13-a-custom-hypercall-virtio-transport-and-a-structo-logger-device)
 
 ---
 
@@ -2654,10 +2655,24 @@ template <> struct structo::virtio::virtq_memory_traits<on_demand_memory, gpa> {
       b[i] = src[i];
     return {};
   }
-  // Ring indices and flags are 16-bit and must be accessed as ONE aligned 16-bit load/store.
-  static reloco::result<std::uint16_t> try_load16(on_demand_memory &m, addr_type a) noexcept;
-  static reloco::result<void> try_store16(on_demand_memory &m, addr_type a, std::uint16_t v) noexcept;
-  // (try_load16/try_store16: reject odd addresses, then read/write 2 bytes little-endian via try_read/try_write.)
+  // Ring indices and flags are 16-bit. a = guest address of the index/flag. An odd address is a protocol
+  // violation, so it is refused before anything is mapped; otherwise map the 2 bytes, copy, unmap.
+  static reloco::result<std::uint16_t> try_load16(on_demand_memory &m, addr_type a) noexcept {
+    if (a.value % 2 != 0)
+      return reloco::unexpected(reloco::error::invalid_argument);
+    reloco::array<std::byte, 2> raw{};
+    if (auto r = try_read(m, a, raw.as_span()); !r)
+      return reloco::unexpected(r.error());
+    return load_le<std::uint16_t>(raw.as_span()); // le_bytes.hpp: little-endian decode, no memcpy
+  }
+  // v = value to store, written as ONE 2-byte store into the mapping
+  static reloco::result<void> try_store16(on_demand_memory &m, addr_type a, std::uint16_t v) noexcept {
+    if (a.value % 2 != 0)
+      return reloco::unexpected(reloco::error::invalid_argument);
+    reloco::array<std::byte, 2> raw{};
+    store_le<std::uint16_t>(raw.as_span(), v);
+    return try_write(m, a, reloco::span<const std::byte>(raw.data(), raw.size()));
+  }
 };
 
 void hv_attach_guest(guest_mapper &mapper,
@@ -2676,8 +2691,7 @@ void hv_attach_guest(guest_mapper &mapper,
 
 (Compiled and run with a simulated guest and a counting mapper: the same
 ping/pong exchange maps guest memory 17 times, each time for exactly the bytes
-touched. The two `try_load16`/`try_store16` bodies are in the compiled
-version; they are elided above only for length.)
+touched.)
 
 Cost model: every access is a map/unmap, so on-demand mapping trades speed for
 a small, short-lived footprint. If a profile says it matters, cache the
@@ -3345,3 +3359,1011 @@ of each `shm_cvq` at its areas from the layout above, set
 largest sendable message is 8 chunks = 2040 payload bytes; the largest the
 guest can receive is `RX_CHUNKS * 256 - 8 = 1016`, so make the hypervisor's
 `send_large` fit that (it simply returns `false` for a message that does not).
+
+
+---
+
+## 13. A custom hypercall virtio transport and a structo logger device
+
+Section 9 used a stock transport (virtio-mmio). Sections 12.x skipped virtio
+entirely. This section is the middle path: keep the **virtio device model**
+(feature negotiation, status handshake, ordinary guest virtio drivers) but
+replace the transport, the part that tells the guest *how to find, configure
+and kick* a device, with something that fits your platform:
+
+- **doorbell and control**: hypercalls (HVC / VMCALL / SMCCC). The guest does
+  not need MMIO windows, PCI, or device-tree/ACPI nodes for the device
+  registers;
+- **interrupts**: whatever your hypervisor injects (unspecified here:
+  `inject_irq()`);
+- **guest memory**: the hypervisor can see *all* guest RAM, but only by
+  mapping it dynamically for each access (`on_demand_memory`, section 12.3).
+  Rings and buffers can therefore live anywhere in guest-physical memory, with
+  no pre-arranged shared region.
+
+On top of that transport we build a **structo logger device**: a virtio device
+with its own device ID that streams hypervisor log lines to a guest driver, and
+accepts a small control message back (set the minimum level).
+
+```mermaid
+flowchart TB
+  subgraph Guest
+    D["logger driver<br/>(ordinary virtio driver)"]
+    T["custom transport<br/>(Linux: virtio_config_ops, FreeBSD: virtio_bus methods)"]
+    D --> T
+  end
+  subgraph HV["structo hypervisor"]
+    X["hc_transport<br/>status, features, queue setup, kick"]
+    F["log_device (Function)<br/>pending ring, q0 log, q1 control"]
+    M["on_demand_memory<br/>map, copy, unmap per access"]
+    X --> F
+    X --> M
+  end
+  T -- "hypercall: hc::call -> hc::ret" --> X
+  X -. "inject_irq()" .-> T
+  M -. "guest RAM" .- T
+```
+
+What the transport has to provide is small. Everything else (queue layout,
+descriptor handling, buffer ownership) is the virtqueue library you already
+know.
+
+### 13.1 The hypercall ABI
+
+One hypercall, `hc_call`, carries an operation code and up to five arguments
+and returns an error code and a 64-bit value. Pick registers to suit your
+architecture (arm64: an SMCCC vendor-hyp call with x1..x6; x86: VMCALL/VMMCALL
+with the arguments in rbx, rcx, rdx, rsi, rdi). Everything is little-endian
+64-bit.
+
+```cpp
+namespace hc {
+// WHAT: operation codes (a0..a4 are the five arguments). WHY these and no more: they are exactly
+// the virtio-mmio register file, flattened into calls, so the guest-side code stays close to
+// what existing virtio transports do.
+enum : std::uint64_t {
+  probe = 1,         // () -> val = (queue_count << 32) | device_id; device_id 0 = no device
+  get_features = 2,  // (word) -> val = 32 feature bits of word 0 (bits 0..31) or word 1 (bits 32..63)
+  set_features = 3,  // (word, bits): the driver's accepted features; refused after FEATURES_OK
+  get_status = 4,    // () -> val = device status
+  set_status = 5,    // (status): the virtio status handshake; 0 resets the device
+  queue_info = 10,   // (q) -> val = largest ring size the device supports for queue q, 0 = no such queue
+  queue_setup = 6,   // (q, size, desc_gpa, avail_gpa, used_gpa): guest-physical addresses of the ring areas
+  notify = 7,        // (q): the doorbell: "I added buffers to queue q"
+  isr_ack = 8,       // (mask) -> val = pending causes before clearing `mask` (bit0 buffers used, bit1 config)
+  read_config = 9,   // (offset) -> val = up to 8 bytes of device config at offset, little-endian
+};
+enum : std::int32_t { ok = 0, e_perm = -1, e_state = -16, e_nodev = -19, e_inval = -22 };
+
+// virtio status bits (the same values as in the virtio spec)
+enum : std::uint32_t { st_ack = 1, st_driver = 2, st_driver_ok = 4, st_features_ok = 8, st_needs_reset = 0x40 };
+enum : std::uint32_t { isr_used = 1, isr_config = 2 };
+
+struct call { std::uint64_t op; std::uint64_t a[5]; }; // what the guest passes in registers
+struct ret { std::int32_t err; std::uint64_t val; };   // what the guest gets back in registers
+} // namespace hc
+```
+
+Interrupts have no register: when the device raises a cause it injects *one*
+interrupt (edge) and the guest reads and clears the causes with `isr_ack`. A
+cause that is already pending does not inject again, so a burst of completions
+costs one interrupt.
+
+### 13.2 The structo transport: `hc_transport`
+
+**What this is.** The device-side state machine: features, status, queue table,
+interrupt causes. **Why it is shaped like this.** It is a template over the
+*Function* (the device type) with exactly the same requirements as the
+virtio-mmio `Function` in `virtio_mmio.hpp`, so a device written once (the
+logger below, `virtio_blk_function`) runs over either transport. It is also a
+template over the memory backend, so it works with `on_demand_memory` here and
+with `virtq_memory_ref` or `direct_virtq_memory` elsewhere.
+
+Everything the guest passes (queue index, size, ring addresses) is untrusted:
+the index is range-checked and masked with `nospec::sanitize`, the size must be
+a power of two within the device limit, and the ring addresses go through
+`try_create`, which validates them against the memory backend.
+
+```cpp
+// WHAT: the queue handed to Function::process(). WHY a wrapper: Function code needs only pop/push,
+// not the whole queue API (set_notify_enabled, should_interrupt stay the transport's business).
+template <typename Queue> class hc_queue_view {
+public:
+  using segment = typename Queue::segment;
+  using chain = typename Queue::chain;
+  explicit hc_queue_view(Queue &q) noexcept : q_(&q) {}
+  [[nodiscard]] reloco::result<reloco::optional<chain>> try_pop(reloco::span<segment> storage) noexcept {
+    return q_->try_pop(storage); // storage: where the popped chain's segments are described
+  }
+  [[nodiscard]] reloco::result<void> try_push_used(const chain &c, std::uint32_t written) noexcept {
+    return q_->try_push_used(c, written); // written = bytes the device wrote into c's writable part
+  }
+private:
+  Queue *q_;
+};
+
+// Mem      = guest memory backend (on_demand_memory), for address space `gpa`
+// Function = the device type (see the Function requirements in virtio_mmio.hpp)
+// Irq      = callable that injects the guest interrupt (unspecified mechanism)
+template <typename Mem, typename Function, typename Irq> class hc_transport {
+public:
+  using queue = split_virtq_device<gpa, gpa, Mem>;
+  // Only VERSION_1 (bit 32) is added by the transport: modern virtio, split rings, nothing else.
+  static constexpr std::uint64_t kVersion1 = std::uint64_t{1} << feature_version_1;
+
+  hc_transport(Mem &mem, Function &fn, Irq irq) noexcept : mem_(&mem), fn_(&fn), irq_(irq) {}
+
+  // WHAT: the hypercall handler. WHY one switch: the VMM's hypercall exit calls this and puts the
+  // result in the guest's registers. c comes straight from guest registers: treat it all as hostile.
+  hc::ret handle(const hc::call &c) noexcept {
+    switch (c.op) {
+    case hc::probe:
+      return {hc::ok, (std::uint64_t{Function::queue_count} << 32) | Function::device_id};
+    case hc::get_features: {
+      const std::uint64_t f = fn_->device_features() | kVersion1;
+      return {hc::ok, c.a[0] == 0 ? (f & 0xffff'ffffu) : c.a[0] == 1 ? (f >> 32) : 0u};
+    }
+    case hc::set_features: // a0 = word (0 = low, 1 = high), a1 = the 32 bits the driver accepts
+      if (status_ & hc::st_features_ok)
+        return {hc::e_state, 0}; // frozen once negotiated
+      if (c.a[0] == 0)
+        features_ = (features_ & ~std::uint64_t{0xffff'ffffu}) | (c.a[1] & 0xffff'ffffu);
+      else if (c.a[0] == 1)
+        features_ = (features_ & 0xffff'ffffu) | ((c.a[1] & 0xffff'ffffu) << 32);
+      else
+        return {hc::e_inval, 0};
+      return {hc::ok, 0};
+    case hc::get_status:
+      return {hc::ok, status_};
+    case hc::set_status:
+      return set_status(static_cast<std::uint32_t>(c.a[0]));
+    case hc::queue_info: // a0 = queue index
+      return {hc::ok, c.a[0] < Function::queue_count ? Function::queue_max_size : 0u};
+    case hc::queue_setup:
+      return queue_setup(c);
+    case hc::notify: // a0 = queue index: run the device on that queue
+      return {service(static_cast<std::uint32_t>(c.a[0])) ? hc::ok : hc::e_state, 0};
+    case hc::isr_ack: { // a0 = causes the guest has handled
+      const std::uint32_t was = isr_;
+      isr_ &= ~static_cast<std::uint32_t>(c.a[0]);
+      return {hc::ok, was};
+    }
+    case hc::read_config: // a0 = byte offset into the device config space
+      return read_config(c.a[0]);
+    default:
+      return {hc::e_inval, 0};
+    }
+  }
+
+  // WHAT: run the device on queue qidx. Called from `notify`, and by the VMM itself when the DEVICE
+  // has something to say (e.g. after the logger got a new record), so it is public.
+  [[nodiscard]] reloco::result<void> service(std::uint32_t qidx) noexcept {
+    const bool in_range = qidx < Function::queue_count;
+    qidx = reloco::nospec::sanitize(qidx, in_range, std::uint32_t{0}); // mask BEFORE the branch
+    if (!in_range || !(status_ & hc::st_driver_ok) || !queues_[qidx].has_value())
+      return reloco::unexpected(reloco::error::invalid_state);
+    auto &q = *queues_[qidx];
+    hc_queue_view<queue> view(q);
+    auto r = run(qidx, q, view);
+    if (!r) { // any ring/protocol failure: the device is broken until the guest resets it
+      status_ |= hc::st_needs_reset;
+      raise(hc::isr_config);
+    }
+    return r;
+  }
+
+private:
+  hc::ret set_status(std::uint32_t v) noexcept {
+    if (v == 0) { // reset: forget features, queues and pending interrupts
+      status_ = 0; features_ = 0; isr_ = 0;
+      for (auto &q : queues_)
+        q.reset();
+      return {hc::ok, 0};
+    }
+    const std::uint32_t keep = status_ & hc::st_needs_reset; // survives until the guest writes 0
+    if ((v & hc::st_features_ok) && !(status_ & hc::st_features_ok)) {
+      // Refuse FEATURES_OK (by not setting it) if the driver accepted unknown bits or skipped VERSION_1;
+      // the driver notices by reading the status back.
+      const bool known = (features_ & ~(fn_->device_features() | kVersion1)) == 0;
+      if (!known || !(features_ & kVersion1))
+        v &= ~std::uint32_t{hc::st_features_ok};
+    }
+    const bool was_ok = status_ & hc::st_driver_ok;
+    status_ = (v & 0xffu) | keep;
+    if (!was_ok && (status_ & hc::st_driver_ok)) // DRIVER_OK just appeared: buffers the driver posted
+      for (std::uint32_t q = 0; q < Function::queue_count; ++q) // before it have not been kicked yet
+        (void)service(q); // an error latches NEEDS_RESET inside service()
+    return {hc::ok, status_};
+  }
+
+  // a0 = queue, a1 = ring size (entries), a2/a3/a4 = guest-physical addresses of the descriptor
+  // table, the available ring and the used ring.
+  hc::ret queue_setup(const hc::call &c) noexcept {
+    const auto qidx = static_cast<std::uint32_t>(c.a[0]);
+    const std::uint64_t size = c.a[1];
+    if (!(status_ & hc::st_features_ok) || (status_ & hc::st_driver_ok))
+      return {hc::e_state, 0}; // only between FEATURES_OK and DRIVER_OK
+    const bool in_range = qidx < Function::queue_count;
+    const std::uint32_t safe = reloco::nospec::sanitize(qidx, in_range, std::uint32_t{0});
+    if (!in_range || queues_[safe].has_value())
+      return {hc::e_inval, 0};
+    if (size == 0 || size > Function::queue_max_size || (size & (size - 1)) != 0)
+      return {hc::e_inval, 0}; // power of two, within the device's limit
+    split_ring_addrs<gpa> addrs{gpa_addr{c.a[2]}, gpa_addr{c.a[3]}, gpa_addr{c.a[4]}};
+    // try_create validates alignment and that all three areas are accessible guest memory (it maps them).
+    auto q = queue::try_create(*mem_, addrs, static_cast<std::uint32_t>(size));
+    if (!q)
+      return {hc::e_inval, 0};
+    queues_[safe] = *q;
+    return {hc::ok, 0};
+  }
+
+  hc::ret read_config(std::uint64_t off) noexcept {
+    const std::size_t size = fn_->config_size();
+    if (off >= size)
+      return {hc::e_inval, 0};
+    reloco::array<std::byte, 8> raw{}; // zero-padded: a short read at the end of the config returns zeros above
+    const std::size_t n = size - static_cast<std::size_t>(off) < raw.size()
+                              ? size - static_cast<std::size_t>(off) : raw.size();
+    if (!fn_->try_read_config(off, reloco::span<std::byte>(raw.data(), n)))
+      return {hc::e_inval, 0};
+    return {hc::ok, load_le<std::uint64_t>(raw.as_span())};
+  }
+
+  // Drain, re-enable kicks, drain again (closes the race with a kick that arrived in between),
+  // then interrupt if the guest wants one. The same sequence as virtio_mmio_device.
+  [[nodiscard]] reloco::result<void> run(std::uint32_t qidx, queue &q, hc_queue_view<queue> &view) noexcept {
+    if (auto r = fn_->process(*mem_, qidx, view); !r)
+      return r;
+    if (auto r = q.try_set_notify_enabled(true); !r)
+      return r;
+    smp_virtq_barriers::mb();
+    if (auto r = fn_->process(*mem_, qidx, view); !r)
+      return r;
+    auto want = q.should_interrupt(); // honours the guest's interrupt suppression
+    if (!want)
+      return reloco::unexpected(want.error());
+    if (*want)
+      raise(hc::isr_used);
+    return {};
+  }
+
+  void raise(std::uint32_t bits) noexcept {
+    const bool edge = (isr_ & bits) != bits; // inject only when a new cause appears
+    isr_ |= bits;
+    if (edge)
+      irq_();
+  }
+
+  Mem *mem_;
+  Function *fn_;
+  Irq irq_;
+  std::uint32_t status_ = 0, isr_ = 0;
+  std::uint64_t features_ = 0;
+  reloco::array<reloco::optional<queue>, Function::queue_count> queues_{};
+};
+```
+
+The transport takes no lock: serialise `handle()` and `service()` per device
+(one mutex in the VMM is enough; log sinks and hypercall exits then cannot
+interleave).
+
+### 13.3 The structo logger device
+
+**What this is.** A virtio device (`device_id = 0xF000`: pick one that is not in
+the virtio spec's list of assigned IDs; an unassigned ID cannot collide with
+a stock driver) with two queues:
+
+- **q0 `log`** (device to guest): the guest keeps empty buffers posted; the
+  device fills one per log record. The record format is the one from 10.1
+  (`log_record_hdr` + text), so the Linux driver in 10.3 reads it unchanged.
+- **q1 `control`** (guest to device): 8-byte requests `{u32 op, u32 arg}`.
+  `op = 1` sets the minimum level; there is no response (used length 0).
+
+Config space (8 bytes, read through `read_config`): `u32 min_level`,
+`u32 lost` (records lost because the staging ring was full).
+
+**Why it is shaped like this.** The VMM's log sinks run when the *hypervisor*
+logs, not when the guest kicks, so records are first staged in a small bounded
+ring (`emit` never blocks and never touches guest memory), and the same
+`process(q0)` that a guest kick runs flushes it into whatever buffers the guest
+has posted. If the guest has none, records wait; if the ring fills, the oldest
+data stays and new records are counted as lost.
+
+```cpp
+struct log_record_hdr {
+  std::uint32_t len;     // text bytes that follow this header
+  std::uint32_t dropped; // records lost since the previous delivered one
+  std::uint64_t seq;     // +1 per delivered record
+};
+enum : std::uint32_t { log_op_set_level = 1 };
+
+class log_device {
+public:
+  // The Function requirements (same as virtio_mmio.hpp): id, queue count and size, features, config.
+  static constexpr std::uint32_t device_id = 0xF000;
+  static constexpr std::uint32_t queue_count = 2;
+  static constexpr std::uint32_t queue_max_size = 64;
+  static constexpr std::size_t kPending = 16; // staged records
+  static constexpr std::size_t kText = 96;    // max text bytes per record (longer text is truncated)
+
+  [[nodiscard]] std::uint64_t device_features() const noexcept { return 0; } // none beyond VERSION_1
+  [[nodiscard]] std::size_t config_size() const noexcept { return 8; }
+
+  // off/dst = config byte range requested by the transport.
+  reloco::result<void> try_read_config(std::uint64_t off, reloco::span<std::byte> dst) noexcept {
+    reloco::array<std::byte, 8> cfg{};
+    store_le<std::uint32_t>(cfg.as_span().first(4), min_level_); // config offset 0
+    store_le<std::uint32_t>(cfg.as_span().subspan(4), lost_);    // config offset 4
+    if (off > cfg.size() || dst.size() > cfg.size() - static_cast<std::size_t>(off))
+      return reloco::unexpected(reloco::error::out_of_range);
+    for (std::size_t i = 0; i < dst.size(); ++i)
+      dst[i] = cfg[static_cast<std::size_t>(off) + i];
+    return {};
+  }
+
+  // WHAT: stage one record. level = severity (0 = most verbose), text = the message.
+  // WHY it does not touch the guest: callable from any hypervisor log sink, in any context,
+  // under the device lock. Follow it with transport.service(0) to deliver.
+  void emit(std::uint32_t level, reloco::span<const char> text) noexcept {
+    if (level < min_level_)
+      return; // filtered by the guest's control request
+    if (count_ == kPending) { // staging ring full: keep what we have, count the loss
+      ++lost_;
+      ++dropped_;
+      return;
+    }
+    auto &rec = pending_[(head_ + count_) % kPending];
+    rec.len = static_cast<std::uint32_t>(text.size() < kText ? text.size() : kText);
+    for (std::uint32_t i = 0; i < rec.len; ++i)
+      rec.text[i] = text[i];
+    ++count_;
+  }
+
+  // WHAT: the entry point the transport calls. qidx 0 = deliver, qidx 1 = control requests.
+  // Mem = the transport's memory backend, View = hc_queue_view<...>. An error return makes the
+  // transport latch DEVICE_NEEDS_RESET.
+  template <typename View, typename Mem>
+  reloco::result<void> process(Mem &mem, std::uint32_t qidx, View &q) noexcept {
+    return qidx == 0 ? flush(mem, q) : control(mem, q);
+  }
+
+private:
+  struct record { std::uint32_t len = 0; reloco::array<char, kText> text{}; };
+
+  // Deliver staged records into the guest's posted receive buffers, oldest first.
+  template <typename View, typename Mem> reloco::result<void> flush(Mem &mem, View &q) noexcept {
+    reloco::array<typename View::segment, 4> segs{}; // the guest posts 1-segment buffers; 4 is generous
+    while (count_ != 0) {
+      auto popped = q.try_pop(segs.as_span());
+      if (!popped)
+        return reloco::unexpected(popped.error()); // corrupt ring
+      if (!popped->has_value())
+        break; // no buffer posted: keep the records, retry on the next kick
+      const auto &c = **popped;
+      const record &rec = pending_[head_];
+      if (c.writable_bytes < sizeof(log_record_hdr)) { // useless buffer: give it back, try the next
+        if (auto r = q.try_push_used(c, 0); !r)
+          return r;
+        continue;
+      }
+      // c.writable_bytes = the guest's buffer capacity: truncate the text to fit.
+      const std::size_t room = c.writable_bytes - sizeof(log_record_hdr);
+      const auto take = static_cast<std::uint32_t>(rec.len < room ? rec.len : room);
+      // Build the whole record in a LOCAL buffer, then copy it into guest memory once.
+      reloco::array<std::byte, sizeof(log_record_hdr) + kText> buf{};
+      auto all = buf.as_span();
+      store_le<std::uint32_t>(all.first(4), take);
+      store_le<std::uint32_t>(all.subspan(4, 4), dropped_);
+      store_le<std::uint64_t>(all.subspan(8, 8), seq_);
+      for (std::uint32_t i = 0; i < take; ++i)
+        buf[sizeof(log_record_hdr) + i] = static_cast<std::byte>(rec.text[i]);
+      const auto total = static_cast<std::uint32_t>(sizeof(log_record_hdr)) + take;
+      // (memory, writable segments, byte offset 0, local source)
+      if (auto r = try_write_chain(mem, c.writable, 0, reloco::span<const std::byte>(buf.data(), total)); !r)
+        return reloco::unexpected(r.error());
+      if (auto r = q.try_push_used(c, total); !r) // total = bytes written: header + text
+        return r;
+      head_ = (head_ + 1) % kPending;
+      --count_;
+      ++seq_;
+      dropped_ = 0;
+    }
+    return {};
+  }
+
+  // Handle guest requests on q1: copy the 8-byte request out ONCE, validate the copy, apply it.
+  template <typename View, typename Mem> reloco::result<void> control(Mem &mem, View &q) noexcept {
+    reloco::array<typename View::segment, 4> segs{};
+    for (;;) {
+      auto popped = q.try_pop(segs.as_span());
+      if (!popped)
+        return reloco::unexpected(popped.error());
+      if (!popped->has_value())
+        return {};
+      const auto &c = **popped;
+      reloco::array<std::byte, 8> req{};
+      if (c.readable_bytes == req.size()) { // wrong size: ignore the request, still complete the buffer
+        if (auto r = try_read_chain(mem, c.readable, 0, req.as_span()); !r)
+          return reloco::unexpected(r.error());
+        const auto op = load_le<std::uint32_t>(req.as_span().first(4));
+        const auto arg = load_le<std::uint32_t>(req.as_span().subspan(4));
+        if (op == log_op_set_level && arg <= 7)
+          min_level_ = arg;
+      }
+      if (auto r = q.try_push_used(c, 0); !r) // len 0: the device wrote nothing
+        return r;
+    }
+  }
+
+  reloco::array<record, kPending> pending_{};
+  std::size_t head_ = 0, count_ = 0;
+  std::uint32_t min_level_ = 0, dropped_ = 0, lost_ = 0;
+  std::uint64_t seq_ = 0;
+};
+```
+
+### 13.4 Wiring it into the VMM
+
+Three entry points: the hypercall exit, the hypervisor's log sink, and the
+interrupt injection.
+
+```cpp
+guest_mapper mapper;                       // the VMM's map-guest-memory primitive (12.3)
+on_demand_memory mem(mapper);              // every access: map, copy, unmap
+log_device logdev;                         // the device function
+// inject_log_irq() = YOUR interrupt injection (an SPI, an MSI, a doorbell to the vCPU ...)
+auto irq = [] { /* inject_log_irq(); */ };
+hc_transport<on_demand_memory, log_device, decltype(irq)> logtp(mem, logdev, irq);
+std::mutex logmu;                          // serialises everything that touches logdev/logtp
+
+// 1) hypercall exit: c was decoded from the guest registers; write r back to them.
+hc::ret on_hypercall(const hc::call &c) {
+  std::lock_guard g(logmu);
+  return logtp.handle(c);
+}
+
+// 2) the hypervisor's own log sink (level/text: whatever your logger produces).
+void hv_log(std::uint32_t level, reloco::span<const char> text) {
+  std::lock_guard g(logmu);
+  logdev.emit(level, text);               // stage it (never blocks)
+  (void)logtp.service(0);                 // deliver now if the guest has posted buffers; an error just
+                                          // means "driver not ready", the record stays staged
+}
+```
+
+(The ABI, the transport and the logger were compiled with `-Wall -Wextra -Wshadow -Wconversion` and `clang++-24 -Wdangling-gsl`,
+and run under ASan/UBSan against a simulated guest that drives the hypercalls
+like the guest transports below (the VMM wiring above is a sketch and was not
+compiled): probe, feature negotiation, both queue setups,
+a bad ring address refused with `e_inval`, four log records delivered with
+`seq` 0..3 and the right `used.len`, a level change through q1 that filters
+the next record, and a notify for a non-existent queue refused.)
+
+### 13.5 What the guest does: the handshake in hypercalls
+
+Whatever the OS, the virtio core drives the same sequence, and the guest
+transport turns each step into one hypercall. This is also the order the
+structo transport enforces (`queue_setup` is refused outside
+FEATURES_OK..DRIVER_OK).
+
+```mermaid
+sequenceDiagram
+  participant D as guest virtio core + logger driver
+  participant T as guest transport
+  participant X as structo hc_transport
+  T->>X: probe
+  X-->>T: device_id 0xF000, 2 queues
+  Note over T: register the virtio device, the core binds the logger driver
+  D->>T: reset, set ACKNOWLEDGE, DRIVER
+  T->>X: set_status(0), set_status(ACK|DRIVER)
+  D->>T: read features, accept VERSION_1
+  T->>X: get_features(0/1), set_features(0/1)
+  T->>X: set_status(... | FEATURES_OK), then get_status
+  X-->>T: FEATURES_OK still set = accepted
+  D->>T: find_vqs (log, control)
+  T->>X: queue_info(q), then queue_setup(q, size, desc, avail, used)
+  D->>T: post receive buffers, device ready
+  T->>X: set_status(... | DRIVER_OK)
+  Note over X: DRIVER_OK: the device starts serving the queues
+  T->>X: notify(0) after later buffers are added
+  X-->>T: inject_irq() when records are delivered
+  T->>X: isr_ack(3), then the core runs the vq callbacks
+```
+
+One thing the hypercall ABI omits is a device index. Give each device its own
+hypercall *number* (a base plus the device's index, `nr` below) and let the
+VMM's hypercall dispatcher pick the matching `hc_transport`; the guest learns
+`nr` and the interrupt from wherever it already learns platform devices
+(device tree, ACPI, a boot parameter).
+
+### 13.6 Linux guest: the transport
+
+**What this is.** A `virtio_config_ops` implementation: the same job
+`virtio_mmio.c` and `virtio_pci_modern.c` do for their hardware, here done with
+hypercalls. Once `register_virtio_device()` succeeds, the Linux virtio core
+negotiates, sets up queues and binds drivers by device ID like for any other
+transport; the logger driver below is an ordinary `virtio_driver`.
+
+**Why `vring_create_virtqueue` works unchanged.** It allocates the ring in
+guest RAM and exposes its guest-physical addresses. We do not set
+`VIRTIO_F_ACCESS_PLATFORM`, so the ring code stores plain guest-physical
+addresses, which is exactly what `on_demand_memory<gpa>` on the hypervisor
+side expects.
+
+```c
+/* Illustrative sketch, not compiled. Modelled on drivers/virtio/virtio_mmio.c: struct virtio_config_ops
+ * and the find_vqs signature differ between kernel versions, so check include/linux/virtio_config.h. */
+#include <linux/virtio.h>
+#include <linux/virtio_config.h>
+#include <linux/virtio_ring.h>
+#include <linux/interrupt.h>
+
+enum { HC_PROBE = 1, HC_GET_FEATURES, HC_SET_FEATURES, HC_GET_STATUS, HC_SET_STATUS,
+       HC_QUEUE_SETUP, HC_NOTIFY, HC_ISR_ACK, HC_READ_CONFIG, HC_QUEUE_INFO };
+
+struct hc_ret { int err; u64 val; };
+/* WHAT: YOUR arch stub for the hypercall instruction. nr = hypercall number of this device (13.5),
+ * op = HC_*, a0..a4 = the operation's arguments (see 13.1). Returns the error code and value. */
+extern struct hc_ret hv_hc(u32 nr, u64 op, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4);
+
+struct hcv_dev {
+  struct virtio_device vdev; /* embedded: the virtio core hands us &vdev, we get hcv_dev back with container_of */
+  u32 nr;                    /* this device's hypercall number */
+  int irq;
+};
+#define to_hcv(v) container_of((v), struct hcv_dev, vdev)
+
+/* Features: word 0 = bits 0..31, word 1 = bits 32..63 (VERSION_1 is bit 32). */
+static u64 hcv_get_features(struct virtio_device *vdev) {
+  struct hcv_dev *d = to_hcv(vdev);
+  return hv_hc(d->nr, HC_GET_FEATURES, 0, 0, 0, 0, 0).val |
+         hv_hc(d->nr, HC_GET_FEATURES, 1, 0, 0, 0, 0).val << 32;
+}
+
+/* WHAT: tell the device which features we accept. The core has already masked vdev->features to what we
+ * understand; vring_transport_features() drops ring features this kernel's ring code does not support. */
+static int hcv_finalize_features(struct virtio_device *vdev) {
+  struct hcv_dev *d = to_hcv(vdev);
+  vring_transport_features(vdev);
+  if (!__virtio_test_bit(vdev, VIRTIO_F_VERSION_1))
+    return -EINVAL;                                 /* this transport is modern-only */
+  hv_hc(d->nr, HC_SET_FEATURES, 0, vdev->features & 0xffffffffu, 0, 0, 0);
+  hv_hc(d->nr, HC_SET_FEATURES, 1, vdev->features >> 32, 0, 0, 0);
+  return 0;
+}
+
+static u8 hcv_get_status(struct virtio_device *vdev) {
+  return hv_hc(to_hcv(vdev)->nr, HC_GET_STATUS, 0, 0, 0, 0, 0).val;
+}
+static void hcv_set_status(struct virtio_device *vdev, u8 s) {
+  hv_hc(to_hcv(vdev)->nr, HC_SET_STATUS, s, 0, 0, 0, 0);
+}
+static void hcv_reset(struct virtio_device *vdev) {
+  hv_hc(to_hcv(vdev)->nr, HC_SET_STATUS, 0, 0, 0, 0, 0);   /* status 0 = reset */
+}
+
+/* WHAT: read device config (offset/buf/len from the virtio core). Each hypercall returns up to 8 bytes. */
+static void hcv_get(struct virtio_device *vdev, unsigned offset, void *buf, unsigned len) {
+  struct hcv_dev *d = to_hcv(vdev);
+  u8 *out = buf;
+  for (unsigned pos = 0; pos < len; pos += 8) {
+    __le64 v = cpu_to_le64(hv_hc(d->nr, HC_READ_CONFIG, offset + pos, 0, 0, 0, 0).val);
+    memcpy(out + pos, &v, min(8u, len - pos));
+  }
+}
+static void hcv_set(struct virtio_device *vdev, unsigned offset, const void *buf, unsigned len) {
+  WARN_ON(1);                                       /* the logger device has no writable config */
+}
+
+/* WHAT: the doorbell. Called by the ring code after buffers were added and the device wants to know. */
+static bool hcv_notify(struct virtqueue *vq) {
+  hv_hc(to_hcv(vq->vdev)->nr, HC_NOTIFY, vq->index, 0, 0, 0, 0);
+  return true;
+}
+
+/* WHAT: create the rings and tell the device where they are. The queue count and callbacks come from the
+ * driver's virtio_find_vqs() call; callbacks[i] runs from vring_interrupt() when queue i has used buffers. */
+static int hcv_find_vqs(struct virtio_device *vdev, unsigned nvqs, struct virtqueue *vqs[],
+                        vq_callback_t *callbacks[], const char *const names[], const bool *ctx,
+                        struct irq_affinity *desc) {
+  struct hcv_dev *d = to_hcv(vdev);
+  for (unsigned i = 0; i < nvqs; i++) {
+    u64 max = hv_hc(d->nr, HC_QUEUE_INFO, i, 0, 0, 0, 0).val;       /* largest ring the device supports */
+    if (!max) goto fail;
+    /* (index, entries, alignment, vdev, weak_barriers, may_reduce_num, context, notify, callback, name) */
+    vqs[i] = vring_create_virtqueue(i, max, PAGE_SIZE, vdev, true, true, ctx ? ctx[i] : false,
+                                    hcv_notify, callbacks[i], names[i]);
+    if (!vqs[i]) goto fail;
+    /* Report size and the three ring areas (guest-physical). The device validates all of it. */
+    if (hv_hc(d->nr, HC_QUEUE_SETUP, i, virtqueue_get_vring_size(vqs[i]),
+              virtqueue_get_desc_addr(vqs[i]), virtqueue_get_avail_addr(vqs[i]),
+              virtqueue_get_used_addr(vqs[i])).err)
+      goto fail;
+  }
+  return 0;
+fail:
+  vdev->config->del_vqs(vdev);                      /* frees whatever was created */
+  return -ENOMEM;
+}
+static void hcv_del_vqs(struct virtio_device *vdev) {
+  struct virtqueue *vq, *n;
+  list_for_each_entry_safe(vq, n, &vdev->vqs, list)
+    vring_del_virtqueue(vq);
+}
+static const char *hcv_bus_name(struct virtio_device *vdev) { return "hcv"; }
+/* Called by the driver core when the last reference to vdev.dev is dropped. */
+static void hcv_release(struct device *dev) { kfree(to_hcv(dev_to_virtio(dev))); }
+
+static const struct virtio_config_ops hcv_config_ops = {
+  .get = hcv_get, .set = hcv_set, .get_status = hcv_get_status, .set_status = hcv_set_status,
+  .reset = hcv_reset, .find_vqs = hcv_find_vqs, .del_vqs = hcv_del_vqs, .get_features = hcv_get_features,
+  .finalize_features = hcv_finalize_features, .bus_name = hcv_bus_name,
+};
+
+/* The interrupt the hypervisor injects. irq/data come from request_irq() below. */
+static irqreturn_t hcv_irq(int irq, void *data) {
+  struct hcv_dev *d = data;
+  u64 isr = hv_hc(d->nr, HC_ISR_ACK, 3, 0, 0, 0, 0).val;          /* read AND clear bit0|bit1 in one call */
+  irqreturn_t ret = IRQ_NONE;
+  if (isr & 1) {                                    /* some queue has used buffers: let each ring check itself */
+    struct virtqueue *vq;
+    list_for_each_entry(vq, &d->vdev.vqs, list)
+      ret |= vring_interrupt(irq, vq);
+  }
+  if (isr & 2) {                                    /* config changed, or the device needs a reset */
+    virtio_config_changed(&d->vdev);
+    ret = IRQ_HANDLED;
+  }
+  return ret;
+}
+
+/* WHAT: register the device. nr/irq/parent come from your platform description (device tree, ACPI, ...). */
+static int hcv_register(struct device *parent, u32 nr, int irq) {
+  struct hcv_dev *d = kzalloc(sizeof(*d), GFP_KERNEL);
+  struct hc_ret p = hv_hc(nr, HC_PROBE, 0, 0, 0, 0, 0);
+  if (!d) return -ENOMEM;
+  if (!(p.val & 0xffffffff)) { kfree(d); return -ENODEV; }          /* no device behind this number */
+  d->nr = nr; d->irq = irq;
+  d->vdev.dev.parent = parent;                      /* required: the ring code allocates through this device */
+  d->vdev.dev.release = hcv_release;                /* kfree(d) once the last reference is dropped */
+  d->vdev.id.device = p.val & 0xffffffff;           /* 0xF000: matches the logger driver's id_table */
+  d->vdev.id.vendor = 0;
+  d->vdev.config = &hcv_config_ops;
+  if (request_irq(irq, hcv_irq, 0, "hcv", d)) { kfree(d); return -EBUSY; }
+  return register_virtio_device(&d->vdev);          /* the core now negotiates and binds a matching driver */
+}
+```
+
+### 13.7 Linux guest: the logger driver
+
+An ordinary virtio driver: it binds by device ID and uses only the virtio core
+API, so it does not know or care that the transport is custom. The receive path
+(`logq_cb`, posting buffers, parsing `log_record_hdr`) is the one from 10.3;
+below is the part that is specific to this device: binding, config, and the
+control queue.
+
+```c
+/* Illustrative sketch, not compiled. */
+#include <linux/module.h>
+#include <linux/virtio.h>
+#include <linux/virtio_config.h>
+
+#define VIRTIO_ID_STRUCTO_LOG 0xF000
+struct hvlog_config { __le32 min_level; __le32 lost; };    /* device config space layout (13.3) */
+
+struct hvlog {
+  struct virtqueue *log, *ctl;
+  /* receive buffers: as in 10.3 */
+};
+
+/* WHAT: send "set minimum level" on the control queue. level = 0..7. */
+static int hvlog_set_level(struct hvlog *h, u32 level) {
+  struct scatterlist sg;
+  __le32 *req = kmalloc(8, GFP_KERNEL);                    /* {op, arg}: stays allocated until the device completes it */
+  if (!req) return -ENOMEM;
+  req[0] = cpu_to_le32(1);                                 /* log_op_set_level */
+  req[1] = cpu_to_le32(level);
+  sg_init_one(&sg, req, 8);
+  /* (queue, scatterlist, number of device-READABLE entries, token = req, gfp) */
+  if (virtqueue_add_outbuf(h->ctl, &sg, 1, req, GFP_KERNEL)) { kfree(req); return -ENOSPC; }
+  virtqueue_kick(h->ctl);                                  /* -> hcv_notify() -> HC_NOTIFY */
+  return 0;
+}
+/* WHAT: control queue callback: the device completed requests, free them. (Runs in interrupt context.) */
+static void hvlog_ctl_done(struct virtqueue *vq) {
+  unsigned int len; void *req;
+  while ((req = virtqueue_get_buf(vq, &len)) != NULL) kfree(req);
+}
+
+static int hvlog_probe(struct virtio_device *vdev) {
+  struct hvlog *h = kzalloc(sizeof(*h), GFP_KERNEL);
+  struct virtqueue *vqs[2];
+  vq_callback_t *cbs[2] = { logq_cb /* from 10.3 */, hvlog_ctl_done };
+  static const char *const names[2] = { "log", "control" };
+  u32 level;
+  int err;
+  if (!h) return -ENOMEM;
+  vdev->priv = h;
+  err = virtio_find_vqs(vdev, 2, vqs, cbs, names, NULL);   /* -> hcv_find_vqs() -> HC_QUEUE_SETUP x2 */
+  if (err) goto out;
+  h->log = vqs[0]; h->ctl = vqs[1];
+  virtio_cread(vdev, struct hvlog_config, min_level, &level);   /* -> HC_READ_CONFIG */
+  dev_info(&vdev->dev, "hv log: min level %u\n", level);
+  /* post the receive buffers on h->log exactly as in 10.3, then: */
+  virtio_device_ready(vdev);                               /* -> DRIVER_OK; from here the device may use the queues */
+  return hvlog_set_level(h, 2);                            /* example: only warnings and above */
+out:
+  kfree(h);
+  return err;
+}
+static void hvlog_remove(struct virtio_device *vdev) {
+  vdev->config->reset(vdev);                               /* stop the device before freeing anything it may touch */
+  vdev->config->del_vqs(vdev);
+  kfree(vdev->priv);
+}
+
+static const struct virtio_device_id id_table[] = { { VIRTIO_ID_STRUCTO_LOG, VIRTIO_DEV_ANY_ID }, { 0 } };
+static struct virtio_driver hvlog_driver = {
+  .driver.name = "hvlog", .id_table = id_table, .probe = hvlog_probe, .remove = hvlog_remove,
+  /* no feature_table: the device has no features besides VERSION_1 */
+};
+module_virtio_driver(hvlog_driver);
+```
+
+### 13.8 FreeBSD guest: the transport
+
+**What this is.** In FreeBSD, a virtio *transport* is a newbus driver that
+implements the `virtio_bus_if` methods (`sys/dev/virtio/virtio_bus_if.m`) and
+adds the virtio device as its child; `virtio_pci` and `virtio_mmio` are the
+two in-tree examples. The child drivers (`virtio_blk`, our logger) use
+`virtio_*()` helpers that call back into the transport through those methods.
+Each method below is one or two hypercalls.
+
+```c
+/* Illustrative sketch, not compiled. Modelled on sys/dev/virtio/mmio/virtio_mmio.c; method names and
+ * argument lists vary a little between FreeBSD versions: check virtio_bus_if.m for yours. */
+#include <sys/param.h>
+#include <sys/systm.h>
+#include <sys/bus.h>
+#include <sys/kernel.h>
+#include <sys/module.h>
+#include <sys/malloc.h>
+#include <sys/rman.h>
+#include <machine/bus.h>
+#include <machine/resource.h>
+#include <dev/virtio/virtio.h>
+#include <dev/virtio/virtqueue.h>
+#include "virtio_bus_if.h"
+
+#define HC_MAX_VQS 4
+/* Same HC_* operation codes as in 13.6 (13.1 is the definition). */
+struct hc_ret { int err; uint64_t val; };
+extern struct hc_ret hv_hc(uint32_t nr, uint64_t op, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4);
+
+struct hcv_softc {
+  device_t       dev, child;
+  uint32_t       nr;                      /* this device's hypercall number (13.5) */
+  struct resource *irq_res;
+  void           *irq_cookie;
+  uint64_t       features;                /* negotiated */
+  struct { struct virtqueue *vq; } vqs[HC_MAX_VQS];
+  int            nvqs;
+};
+
+#define HC(sc, op, a0, a1, a2, a3, a4) hv_hc((sc)->nr, (op), (a0), (a1), (a2), (a3), (a4))
+
+/* WHAT: the child asks which features to use. child_features = what the child driver understands.
+ * Returns what was negotiated; we also tell the device. VERSION_1 (bit 32) is mandatory here. */
+static uint64_t hcv_negotiate_features(device_t dev, uint64_t child_features) {
+  struct hcv_softc *sc = device_get_softc(dev);
+  uint64_t host = HC(sc, HC_GET_FEATURES, 0, 0, 0, 0, 0).val | (HC(sc, HC_GET_FEATURES, 1, 0, 0, 0, 0).val << 32);
+  uint64_t f = (host & child_features) | (1ULL << 32);
+  HC(sc, HC_SET_FEATURES, 0, f & 0xffffffffu, 0, 0, 0);
+  HC(sc, HC_SET_FEATURES, 1, f >> 32, 0, 0, 0);
+  HC(sc, HC_SET_STATUS, 1 | 2 | 8, 0, 0, 0, 0);        /* ACK | DRIVER | FEATURES_OK */
+  sc->features = f;
+  return f;
+}
+static int hcv_with_feature(device_t dev, uint64_t feature) {
+  return (((struct hcv_softc *)device_get_softc(dev))->features & feature) != 0;
+}
+
+/* WHAT: create the child's virtqueues and register them with the device. info[i] describes queue i
+ * (name, interrupt handler, number of sg segments); the sizes come from the device. */
+static int hcv_alloc_virtqueues(device_t dev, int flags, int nvqs, struct vq_alloc_info *info) {
+  struct hcv_softc *sc = device_get_softc(dev);
+  for (int i = 0; i < nvqs; i++) {
+    int size = (int)HC(sc, HC_QUEUE_INFO, i, 0, 0, 0, 0).val;
+    if (size == 0) return ENODEV;
+    /* (dev, queue index, entries, ring alignment, highest allowed physical address, info, &vq) */
+    int error = virtqueue_alloc(dev, i, size, PAGE_SIZE, ~(vm_paddr_t)0, &info[i], &sc->vqs[i].vq);
+    if (error) return error;
+    struct virtqueue *vq = sc->vqs[i].vq;
+    if (HC(sc, HC_QUEUE_SETUP, i, size, virtqueue_desc_paddr(vq), virtqueue_avail_paddr(vq),
+           virtqueue_used_paddr(vq)).err)
+      return EINVAL;
+  }
+  sc->nvqs = nvqs;
+  return 0;
+}
+
+/* WHAT: the doorbell. queue = index of the queue the child just added buffers to; offset unused here. */
+static void hcv_notify_vq(device_t dev, uint16_t queue, bus_size_t offset) {
+  struct hcv_softc *sc = device_get_softc(dev);
+  HC(sc, HC_NOTIFY, queue, 0, 0, 0, 0);
+}
+
+/* WHAT: read the device config space into dst, len bytes from offset (up to 8 per hypercall). */
+static void hcv_read_device_config(device_t dev, bus_size_t offset, void *dst, int len) {
+  struct hcv_softc *sc = device_get_softc(dev);
+  for (int pos = 0; pos < len; pos += 8) {
+    uint64_t v = htole64(HC(sc, HC_READ_CONFIG, offset + pos, 0, 0, 0, 0).val);
+    memcpy((uint8_t *)dst + pos, &v, MIN(8, len - pos));
+  }
+}
+static void hcv_write_device_config(device_t dev, bus_size_t offset, void *src, int len) { /* read-only device */ }
+
+/* WHAT: the interrupt the hypervisor injects. Acknowledge the causes, then run each queue's handler. */
+static void hcv_intr(void *arg) {
+  struct hcv_softc *sc = arg;
+  uint64_t isr = HC(sc, HC_ISR_ACK, 3, 0, 0, 0, 0).val;
+  if (isr & 1)
+    for (int i = 0; i < sc->nvqs; i++)
+      if (sc->vqs[i].vq != NULL && virtqueue_intr_filter(sc->vqs[i].vq) == FILTER_SCHEDULE_THREAD)
+        virtqueue_intr(sc->vqs[i].vq);              /* calls the handler given in vq_alloc_info */
+  /* isr & 2: config change or NEEDS_RESET: schedule a child reset/reinit (virtio_mmio.c shows how) */
+}
+static int hcv_setup_intr(device_t dev, enum intr_type type) {
+  struct hcv_softc *sc = device_get_softc(dev);
+  return bus_setup_intr(dev, sc->irq_res, type | INTR_MPSAFE, NULL, hcv_intr, sc, &sc->irq_cookie);
+}
+
+/* WHAT: stop/reset (status 0). DRIVER_OK is written by the virtio bus code after the child's attach
+ * returns (see 9.6); the structo transport serves the queues as soon as it sees it, so buffers the
+ * child posted during attach are picked up then. */
+static void hcv_stop(device_t dev) {
+  struct hcv_softc *sc = device_get_softc(dev);
+  HC(sc, HC_SET_STATUS, 0, 0, 0, 0, 0);
+}
+
+static device_method_t hcv_methods[] = {
+  DEVMETHOD(virtio_bus_negotiate_features,  hcv_negotiate_features),
+  DEVMETHOD(virtio_bus_with_feature,        hcv_with_feature),
+  DEVMETHOD(virtio_bus_alloc_virtqueues,    hcv_alloc_virtqueues),
+  DEVMETHOD(virtio_bus_setup_intr,          hcv_setup_intr),
+  DEVMETHOD(virtio_bus_stop,                hcv_stop),
+  DEVMETHOD(virtio_bus_notify_vq,           hcv_notify_vq),
+  DEVMETHOD(virtio_bus_read_device_config,  hcv_read_device_config),
+  DEVMETHOD(virtio_bus_write_device_config, hcv_write_device_config),
+  /* + device_probe/attach/detach, virtio_bus_reinit(_complete), virtio_bus_poll (see virtio_mmio.c) */
+  DEVMETHOD_END
+};
+/* hcv_attach(): get nr and the interrupt resource from your platform description, call HC_PROBE,
+ * then device_add_child(dev, NULL, -1) and set_ivars the device ID so the virtio core can match drivers. */
+```
+
+### 13.9 FreeBSD guest: the logger driver
+
+A normal FreeBSD virtio driver, using only the generic `virtio_*()` API. The
+receive-buffer posting and record parsing are the same as the FreeBSD part of
+section 10; the device-specific code is below.
+
+```c
+/* Illustrative sketch, not compiled. */
+#include <sys/param.h>
+#include <sys/systm.h>
+#include <sys/bus.h>
+#include <sys/kernel.h>
+#include <sys/module.h>
+#include <sys/malloc.h>
+#include <sys/sglist.h>
+#include <dev/virtio/virtio.h>
+#include <dev/virtio/virtqueue.h>
+
+#define VIRTIO_ID_STRUCTO_LOG 0xF000
+struct hvlog_config { uint32_t min_level; uint32_t lost; };       /* device config space layout (13.3) */
+
+struct hvlog_softc {
+  device_t         dev;
+  struct virtqueue *log, *ctl;
+  struct mtx       mtx;
+};
+
+/* WHAT: bind only to our device type. virtio_get_device_type() = the ID the transport reported. */
+static int hvlog_probe(device_t dev) {
+  if (virtio_get_device_type(dev) != VIRTIO_ID_STRUCTO_LOG)
+    return ENXIO;
+  device_set_desc(dev, "structo hypervisor log");
+  return BUS_PROBE_DEFAULT;
+}
+
+/* WHAT: log queue interrupt (one per virtqueue, given in vq_alloc_info below). */
+static void hvlog_log_intr(void *arg) {
+  struct hvlog_softc *sc = arg;
+  void *cookie;
+  uint32_t len;
+  mtx_lock(&sc->mtx);
+  while ((cookie = virtqueue_dequeue(sc->log, &len)) != NULL) {
+    /* parse log_record_hdr + text; validate hdr.len <= len - 16 first; print with log(LOG_INFO, ...);
+     * then re-post `cookie` with virtqueue_enqueue(sc->log, cookie, &sg, 0, 1) and virtqueue_notify() */
+  }
+  mtx_unlock(&sc->mtx);
+}
+static void hvlog_ctl_intr(void *arg) { /* dequeue completed requests from sc->ctl and free them */ }
+
+static int hvlog_set_level(struct hvlog_softc *sc, uint32_t level); /* below */
+
+static int hvlog_attach(device_t dev) {
+  struct hvlog_softc *sc = device_get_softc(dev);
+  struct vq_alloc_info info[2];
+  struct hvlog_config cfg;
+  int error;
+  sc->dev = dev;
+  mtx_init(&sc->mtx, "hvlog", NULL, MTX_DEF);
+  virtio_set_feature_desc(dev, NULL);
+  virtio_negotiate_features(dev, 0);                    /* -> hcv_negotiate_features(): VERSION_1 only */
+  /* (info, max sg segments per request, interrupt handler, handler argument, &vq, name) */
+  VQ_ALLOC_INFO_INIT(&info[0], 1, hvlog_log_intr, sc, &sc->log, "%s log", device_get_nameunit(dev));
+  VQ_ALLOC_INFO_INIT(&info[1], 1, hvlog_ctl_intr, sc, &sc->ctl, "%s control", device_get_nameunit(dev));
+  error = virtio_alloc_virtqueues(dev, 0, 2, info);     /* -> hcv_alloc_virtqueues() -> HC_QUEUE_SETUP x2 */
+  if (error) goto fail;
+  error = virtio_setup_intr(dev, INTR_TYPE_MISC);
+  if (error) goto fail;
+  /* (device, byte offset in config space, destination, length) -> HC_READ_CONFIG */
+  virtio_read_device_config(dev, offsetof(struct hvlog_config, min_level), &cfg.min_level, sizeof(cfg.min_level));
+  device_printf(dev, "hv log: min level %u\n", cfg.min_level);
+  /* post receive buffers on sc->log (10.3.1), then: */
+  hvlog_set_level(sc, 2);                               /* example: only warnings and above */
+  return 0;
+fail:
+  virtio_stop(dev);
+  return error;
+}
+
+/* WHAT: send "set minimum level". req = {op = 1, arg = level}, little-endian, 8 bytes, wired memory. */
+static int hvlog_set_level(struct hvlog_softc *sc, uint32_t level) {
+  uint32_t *req = malloc(8, M_DEVBUF, M_NOWAIT);
+  struct sglist_seg segs[1];
+  struct sglist sg;
+  if (req == NULL) return ENOMEM;
+  req[0] = htole32(1);
+  req[1] = htole32(level);
+  sglist_init(&sg, 1, segs);
+  sglist_append(&sg, req, 8);
+  /* (queue, cookie returned by dequeue, sglist, device-readable segs = 1, device-writable segs = 0) */
+  int error = virtqueue_enqueue(sc->ctl, req, &sg, 1, 0);
+  if (error) { free(req, M_DEVBUF); return error; }
+  virtqueue_notify(sc->ctl);                            /* -> hcv_notify_vq() -> HC_NOTIFY */
+  return 0;
+}
+
+static device_method_t hvlog_methods[] = {
+  DEVMETHOD(device_probe, hvlog_probe),
+  DEVMETHOD(device_attach, hvlog_attach),
+  /* device_detach: virtio_stop(dev), free buffers */
+  DEVMETHOD_END
+};
+static driver_t hvlog_driver = { "hvlog", hvlog_methods, sizeof(struct hvlog_softc) };
+/* attach it below the transport: DRIVER_MODULE(hvlog, hcv, hvlog_driver, 0, 0) plus MODULE_DEPEND on virtio */
+```
+
+### 13.10 Notes and pitfalls
+
+- **The same device, any transport.** `log_device` only needs the `Function`
+  interface, so you can also expose it through `virtio_mmio_device` (9.4.1)
+  without changing it. Write the device once, pick the transport per platform.
+- **Interrupts are edge-coalesced.** The transport injects only when a cause
+  appears; the guest handler must drain *everything* (read all used buffers)
+  before returning, then ack. The two-phase drain in `run()` plus
+  `isr_ack` returning the old cause bits is what prevents lost wake-ups.
+- **A failing device is not a crashing hypervisor.** Any ring error latches
+  DEVICE_NEEDS_RESET and raises the config cause; the guest transport should
+  turn that into a reset and re-probe (`virtio_config_changed()` on Linux).
+- **Guest memory that disappears.** With on-demand mapping a ring address can
+  stop being valid (ballooning, hot-unplug). That surfaces as a failed
+  `try_pop` / `try_push_used`, i.e. the same NEEDS_RESET path, not as a fault.
+- **Cost.** Each guest-memory access maps and unmaps, so the transport pays
+  per descriptor, not per message. For a log stream that is negligible. For a
+  high-rate device, cache the mapping of the ring pages in the `guest_mapper`
+  (12.3, cost model) and keep mapping the data buffers on demand.
