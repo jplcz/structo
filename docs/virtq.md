@@ -3124,3 +3124,224 @@ Whichever the OS, a chain costs one ring slot per segment, so choose segment
 sizes with that in mind: a few large segments (pages) rather than many small
 ones, or negotiate `VIRTIO_F_INDIRECT_DESC` (split rings only, see 9.4.1) so a
 whole chain uses a single ring slot.
+
+#### 12.5.1 The same, in the single shared region (Example 1)
+
+**Situation.** Same chained messages, but guest and hypervisor share only the
+one block from 12.2, so descriptor `addr` fields are **offsets from the region
+base** and every segment must point *inside* the region. The easiest way to
+keep chains inside is a **chunk pool**: the guest cuts a part of the region
+into fixed 256-byte chunks and builds each chain out of whichever chunks are
+free. A descriptor is then no longer tied to one buffer (as in 12.2); each
+message takes as many descriptor/chunk pairs as it needs.
+
+```
+shared region (byte offsets)
+
+0x0000  +---------------------------+
+        | control page (shm_ctl)    |  handshake, as in 12.2
+0x1000  +---------------------------+
+        | q0 rings: desc 0x1000     |  8 descriptors, avail 0x1080, used 0x1094
+0x3000  +---------------------------+
+        | q1 rings: desc 0x3000     |  avail 0x3080, used 0x3094
+0x10000 +---------------------------+
+        | q0 chunk pool             |  16 chunks x 256 B = 4 KiB, chunk c at 0x10000 + 256*c
+        |  c0 c1 c2 c3 ... c15      |
+0x11000 +---------------------------+
+        | q1 chunk pool             |  16 chunks x 256 B; rx chains are 4 chunks (1 KiB)
+        |  c0 c1 c2 c3 ... c15      |
+0x12000 +---------------------------+
+
+q0 chain for a 700-byte message (8 header + 700 payload = 708 bytes = 3 chunks)
+
+ desc 0 -> chunk 0  addr 0x10000 len 256  NEXT -> desc 1
+ desc 1 -> chunk 1  addr 0x10100 len 256  NEXT -> desc 2
+ desc 2 -> chunk 2  addr 0x10200 len 196  (last: only the bytes in use)
+ avail.ring[n] = 0   (head only)           used.ring[n] = { id 0, len 0 }
+
+q1: two receive chains pre-posted, 4 chunks each, all F_WRITE
+ chain A: desc 0..3 -> chunks 0..3     chain B: desc 4..7 -> chunks 4..7
+ hv fills chain A with a 608-byte reply: used.ring[n] = { id 0, len 608 }  (chunks 0..2 hold data)
+```
+
+**Hypervisor (structo).** Nothing new: `recv_large` / `send_large` from above
+work as they are. The memory backend is `shm_mem` from 12.2
+(`direct_virtq_memory<shm>`), which bounds-checks every offset against the
+region size, so a descriptor that points past the end of the region (or a
+chain that wanders there) fails with an error before any byte is touched.
+
+```cpp
+// Attach exactly as in 12.2 (control page, try_create for both queues), then:
+using shm_dev = split_virtq_device<shm, shm, shm_mem>;
+reloco::array<shm_dev::segment, 16> segs{}; // storage for the popped chain's segments (>= longest chain)
+
+// On every guest doorbell: drain q0.
+auto drain = [&](shm_dev &from_guest, shm_mem &mem) -> reloco::result<void> {
+  for (;;) {
+    auto got = recv_large(from_guest, mem, segs.as_span(), [](std::uint32_t type, std::uint32_t off,
+                                                              reloco::span<const std::byte> piece) {
+      // type = msg_hdr.type, off = byte offset of `piece` in the payload: append to your reassembly buffer
+    });
+    if (!got)
+      return reloco::unexpected(got.error()); // protocol violation: stop serving this guest
+    if (!*got)
+      return {}; // queue empty
+  }
+};
+// To reply:  auto sent = send_large(to_guest, mem, segs.as_span(), type, payload_bytes);  then should_interrupt()/irq as in 12.1.
+```
+
+(Compiled and run under ASan/UBSan against the C guest below: a 700-byte
+message sent as a 3-chunk chain arrives intact, the 600-byte reply fills the
+pre-posted receive chain, and all descriptors/chunks are recycled afterwards.)
+
+**Guest (Linux or FreeBSD, plain C).** This extends the ring code from 12.2
+(same `SHM_WMB/RMB/MB` macros, `struct vq_desc/avail/used`, `F_NEXT`,
+`F_WRITE`, `USED_F_NO_NOTIFY`, `shm_ring_doorbell()`). Two details matter for
+safety: the guest keeps its **own private record** of which descriptors and
+chunks belong to a chain (the hypervisor can write the shared descriptor
+table, so the guest never walks it to find its buffers), and it copies each
+received piece into private memory before handing it on.
+
+```c
+#define CHUNK       256   /* bytes per pool chunk: the unit chains are built from */
+#define POOL_CHUNKS 16    /* chunks per queue pool (fits a uint32_t bitmask) */
+#define RX_CHUNKS   4     /* one posted receive chain = 4 chunks = 1024 bytes of capacity */
+
+struct shm_cvq {
+  volatile struct vq_desc  *desc;     /* pointers into OUR mapping of the region */
+  volatile struct vq_avail *avail;
+  volatile struct vq_used  *used;
+  volatile uint8_t         *pool;     /* chunk pool, also as a region OFFSET below: what the device sees */
+  uint32_t pool_off;
+  uint16_t avail_idx, used_seen;
+  uint32_t free_desc;                 /* bit i set = descriptor i is free */
+  uint32_t free_chunk;                /* bit c set = pool chunk c is free */
+  /* PRIVATE chain bookkeeping. The region is writable by the hypervisor, so never walk the
+   * shared descriptor table to find out which chunks a completed chain used. */
+  uint8_t  n_of[VQ_N];                /* head descriptor -> number of chunks (0 = not in flight) */
+  uint8_t  d_of[VQ_N][VQ_N];          /* head -> descriptor index of each link */
+  uint8_t  c_of[VQ_N][VQ_N];          /* head -> pool chunk index of each link */
+};
+
+/* WHAT: take n descriptors + n chunks and link them into one chain. rx: device-writable chain.
+ * last_len: bytes in the final chunk the device may READ (tx; ignored for rx, which exposes whole chunks).
+ * Returns the head descriptor index, or -1 if there is not enough room (retry after reaping). */
+static int cvq_build(struct shm_cvq *q, unsigned n, int rx, uint32_t last_len) {
+  if (n == 0 || n > VQ_N || __builtin_popcount(q->free_desc) < (int)n ||
+      __builtin_popcount(q->free_chunk) < (int)n)
+    return -1;
+  uint8_t d[VQ_N], c[VQ_N];
+  for (unsigned k = 0; k < n; k++) {
+    d[k] = (uint8_t)__builtin_ctz(q->free_desc);   q->free_desc  &= ~(1u << d[k]);
+    c[k] = (uint8_t)__builtin_ctz(q->free_chunk);  q->free_chunk &= ~(1u << c[k]);
+  }
+  for (unsigned k = 0; k < n; k++) {
+    q->desc[d[k]].addr  = q->pool_off + (uint64_t)c[k] * CHUNK;     /* OFFSET from the region start */
+    q->desc[d[k]].len   = (rx || k + 1 < n) ? CHUNK : last_len;
+    q->desc[d[k]].flags = (uint16_t)((k + 1 < n ? F_NEXT : 0) | (rx ? F_WRITE : 0));
+    q->desc[d[k]].next  = k + 1 < n ? d[k + 1] : 0;
+  }
+  q->n_of[d[0]] = (uint8_t)n;
+  memcpy(q->d_of[d[0]], d, n);
+  memcpy(q->c_of[d[0]], c, n);
+  return d[0];
+}
+
+/* WHAT: give a built chain to the device: only the HEAD goes into the avail ring. */
+static void cvq_publish(struct shm_cvq *q, int head) {
+  q->avail->ring[q->avail_idx % VQ_N] = (uint16_t)head;
+  SHM_WMB();                                  /* descriptors + payload visible BEFORE the index */
+  q->avail->idx = ++q->avail_idx;
+}
+
+/* WHAT: release a completed chain's descriptors and chunks (head already range-checked). */
+static void cvq_free(struct shm_cvq *q, unsigned head) {
+  for (unsigned k = 0; k < q->n_of[head]; k++) {
+    q->free_desc  |= 1u << q->d_of[head][k];
+    q->free_chunk |= 1u << q->c_of[head][k];
+  }
+  q->n_of[head] = 0;
+}
+
+/* WHAT: copy n bytes between a flat buffer and the chain at byte offset pos. to_chain: 1 = write the chain.
+ * It walks OUR private chunk list, so the hypervisor cannot redirect it. */
+static void cvq_copy(struct shm_cvq *q, unsigned head, uint32_t pos, void *buf, uint32_t n, int to_chain) {
+  uint8_t *b = buf;
+  while (n) {
+    unsigned k = pos / CHUNK, in = pos % CHUNK;
+    uint32_t m = CHUNK - in < n ? CHUNK - in : n;
+    volatile uint8_t *c = q->pool + (size_t)q->c_of[head][k] * CHUNK + in;
+    if (to_chain) memcpy((void *)c, b, m); else memcpy(b, (const void *)c, m);
+    pos += m; b += m; n -= m;
+  }
+}
+
+/* WHAT: send one message of 8 + len bytes as a chain. type/payload/len: msg_hdr fields and the bytes.
+ * Returns 0, or -1 if the message is too big or there is no room right now. */
+int shm_send_chain(struct shm_cvq *tx, uint32_t type, const void *payload, uint32_t len) {
+  uint32_t total = 8 + len;
+  unsigned n = (total + CHUNK - 1) / CHUNK;
+  int head = cvq_build(tx, n, 0, total - (n - 1) * CHUNK);  /* last chunk exposes only the bytes in use */
+  if (head < 0) return -1;
+  uint32_t hdr[2] = { type, len };                          /* little-endian host: big-endian is unsupported */
+  cvq_copy(tx, (unsigned)head, 0, hdr, 8, 1);
+  cvq_copy(tx, (unsigned)head, 8, (void *)payload, len, 1);
+  cvq_publish(tx, head);
+  SHM_MB();                                                 /* avail.idx store BEFORE reading the no-notify flag */
+  if (!(tx->used->flags & USED_F_NO_NOTIFY))
+    shm_ring_doorbell();                                    /* YOUR doorbell mechanism */
+  return 0;
+}
+
+/* WHAT: keep a receive chain posted. Call at start-up (twice) and after each message. Returns 0 or -1. */
+int shm_post_rx_chain(struct shm_cvq *rx) {
+  int head = cvq_build(rx, RX_CHUNKS, 1, 0);
+  if (head < 0) return -1;
+  cvq_publish(rx, head);
+  return 0;
+}
+
+/* WHAT: interrupt handler body. on_chunk(type, offset, data, n) is called with each payload piece, already
+ * copied into private memory (so the callee cannot be raced by the hypervisor). */
+void shm_irq_chain(struct shm_cvq *tx, struct shm_cvq *rx,
+                   void (*on_chunk)(uint32_t type, uint32_t off, const void *data, uint32_t n)) {
+  while (tx->used_seen != tx->used->idx) {                  /* tx: recycle finished chains */
+    SHM_RMB();
+    uint32_t id = tx->used->ring[tx->used_seen++ % VQ_N].id;
+    if (id < VQ_N && tx->n_of[id]) cvq_free(tx, id);        /* ignore ids that are not in flight */
+  }
+  while (rx->used_seen != rx->used->idx) {                  /* rx: deliver, then re-post */
+    SHM_RMB();
+    uint32_t id  = rx->used->ring[rx->used_seen % VQ_N].id;
+    uint32_t len = rx->used->ring[rx->used_seen % VQ_N].len;
+    rx->used_seen++;
+    if (id >= VQ_N || !rx->n_of[id]) continue;              /* not a chain we posted */
+    uint32_t hdr[2];
+    if (len >= 8 && len <= (uint32_t)rx->n_of[id] * CHUNK) {
+      cvq_copy(rx, id, 0, hdr, 8, 0);
+      if (hdr[1] <= len - 8) {
+        uint8_t piece[64];
+        for (uint32_t off = 0; off < hdr[1];) {
+          uint32_t n = hdr[1] - off < sizeof piece ? hdr[1] - off : sizeof piece;
+          cvq_copy(rx, id, 8 + off, piece, n, 0);
+          on_chunk(hdr[0], off, piece, n);
+          off += n;
+        }
+      }
+    }
+    cvq_free(rx, id);
+    (void)shm_post_rx_chain(rx);
+  }
+}
+```
+
+Bring-up on the guest: map the region, point `desc/avail/used/pool/pool_off`
+of each `shm_cvq` at its areas from the layout above, set
+`free_desc = (1u << VQ_N) - 1` and `free_chunk = 0xFFFF`, call
+`shm_post_rx_chain(rx)` twice, publish the layout in `shm_ctl`, and set
+`guest_ready` last (12.2). A message of `len` payload bytes needs
+`ceil((8 + len) / 256)` chunks and as many descriptors, so with these sizes the
+largest sendable message is 8 chunks = 2040 payload bytes; the largest the
+guest can receive is `RX_CHUNKS * 256 - 8 = 1016`, so make the hypervisor's
+`send_large` fit that (it simply returns `false` for a message that does not).
