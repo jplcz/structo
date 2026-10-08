@@ -48,3 +48,12 @@ endif()
 add_custom_target(jplcz_structo_examples
     DEPENDS ${JPLCZ_STRUCTO_EXAMPLE_TARGETS}
 )
+
+# C++20-only Linux demo of bootldr::netstack over a pty/serial line (SLIP or PPP); POSIX only.
+# cxx_std_20 means "at least C++20", so a newer global standard is kept.
+if(UNIX)
+    add_executable(netstack_linux_demo netstack_linux_demo.cpp)
+    target_link_libraries(netstack_linux_demo PRIVATE jplcz_structo jplcz_structo_warnings)
+    target_compile_features(netstack_linux_demo PRIVATE cxx_std_20)
+    add_dependencies(jplcz_structo_examples netstack_linux_demo)
+endif()

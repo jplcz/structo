@@ -431,8 +431,8 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_ppp.cpp)
     target_link_libraries(jplcz_structo_coroutine_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)
-    set_target_properties(jplcz_structo_coroutine_tests PROPERTIES
-        CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
+    # "At least C++20", not exactly 20: a newer global standard is kept.
+    target_compile_features(jplcz_structo_coroutine_tests PRIVATE cxx_std_20)
     gtest_discover_tests(jplcz_structo_coroutine_tests TEST_PREFIX "Coroutine.")
 
     # tests/test_ipc_ring_fault_injection.cpp defines
