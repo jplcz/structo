@@ -11,9 +11,9 @@
  *
  * What it does today: owns an `ipv4_node` over a `hw::net_device_ref`,
  * applies a static address or runs a DHCP client, answers ICMP echo (ping),
- * and counts everything else as dropped. There are **no socket-style
- * protocols yet** (no UDP/TCP endpoints); `set_packet_handler()` is the hook
- * where they will attach.
+ * and queues UDP datagrams on bound `udp_socket`s (see `udp_socket.hpp`;
+ * sockets are owned by the client and use heap memory). Everything else goes
+ * to `set_packet_handler()` or is counted as dropped. No TCP yet.
  *
  * Tasks (frames come from the scheduler's allocator):
  * - *rx*: loops on `ipv4_node::receive()`, feeds DHCP, passes the rest to the
@@ -51,6 +51,7 @@
  */
 
 #include "scheduler.hpp"
+#include "udp_socket.hpp"
 
 #include "../hw/polled_net_device.hpp"
 #include "../net/dhcp_client.hpp"
@@ -78,13 +79,14 @@ struct netstack_stats {
   std::uint32_t tx_errors = 0;   ///< Failed DHCP transmissions.
 };
 
-template <std::size_t Mtu = 1006> class netstack {
+template <std::size_t Mtu = 1006> class netstack : public udp_demux {
 public:
   /** @brief Handler for IPv4 datagrams the stack does not process itself; the packet is valid only during the call. */
   using packet_fn = void (*)(void *ctx, const net::ipv4_packet &pkt) noexcept;
 
   netstack(scheduler &sched, hw::net_device_ref dev, const netstack_config &cfg = {}) noexcept
-      : sched_(&sched), cfg_(cfg), ip_(dev, cfg.static_ip), dhcp_(resolve_mac(dev, cfg), cfg.xid_seed) {}
+      : udp_demux(sched, this, &send_udp, &local_address), sched_(&sched), cfg_(cfg), ip_(dev, cfg.static_ip),
+        dhcp_(resolve_mac(dev, cfg), cfg.xid_seed) {}
   netstack(const netstack &) = delete;
   netstack &operator=(const netstack &) = delete;
   ~netstack() { stop(); }
@@ -131,7 +133,7 @@ public:
   /** @brief The IPv4 endpoint, for future protocol layers. */
   [[nodiscard]] net::ipv4_node<Mtu> &ip() noexcept { return ip_; }
 
-  /** @brief Receives every datagram that is not DHCP or ICMP echo (`nullptr` = drop them). */
+  /** @brief Receives every datagram that is not DHCP, ICMP echo or UDP for a bound `udp_socket` (`nullptr` = drop them). */
   void set_packet_handler(packet_fn fn, void *ctx) noexcept {
     handler_ = fn;
     handler_ctx_ = ctx;
@@ -149,6 +151,14 @@ private:
     return {0x02, 0x00, 0x00, 0x00, 0x00, 0x01}; // locally administered
   }
 
+  // udp_demux hooks: transmit a UDP datagram as IPv4, and report our address.
+  static reloco::task<void> send_udp(void *self, net::ipv4_address dst,
+                                     reloco::span<const std::uint8_t> udp) noexcept {
+    auto sent = co_await static_cast<netstack *>(self)->ip_.send(net::ip_proto_udp, dst, udp);
+    co_await std::move(sent);
+  }
+  static net::ipv4_address local_address(void *self) noexcept { return static_cast<netstack *>(self)->ip_.address(); }
+
   static reloco::task<void> rx_loop(reloco::allocator_arg_t, reloco::allocator_ref, netstack &n) noexcept {
     for (;;) {
       auto pkt = co_await n.ip_.receive();
@@ -159,6 +169,8 @@ private:
       }
       if (n.cfg_.dhcp && n.dhcp_.handle(n.ip_, *pkt, n.sched_->now_ms())) {
         ++n.stats_.rx_handled;
+      } else if (n.deliver_udp(*pkt)) {
+        ++n.stats_.rx_handled; // queued on a bound udp_socket
       } else if (n.handler_) {
         ++n.stats_.rx_handled;
         n.handler_(n.handler_ctx_, *pkt);

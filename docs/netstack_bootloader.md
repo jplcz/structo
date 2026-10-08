@@ -9,8 +9,8 @@ SPDX-License-Identifier: BSD-2-Clause
 C++20 only. `bootldr::netstack` (`bootldr/netstack.hpp`) runs the network
 stack as two tasks of a `bootldr::scheduler`, over a SLIP link on a polled
 UART. Today it provides a static or DHCP-assigned IPv4 address and answers
-ping; it has **no socket-style protocols yet** (no UDP/TCP endpoints), only a
-raw packet hook.
+ping and queues UDP datagrams for `bootldr::udp_socket`s (section 6); there is
+no TCP yet, and anything else goes to a raw packet hook.
 
 ```
 netstack           (bootldr/netstack.hpp)       rx task + timer task, DHCP, ping
@@ -127,11 +127,51 @@ In code, `net.stats()` counts handled/dropped datagrams and RX/TX errors, and
 `net.dhcp_state()` shows the DHCP progress (`selecting` forever = no server
 reachable; check `slattach`, baud and MTU).
 
-## 6. Handling other protocols (raw hook)
+## 6. UDP sockets
 
-Anything that is not DHCP or an ICMP echo request goes to the packet handler
-(or is counted in `stats().rx_dropped`). It is the attach point for future UDP
-/TCP layers and can be used today to experiment:
+A `bootldr::udp_socket` is owned by your code (stack, struct member ...) and
+plugs into the stack by reference. Its data is on the heap: received
+datagrams and send buffers are allocated from the scheduler's allocator (or
+one you pass), nothing is statically sized.
+
+```cpp
+#include <structo/bootldr/udp_socket.hpp> // already included by netstack.hpp
+
+// A tiny UDP echo service: replies to every datagram sent to port 5000.
+reloco::task<void> echo(bootldr::udp_socket &sock) {
+  reloco::array<std::uint8_t, 512> buf;   // your receive buffer; longer datagrams are truncated (rx.truncated)
+  for (;;) {
+    // Inner co_await suspends this task until a datagram arrives; the outer one
+    // unwraps the result or ends the task with the error (e.g. socket closed).
+    auto rx = co_await co_await sock.receive_from(buf);
+    // Reply: destination address, destination port, payload view. The address
+    // must be configured (static or DHCP); otherwise this fails with invalid_state.
+    co_await co_await sock.send_to(rx.source, rx.source_port, {buf.data(), rx.size});
+  }
+}
+
+// In main(), after net.start():
+bootldr::udp_socket sock{net};        // unbound; heap comes from sched's allocator. 2nd arg: max queued datagrams (8)
+if (!sock.bind(5000))                 // 0 would pick a free port from 49152 up; fails with busy if taken
+  return 1;
+sched.spawn(echo(sock));              // detached task; sock must outlive it
+```
+
+Host side: `echo hello | nc -u -w1 192.168.7.2 5000`.
+
+Rules: at most `max_queue` datagrams wait per socket, extra ones are dropped
+and counted in `sock.dropped()` (so are datagrams that could not be copied
+because the heap is exhausted). `try_receive_from()` is the non-blocking
+variant (`error::try_again` when empty), handy for your own timeouts together
+with `sched.sleep_for()`. Cancel or finish tasks waiting in `receive_from()`
+before closing or destroying the socket. DHCP traffic (port 68) is consumed
+by the stack before sockets see it.
+
+## 7. Handling other protocols (raw hook)
+
+Anything that is not DHCP, an ICMP echo request or UDP for a bound socket goes
+to the packet handler (or is counted in `stats().rx_dropped`). It is the attach
+point for other protocols and can be used today to experiment:
 
 ```cpp
 // Called from the rx task for every other IPv4 datagram addressed to us.

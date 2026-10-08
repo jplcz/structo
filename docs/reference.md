@@ -257,6 +257,7 @@ Usage guide: [virtq.md](virtq.md). Split and packed rings are both supported by 
 
 | Header | Type(s) | One-line summary |
 |---|---|---|
-| `bootldr/netstack.hpp` | `bootldr::netstack<Mtu>`, `bootldr::netstack_config`, `bootldr::netstack_stats` | C++20 network stack for the bootloader running as scheduler tasks: static IP or DHCP, ping, raw packet handler hook; no socket protocols yet |
+| `bootldr/netstack.hpp` | `bootldr::netstack<Mtu>`, `bootldr::netstack_config`, `bootldr::netstack_stats` | C++20 network stack for the bootloader running as scheduler tasks: static IP or DHCP, ping, UDP delivery to sockets, raw packet handler hook |
+| `bootldr/udp_socket.hpp` | `bootldr::udp_socket`, `bootldr::udp_demux`, `bootldr::udp_received` | C++20 UDP socket owned by the client and plugged into a `netstack`; heap-allocated receive queue and send buffers (`reloco::allocator_ref`); `bind`/`receive_from`/`try_receive_from`/`send_to` |
 | `bootldr/scheduler.hpp` | `bootldr::scheduler`, `scheduler::event`, `bootldr::spawn_mode`, `bootldr::task_id` | C++20 cooperative coroutine scheduler for `reloco::task<void>`; storage from a `reloco::allocator_ref`; `yield`/`sleep_for`/`sleep_until`/`join`/`event` awaitables, pollers, fault handler |
 | [`bootldr/xmodem.hpp`](xmodem.md) | `bootldr::xmodem_receiver`, `bootldr::xmodem_sender`, `bootldr::receive`/`send`, `bootldr::xmodem_crc16` | Allocation-free, sans-IO XMODEM / XMODEM-CRC / XMODEM-1K state machines for loading images over a serial line, plus blocking drivers over `hw::uart_ref` |

@@ -146,7 +146,123 @@ struct seen {
   std::uint8_t protocol = 0;
 };
 
+bytes udp_packet(ipv4_address src, std::uint16_t sport, ipv4_address dst, std::uint16_t dport, const bytes &payload) {
+  bytes udp = make_bytes(udp_header_size + payload.size(), 0);
+  EXPECT_TRUE(build_udp(sport, dport, payload, src, dst, udp).has_value());
+  return ip_packet(ip_proto_udp, src, dst, udp);
+}
+
+// Receives one datagram on `s` and sends it straight back to its sender.
+reloco::task<void> echo_once(bootldr::udp_socket &s) {
+  reloco::array<std::uint8_t, 64> buf{};
+  auto rx = co_await co_await s.receive_from(buf);
+  co_await co_await s.send_to(rx.source, rx.source_port, {buf.data(), rx.size});
+}
+
+reloco::task<void> send_unready(bootldr::udp_socket &s, reloco::error &out) {
+  const bytes payload = make_bytes({1});
+  auto r = co_await s.send_to(host, 1, payload);
+  if (!r)
+    out = r.error();
+}
+
 } // namespace
+
+TEST_F(Netstack, UdpSocketReceivesAndRepliesUsingHeap) {
+  bootldr::netstack_config cfg;
+  cfg.static_ip = ipv4_config::make_static(board);
+  bootldr::netstack<mtu> net{sched, nic, cfg};
+  ASSERT_TRUE(net.poll_with(pnd).has_value());
+  ASSERT_TRUE(net.start().has_value());
+
+  bootldr::udp_socket sock{net};
+  auto port = sock.bind(5000);
+  ASSERT_TRUE(port.has_value());
+  EXPECT_EQ(*port, 5000);
+  ASSERT_TRUE(sched.spawn(echo_once(sock)).has_value());
+  step();
+
+  inject(udp_packet(host, 4000, board, 5000, make_bytes({9, 8, 7})));
+  step();
+  EXPECT_EQ(net.stats().rx_dropped, 0u);
+
+  const bytes tx = take_tx();
+  auto ip = parse_ipv4(tx);
+  ASSERT_TRUE(ip.has_value());
+  EXPECT_EQ(ip->header.dst, host);
+  auto udp = parse_udp(ip->payload, ip->header.src, ip->header.dst);
+  ASSERT_TRUE(udp.has_value());
+  EXPECT_EQ(udp->src_port, 5000);
+  EXPECT_EQ(udp->dst_port, 4000);
+  const bytes expect = make_bytes({9, 8, 7});
+  EXPECT_TRUE(net_test::bytes_equal(udp->payload, expect));
+}
+
+TEST_F(Netstack, UdpSocketQueueLimitTruncationAndBind) {
+  bootldr::netstack_config cfg;
+  cfg.static_ip = ipv4_config::make_static(board);
+  bootldr::netstack<mtu> net{sched, nic, cfg};
+  ASSERT_TRUE(net.poll_with(pnd).has_value());
+  ASSERT_TRUE(net.start().has_value());
+
+  bootldr::udp_socket a{net, 2};
+  bootldr::udp_socket b{net};
+  ASSERT_TRUE(a.bind(6000).has_value());
+  EXPECT_EQ(a.bind(6001).error(), reloco::error::invalid_state);
+  EXPECT_EQ(b.bind(6000).error(), reloco::error::busy);
+  auto eph = b.bind();
+  ASSERT_TRUE(eph.has_value());
+  EXPECT_GE(*eph, 49152);
+
+  reloco::array<std::uint8_t, 2> small{};
+  EXPECT_EQ(a.try_receive_from(small).error(), reloco::error::try_again);
+  step();
+  for (std::uint8_t i = 0; i < 3; ++i) {
+    inject(udp_packet(host, 1, board, 6000, make_bytes({i, 1, 2, 3})));
+    step();
+  }
+  EXPECT_EQ(a.pending(), 2u);
+  EXPECT_EQ(a.dropped(), 1u);
+
+  auto r = a.try_receive_from(small);
+  ASSERT_TRUE(r.has_value());
+  EXPECT_EQ(r->size, 2u);
+  EXPECT_TRUE(r->truncated);
+  EXPECT_EQ(small[0], 0);
+  ASSERT_TRUE(a.try_receive_from(small).has_value());
+  EXPECT_EQ(a.try_receive_from(small).error(), reloco::error::try_again);
+
+  // Nobody listens on this port: falls through to the dropped counter.
+  inject(udp_packet(host, 1, board, 7000, make_bytes({1})));
+  step();
+  EXPECT_EQ(net.stats().rx_dropped, 1u);
+
+  a.close();
+  EXPECT_FALSE(a.is_bound());
+  EXPECT_TRUE(b.is_bound());
+  EXPECT_TRUE(a.bind(6000).has_value()); // port is free again
+}
+
+TEST_F(Netstack, UdpSendFailsWithoutAddress) {
+  bootldr::netstack<mtu> net{sched, nic};
+  bootldr::udp_socket sock{net};
+  reloco::error err{};
+  ASSERT_TRUE(sched.spawn(send_unready(sock, err)).has_value());
+  sched.run();
+  EXPECT_EQ(err, reloco::error::invalid_state);
+}
+
+TEST_F(Netstack, SocketOutlivingStackIsDetached) {
+  alignas(bootldr::udp_socket) unsigned char storage[sizeof(bootldr::udp_socket)];
+  bootldr::udp_socket *sock = nullptr;
+  {
+    bootldr::netstack<mtu> net{sched, nic};
+    sock = new (storage) bootldr::udp_socket{net};
+    ASSERT_TRUE(sock->bind(100).has_value());
+  }
+  EXPECT_EQ(sock->bind(101).error(), reloco::error::invalid_state);
+  sock->~udp_socket();
+}
 
 TEST_F(Netstack, StaticAddressIsReadyAndAnswersPing) {
   bootldr::netstack_config cfg;
