@@ -298,6 +298,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_mmio_space.cpp
         tests/test_multiboot2.cpp
         tests/test_uart_ref.cpp
+        tests/test_xmodem.cpp
         tests/test_timer_ref.cpp
         tests/test_irqc_ref.cpp
         tests/test_framebuffer.cpp
@@ -456,6 +457,7 @@ if(JPLCZ_STRUCTO_BUILD_HEADER_CHECKS)
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/hw/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/hypervisor/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/virtio/*.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/bootldr/*.hpp"
     )
     list(APPEND JPLCZ_STRUCTO_PUBLIC_HEADERS ${JPLCZ_STRUCTO_ARCH_HEADERS})
 

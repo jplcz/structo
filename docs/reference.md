@@ -28,6 +28,7 @@ have a linked, standalone page going into more depth.
 - [Synchronization & interrupt/preemption guards](#synchronization-interruptpreemption-guards)
 - [Hypervisor: vCPU state & trap/hypercall dispatch](#hypervisor-vcpu-state-traphypercall-dispatch)
 - [VIRTIO virtqueues (`virtio/`)](#virtio-virtqueues-virtio)
+- [Boot loader protocols (`bootldr/`)](#boot-loader-protocols-bootldr)
 
 ## Boot & devicetree discovery
 
@@ -235,3 +236,9 @@ Usage guide: [virtq.md](virtq.md). Split and packed rings are both supported by 
 | [`virtio/virtio_gpu.hpp`](virtq.md) | `virtio_gpu_function<GuestSpace, Display, MaxResources, Scanouts>`, `gpu::*` | 2D virtio-gpu (device ID 16): resources with guest scatter backing, `TRANSFER_TO_HOST_2D` into a bounded host copy, `RESOURCE_FLUSH` to a `Display`, optional cursor queue; allocation and rect bounds enforced |
 | [`virtio/virtio_gpu_framebuffer.hpp`](virtq.md) | `framebuffer_display<PixelFormat>` | `Display` binding that presents virtio-gpu scanout 0 into any `hw::framebuffer` (also `mmio_framebuffer_device::pixels()`) |
 | [`virtio/virtio_gpu_accel.hpp`](virtq.md) | `framebuffer_accel_display<PixelFormat>` | `Display` binding for a device with a scanout `hw::framebuffer` plus a `hw::gpu_accel_ref`: guest pixels are converted into the framebuffer, fills (scanout disable) go through the accel ref; `gpu_accel_ref` is not extended |
+
+## Boot loader protocols (`bootldr/`)
+
+| Header | Type(s) | One-line summary |
+|---|---|---|
+| [`bootldr/xmodem.hpp`](xmodem.md) | `bootldr::xmodem_receiver`, `bootldr::xmodem_sender`, `bootldr::receive`/`send`, `bootldr::xmodem_crc16` | Allocation-free, sans-IO XMODEM / XMODEM-CRC / XMODEM-1K state machines for loading images over a serial line, plus blocking drivers over `hw::uart_ref` |
