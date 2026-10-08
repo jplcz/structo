@@ -355,7 +355,7 @@ public:
 
       if (in_block_off == 0 && remaining >= bs) {
         const std::size_t whole_blocks_bytes = remaining - remaining % bs;
-        auto read = try_read_blocks(lba, span<std::byte>(dst.data() + done, whole_blocks_bytes));
+        auto read = try_read_blocks(lba, dst.subspan(done, whole_blocks_bytes));
         if (!read)
           return read;
         done += whole_blocks_bytes;
@@ -364,7 +364,10 @@ public:
         if (!read)
           return read;
         const std::size_t take = std::min(bs - in_block_off, remaining);
+        // take <= bs - in_block_off and <= remaining, so both ranges stay inside scratch (bs bytes) and dst.
+        RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
         std::memcpy(dst.data() + done, scratch.data() + in_block_off, take);
+        RELOCO_END_UNSAFE_BUFFER_USAGE
         done += take;
       }
     }

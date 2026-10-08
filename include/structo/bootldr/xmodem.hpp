@@ -44,6 +44,7 @@
  * drive the engines directly with a real timer.
  */
 
+#include <reloco/array.hpp>
 #include <reloco/error.hpp>
 #include <reloco/function_ref.hpp>
 #include <reloco/span.hpp>
@@ -213,7 +214,7 @@ public:
   }
 
   /** @brief Payload of the packet signalled by `xmodem_event::block`; valid until the next `on_byte`. */
-  [[nodiscard]] span<const std::uint8_t> block() const noexcept { return span<const std::uint8_t>(buf_, size_); }
+  [[nodiscard]] span<const std::uint8_t> block() const noexcept { return span<const std::uint8_t>(buf_.data(), size_); }
 
   /** @brief Packets delivered so far (duplicates excluded). */
   [[nodiscard]] constexpr std::uint32_t blocks_received() const noexcept { return delivered_; }
@@ -253,7 +254,7 @@ private:
 
   xmodem_event finish_packet() noexcept {
     state_ = state::header;
-    const span<const std::uint8_t> payload(buf_, size_);
+    const span<const std::uint8_t> payload(buf_.data(), size_);
     bool ok = static_cast<std::uint8_t>(blk_ ^ cblk_) == 0xFF;
     if (ok) {
       if (crc_)
@@ -304,14 +305,14 @@ private:
   std::uint8_t blk_ = 0;
   std::uint8_t cblk_ = 0;
   std::uint8_t expected_ = 1;
-  std::uint8_t check_[2]{};
+  array<std::uint8_t, 2> check_{};
   std::uint8_t reply_[1]{};
   std::size_t reply_len_ = 0;
   std::size_t size_ = xmodem_small_block;
   std::size_t pos_ = 0;
   std::uint32_t errors_ = 0;
   std::uint32_t delivered_ = 0;
-  std::uint8_t buf_[xmodem_max_block]{};
+  array<std::uint8_t, xmodem_max_block> buf_{};
 };
 
 // ============================================================================
@@ -384,7 +385,7 @@ public:
   }
 
   /** @brief Bytes to put on the wire after a `transmit` (or `failed`, which holds CAN) event. */
-  [[nodiscard]] span<const std::uint8_t> packet() const noexcept { return span<const std::uint8_t>(pkt_, pkt_len_); }
+  [[nodiscard]] span<const std::uint8_t> packet() const noexcept { return span<const std::uint8_t>(pkt_.data(), pkt_len_); }
 
   /** @brief Whether CRC-16 mode was negotiated. */
   [[nodiscard]] constexpr bool crc_mode() const noexcept { return crc_; }
@@ -410,11 +411,11 @@ private:
     pkt_[0] = big ? xmodem_ctl::stx : xmodem_ctl::soh;
     pkt_[1] = blk_;
     pkt_[2] = static_cast<std::uint8_t>(~blk_);
-    std::uint8_t *data = pkt_ + 3;
+    const span<std::uint8_t> data = span<std::uint8_t>(pkt_.data(), pkt_.size()).subspan(3);
     for (std::size_t i = 0; i < size; ++i)
       data[i] = i < last_payload_ ? image_[offset_ + i] : xmodem_ctl::sub;
 
-    const span<const std::uint8_t> payload(data, size);
+    const span<const std::uint8_t> payload(data.data(), size);
     pkt_len_ = 3 + size;
     if (crc_) {
       const std::uint16_t crc = xmodem_crc16(payload);
@@ -454,7 +455,7 @@ private:
   std::size_t last_payload_ = 0;
   std::size_t pkt_len_ = 0;
   std::uint32_t errors_ = 0;
-  std::uint8_t pkt_[xmodem_max_packet]{};
+  array<std::uint8_t, xmodem_max_packet> pkt_{};
 };
 
 // ============================================================================

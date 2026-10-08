@@ -51,7 +51,7 @@ struct icmp_echo {
   e.type = m[0];
   e.id = static_cast<std::uint16_t>((m[4] << 8) | m[5]);
   e.seq = static_cast<std::uint16_t>((m[6] << 8) | m[7]);
-  e.data = span<const std::uint8_t>(m.data() + icmp_echo_header_size, m.size() - icmp_echo_header_size);
+  e.data = m.subspan(icmp_echo_header_size);
   return e;
 }
 

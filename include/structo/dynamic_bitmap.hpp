@@ -50,6 +50,7 @@
 #include <reloco/default_allocator.hpp>
 #include <reloco/error.hpp>
 #include <reloco/expected.hpp>
+#include <reloco/lifetime.hpp>
 #include <reloco/span.hpp>
 #include <utility>
 
@@ -107,7 +108,10 @@ public:
       return bm;
     }
 
+    // allocate() returns a block of exactly wc words and is only checked for failure here.
+    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
     auto res = alloc.allocate(wc * sizeof(unsigned long), alignof(unsigned long));
+    RELOCO_END_UNSAFE_BUFFER_USAGE
     if (!res) {
       return unexpected(res.error());
     }
@@ -148,7 +152,10 @@ public:
 private:
   void release() noexcept {
     if (words_ != nullptr) {
+      // Releases exactly the word_count_ words obtained in try_allocate().
+      RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
       alloc_.deallocate(words_, word_count_ * sizeof(unsigned long));
+      RELOCO_END_UNSAFE_BUFFER_USAGE
       words_ = nullptr;
       word_count_ = 0;
       nbits_ = 0;

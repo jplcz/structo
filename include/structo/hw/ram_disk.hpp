@@ -42,6 +42,7 @@
 #include "block_device_ref.hpp"
 
 #include <reloco/detail/assert.hpp>
+#include <reloco/lifetime.hpp>
 
 #include <cstring>
 
@@ -91,13 +92,19 @@ template <> struct block_device_traits<ram_disk> {
 
   static result<void> try_read_blocks(ram_disk &b, std::uint64_t lba, span<std::byte> dst) noexcept {
     const span<std::byte> storage = b.storage();
+    // block_device_ref validates [lba, lba + dst.size() / block_size) against block_count() before dispatching here.
+    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
     std::memcpy(dst.data(), storage.data() + lba * b.block_size(), dst.size());
+    RELOCO_END_UNSAFE_BUFFER_USAGE
     return {};
   }
 
   static result<void> try_write_blocks(ram_disk &b, std::uint64_t lba, span<const std::byte> src) noexcept {
     const span<std::byte> storage = b.storage();
+    // block_device_ref validates [lba, lba + src.size() / block_size) against block_count() before dispatching here.
+    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
     std::memcpy(storage.data() + lba * b.block_size(), src.data(), src.size());
+    RELOCO_END_UNSAFE_BUFFER_USAGE
     return {};
   }
 };
@@ -144,7 +151,10 @@ template <> struct block_device_traits<read_only_ram_disk> {
 
   static result<void> try_read_blocks(read_only_ram_disk &b, std::uint64_t lba, span<std::byte> dst) noexcept {
     const span<const std::byte> storage = b.storage();
+    // block_device_ref validates [lba, lba + dst.size() / block_size) against block_count() before dispatching here.
+    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
     std::memcpy(dst.data(), storage.data() + lba * b.block_size(), dst.size());
+    RELOCO_END_UNSAFE_BUFFER_USAGE
     return {};
   }
 

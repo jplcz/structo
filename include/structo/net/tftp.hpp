@@ -118,7 +118,7 @@ inline void tftp_put16(span<std::uint8_t> out, std::size_t at, std::uint16_t v) 
     if (d.size() > tftp_max_packet)
       return unexpected(error::invalid_argument);
     p.block = word;
-    p.data = span<const std::uint8_t>(d.data() + 4, d.size() - 4);
+    p.data = d.subspan(4);
     return p;
   case tftp_ack:
     if (d.size() != 4)
@@ -130,7 +130,7 @@ inline void tftp_put16(span<std::uint8_t> out, std::size_t at, std::uint16_t v) 
     std::size_t len = d.size() - 4;
     if (len > 0 && d[d.size() - 1] == 0)
       --len; // strip the terminator
-    p.message = reloco::string_view(reinterpret_cast<const char *>(d.data() + 4), len);
+    p.message = reloco::string_view(reinterpret_cast<const char *>(d.subspan(4).data()), len);
     return p;
   }
   default:

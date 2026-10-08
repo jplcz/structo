@@ -48,6 +48,7 @@
 #include <microfmt/microfmt.hpp>
 
 #include <reloco/error.hpp>
+#include <reloco/lifetime.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -107,13 +108,15 @@ private:
     return reloco::error::invalid_argument;
   }
 
-  // Default reader: plain volatile byte reads.
+  // Default reader: plain volatile byte reads; the caller guarantees [src, src + n) is readable and dst holds n bytes.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   static std::size_t volatile_read(void *, std::uintptr_t src, std::uint8_t *dst, std::size_t n) noexcept {
     const volatile std::uint8_t *p = reinterpret_cast<const volatile std::uint8_t *>(src);
     for (std::size_t i = 0; i < n; ++i)
       dst[i] = p[i];
     return n;
   }
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 
   [[nodiscard]] microfmt::memory_reader_fn_t reader() const noexcept {
     return hooks_.read_memory ? hooks_.read_memory : &volatile_read;
@@ -190,6 +193,10 @@ private:
     }
   }
 
+  // Raw memory-access commands: every address is user-supplied by design and the loops are bounded by the
+  // user-supplied length; the shell is a debug tool that deliberately touches arbitrary memory.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
   static reloco::task<void> cp_cmd(command_call &call) noexcept {
     if (call.argc() != 4)
       co_await reloco::unexpected(usage(call));
@@ -263,6 +270,8 @@ private:
         co_await call.sh().sched().yield();
     }
   }
+
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 
   static reloco::task<void> go_cmd(command_call &call) noexcept {
     auto &self = *static_cast<generic_commands *>(call.ctx());

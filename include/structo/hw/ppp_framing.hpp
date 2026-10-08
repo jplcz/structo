@@ -191,7 +191,7 @@ private:
       proto = static_cast<std::uint16_t>((proto << 8) | buf_[pos++]);
     }
     frame_.protocol = proto;
-    frame_.payload = reloco::span<const std::uint8_t>(buf_.data() + pos, end - pos);
+    frame_.payload = reloco::span<const std::uint8_t>(buf_.subspan(pos, end - pos));
     return true;
   }
 

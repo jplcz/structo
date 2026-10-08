@@ -350,7 +350,7 @@ private:
     const std::size_t len = (static_cast<std::size_t>(p[2]) << 8) | p[3];
     if (len < 4 || len > p.size())
       return;
-    const bytes body(p.data() + 4, len - 4);
+    const bytes body = p.subspan(4, len - 4);
     switch (code) {
     case code_conf_request:
       on_conf_request(l, id, body);
@@ -428,7 +428,7 @@ private:
       const std::size_t olen = opts[pos + 1];
       if (olen < 2 || pos + olen > opts.size())
         return verdict::malformed;
-      const bytes o(opts.data() + pos, olen);
+      const bytes o = opts.subspan(pos, olen);
       pos += olen;
       if (&l == &lcp_) {
         const bool known = (type == 1 && olen == 4) || (type == 2 && olen == 6) || (type == 5 && olen == 6) ||

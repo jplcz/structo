@@ -98,6 +98,7 @@
 #include <reloco/detail/compat.hpp>
 #include <reloco/error.hpp>
 #include <reloco/int_ops.hpp>
+#include <reloco/lifetime.hpp>
 #include <reloco/span.hpp>
 #include <reloco/unique_ptr.hpp>
 #include <type_traits>
@@ -453,7 +454,10 @@ public:
       if (auto res = materialize_bytes<false>(storage); !res)
         return unexpected(res.error());
       U out;
+      // sizeof(U) bytes were just materialized into storage, which is exactly sizeof(U) long.
+      RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
       std::memcpy(&out, storage.data(), sizeof(U));
+      RELOCO_END_UNSAFE_BUFFER_USAGE
       return out;
     });
   }
@@ -465,7 +469,10 @@ public:
       if (auto res = materialize_bytes<true>(storage); !res)
         return unexpected(res.error());
       U out;
+      // sizeof(U) bytes were just materialized into storage, which is exactly sizeof(U) long.
+      RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
       std::memcpy(&out, storage.data(), sizeof(U));
+      RELOCO_END_UNSAFE_BUFFER_USAGE
       return out;
     });
   }
@@ -570,7 +577,10 @@ private:
     // U; a large, caller-controlled-size U instead gets a short-lived
     // heap zero buffer, keeping this call's stack frame bounded.
     auto extend_res = with_scratch_buffer(sizeof(U), [&buf](span<std::byte> zero_storage) -> result<void> {
+      // zero_storage.size() is the exact size of the buffer being cleared.
+      RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
       std::memset(zero_storage.data(), 0, zero_storage.size());
+      RELOCO_END_UNSAFE_BUFFER_USAGE
       return buf.try_put_slice(span<const std::byte>(zero_storage.data(), zero_storage.size()));
     });
     if (!extend_res)

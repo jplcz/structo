@@ -40,6 +40,7 @@
 #include "bitmap_utils.hpp"
 
 #include <cstddef>
+#include <reloco/array.hpp>
 #include <reloco/span.hpp>
 
 namespace structo {
@@ -67,15 +68,15 @@ public:
     for (std::size_t i = 0; i < word_count; ++i) {
       bm.words_[i] = ~0UL;
     }
-    bitmap_utils::mask_tail_padding(span<unsigned long>(bm.words_, word_count), N);
+    bitmap_utils::mask_tail_padding(span<unsigned long>(bm.words_.data(), word_count), N);
     return bm;
   }
 
   // ---- `bitmap_ops<Derived>` contract ----
 
-  [[nodiscard]] span<unsigned long> words() & noexcept { return span<unsigned long>(words_, word_count); }
+  [[nodiscard]] span<unsigned long> words() & noexcept { return span<unsigned long>(words_.data(), word_count); }
   [[nodiscard]] span<const unsigned long> words() const & noexcept {
-    return span<const unsigned long>(words_, word_count);
+    return span<const unsigned long>(words_.data(), word_count);
   }
   [[nodiscard]] static constexpr std::size_t nbits() noexcept { return N; }
 
@@ -145,7 +146,7 @@ public:
   [[nodiscard]] friend bool operator!=(const fixed_bitmap &a, const fixed_bitmap &b) noexcept { return !(a == b); }
 
 private:
-  unsigned long words_[word_count == 0 ? 1 : word_count]{};
+  reloco::array<unsigned long, (word_count == 0 ? 1 : word_count)> words_{};
 };
 
 } // namespace structo

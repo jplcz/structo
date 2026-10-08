@@ -258,7 +258,10 @@ public:
         return unexpected(word.error());
       std::uint64_t raw = word.value();
       std::size_t chunk = dst.size() - filled < sizeof(raw) ? dst.size() - filled : sizeof(raw);
+      // chunk <= dst.size() - filled, and sizeof(raw) bounds the source.
+      RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
       std::memcpy(dst.data() + filled, &raw, chunk);
+      RELOCO_END_UNSAFE_BUFFER_USAGE
       filled += chunk;
     }
     return {};

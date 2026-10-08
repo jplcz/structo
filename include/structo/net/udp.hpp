@@ -52,7 +52,7 @@ struct udp_datagram {
   udp_datagram out;
   out.src_port = static_cast<std::uint16_t>((d[0] << 8) | d[1]);
   out.dst_port = static_cast<std::uint16_t>((d[2] << 8) | d[3]);
-  out.payload = span<const std::uint8_t>(d.data() + udp_header_size, len - udp_header_size);
+  out.payload = d.subspan(udp_header_size, len - udp_header_size);
   return out;
 }
 

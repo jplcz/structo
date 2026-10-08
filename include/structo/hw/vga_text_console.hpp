@@ -88,14 +88,14 @@ public:
    * callers normally reach this only through a bounds-checked
    * @ref console_ref, which this backend is adapted to. */
   void put_cell(std::size_t x, std::size_t y, char ch, console_color fg, console_color bg) noexcept {
-    std::byte *cell = cell_ptr(x, y);
+    auto cell = cell_ptr(x, y);
     cell[0] = static_cast<std::byte>(ch);
     cell[1] = pack_attribute(fg, bg);
   }
 
   /** @brief Reads the cell at `(x, y)`. UB if out of bounds. */
   [[nodiscard]] console_cell get_cell(std::size_t x, std::size_t y) const noexcept {
-    const std::byte *cell = cell_ptr(x, y);
+    auto cell = cell_ptr(x, y);
     std::uint8_t attr = static_cast<std::uint8_t>(cell[1]);
     return console_cell{static_cast<char>(cell[0]), static_cast<console_color>(attr & 0x0F),
                         static_cast<console_color>((attr >> 4) & 0x07)};
@@ -114,11 +114,11 @@ private:
                    reloco::optional<cursor_sink> on_move_cursor) noexcept
       : buffer_(buffer), columns_(columns), rows_(rows), on_move_cursor_(on_move_cursor) {}
 
-  [[nodiscard]] std::byte *cell_ptr(std::size_t x, std::size_t y) noexcept {
-    return buffer_.data() + (y * columns_ + x) * 2;
+  [[nodiscard]] reloco::span<std::byte> cell_ptr(std::size_t x, std::size_t y) noexcept {
+    return buffer_.subspan((y * columns_ + x) * 2, 2);
   }
-  [[nodiscard]] const std::byte *cell_ptr(std::size_t x, std::size_t y) const noexcept {
-    return buffer_.data() + (y * columns_ + x) * 2;
+  [[nodiscard]] reloco::span<const std::byte> cell_ptr(std::size_t x, std::size_t y) const noexcept {
+    return buffer_.subspan((y * columns_ + x) * 2, 2);
   }
 
   /** @brief Packs `fg`/`bg` into the standard VGA attribute byte:

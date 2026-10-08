@@ -146,7 +146,7 @@ struct ipv4_packet {
   out.header.protocol = p[9];
   out.header.src = ipv4_address(p[12], p[13], p[14], p[15]);
   out.header.dst = ipv4_address(p[16], p[17], p[18], p[19]);
-  out.payload = span<const std::uint8_t>(p.data() + hlen, total - hlen);
+  out.payload = p.subspan(hlen, total - hlen);
   return out;
 }
 
