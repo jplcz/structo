@@ -83,7 +83,7 @@ inline constexpr std::size_t xmodem_max_packet = 3 + xmodem_max_block + 2;
   for (std::uint8_t b : data) {
     crc = static_cast<std::uint16_t>(crc ^ (static_cast<std::uint16_t>(b) << 8));
     for (int i = 0; i < 8; ++i)
-      crc = static_cast<std::uint16_t>((crc & 0x8000u) ? ((crc << 1) ^ 0x1021u) : (crc << 1));
+      crc = static_cast<std::uint16_t>((crc & 0x8000u) ? (static_cast<unsigned>(crc << 1) ^ 0x1021u) : static_cast<unsigned>(crc << 1));
   }
   return crc;
 }

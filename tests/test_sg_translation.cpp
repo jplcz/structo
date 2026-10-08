@@ -263,8 +263,8 @@ template <std::size_t NumSlots, std::size_t BufSize> struct fake_page_hooks {
 
   alignas(16) static inline std::byte backing[BufSize]{};
   static inline std::size_t phys_offset[NumSlots] = {};
-  static inline int program_calls = 0;
-  static inline int unprogram_calls = 0;
+  [[maybe_unused]] static inline int program_calls = 0;
+  [[maybe_unused]] static inline int unprogram_calls = 0;
 
   static void reset_counters() noexcept {
     program_calls = 0;

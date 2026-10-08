@@ -30,8 +30,8 @@ template <std::size_t NumSlots> struct fake_hooks {
 
   static inline std::size_t phys_offset[NumSlots] = {};
   static inline bool mapped[NumSlots] = {};
-  static inline int program_calls = 0;
-  static inline int unprogram_calls = 0;
+  [[maybe_unused]] static inline int program_calls = 0;
+  [[maybe_unused]] static inline int unprogram_calls = 0;
 
   static void *slot_base(std::size_t slot) noexcept { return fake_ram + phys_offset[slot]; }
 

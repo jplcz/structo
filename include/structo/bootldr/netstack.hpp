@@ -172,7 +172,7 @@ private:
       auto pkt = co_await n.ip_.receive();
       if (!pkt) {
         ++n.stats_.rx_errors;
-        co_await n.pause(n.cfg_.error_backoff_ms);
+        (void)co_await n.pause(n.cfg_.error_backoff_ms);
         continue;
       }
       if (n.cfg_.dhcp && n.dhcp_.handle(n.ip_, *pkt, n.sched_->now_ms())) {
@@ -197,7 +197,7 @@ private:
         if (!sent)
           ++n.stats_.tx_errors;
       }
-      co_await n.pause(n.cfg_.tick_ms);
+      (void)co_await n.pause(n.cfg_.tick_ms);
     }
   }
 

@@ -88,7 +88,7 @@ inline void tftp_put16(span<std::uint8_t> out, std::size_t at, std::uint16_t v) 
     return unexpected(error::out_of_range);
   detail::tftp_put16(out, 0, tftp_ack);
   detail::tftp_put16(out, 2, block);
-  return 4;
+  return std::size_t{4};
 }
 
 /** @brief Builds ERROR(`code`, `message`). */
