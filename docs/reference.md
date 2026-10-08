@@ -262,6 +262,7 @@ Usage guide: [virtq.md](virtq.md). Split and packed rings are both supported by 
 
 | Header | Type(s) | One-line summary |
 |---|---|---|
+| `bootldr/boot_prompt.hpp` | `bootldr::boot_prompt`, `bootldr::boot_prompt_options`, `bootldr::prompt_result` | Synchronous "press a key to boot" prompt over `hw::uart_ref`: optional seconds countdown, ignores other keys, flushes stale input, caller-supplied ms clock; returns `key_pressed` or `timed_out` |
 | `bootldr/netstack.hpp` | `bootldr::netstack<Mtu>`, `bootldr::netstack_config`, `bootldr::netstack_stats` | C++20 network stack for the bootloader running as scheduler tasks: static IP or DHCP, ping, UDP delivery to sockets, raw packet handler hook, `use_ppp()` to take the address from a PPP link |
 | `bootldr/udp_socket.hpp` | `bootldr::udp_socket`, `bootldr::udp_demux`, `bootldr::udp_received` | C++20 UDP socket owned by the client and plugged into a `netstack`; heap-allocated receive queue and send buffers (`reloco::allocator_ref`); `bind`/`receive_from`/`try_receive_from`/`send_to`; `receive_from(buf, timeout_ms)` fails with `timed_out` (needs `scheduler::set_clock`) |
 | `bootldr/tftp.hpp` | `bootldr::tftp_client`, `bootldr::tftp_options` | C++20 TFTP client over a `udp_socket` on the netstack: `get`/`put` to memory or via callbacks, retransmit on timeout, server error mapping |

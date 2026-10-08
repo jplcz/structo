@@ -299,6 +299,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_multiboot2.cpp
         tests/test_uart_ref.cpp
         tests/test_xmodem.cpp
+        tests/test_boot_prompt.cpp
         tests/test_timer_ref.cpp
         tests/test_irqc_ref.cpp
         tests/test_framebuffer.cpp
