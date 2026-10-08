@@ -34,6 +34,8 @@
 #include <reloco/string_view.hpp>
 #include <structo/hw/uart_ref.hpp>
 
+#include <microfmt/microfmt.hpp>
+
 #include <cstdint>
 
 namespace structo::bootldr {
@@ -63,25 +65,10 @@ inline std::uint8_t prompt_fold(std::uint8_t c) noexcept {
   return (c >= 'A' && c <= 'Z') ? static_cast<std::uint8_t>(c - 'A' + 'a') : c;
 }
 
-// Writes "\r<message> (N) " for the countdown line.
+// Redraws the countdown line "\r<message> (N) ".
 inline reloco::result<void> prompt_draw(const hw::uart_ref &uart, reloco::string_view msg, std::uint32_t secs) noexcept {
-  char digits[11];
-  int n = 0;
-  do {
-    digits[n++] = static_cast<char>('0' + secs % 10);
-    secs /= 10;
-  } while (secs != 0);
-  if (auto r = uart.write_string("\r"); !r)
-    return r;
-  if (auto r = uart.write_string(msg); !r)
-    return r;
-  if (auto r = uart.write_string(" ("); !r)
-    return r;
-  while (n > 0) {
-    if (auto r = uart.put_byte(static_cast<std::uint8_t>(digits[--n])); !r)
-      return r;
-  }
-  return uart.write_string(") ");
+  const auto line = microfmt::format<128>("\r{} ({}) ", msg, secs);
+  return uart.write_string(line.view());
 }
 
 } // namespace detail

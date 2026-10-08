@@ -300,6 +300,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_uart_ref.cpp
         tests/test_xmodem.cpp
         tests/test_boot_prompt.cpp
+        tests/test_cmdline.cpp
         tests/test_timer_ref.cpp
         tests/test_irqc_ref.cpp
         tests/test_framebuffer.cpp
@@ -429,7 +430,8 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_arp.cpp
         tests/test_scheduler.cpp
         tests/test_netstack.cpp
-        tests/test_ppp.cpp)
+        tests/test_ppp.cpp
+        tests/test_shell.cpp)
     target_link_libraries(jplcz_structo_coroutine_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)
     # "At least C++20", not exactly 20: a newer global standard is kept.
