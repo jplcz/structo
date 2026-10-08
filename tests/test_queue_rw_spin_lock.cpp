@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 #include <gtest/gtest.h>
+#include <reloco/lifetime.hpp>
 #include <structo/sync/queue_rw_spin_lock.hpp>
 #include <structo/sync/softlock_detector.hpp>
 
@@ -154,7 +155,10 @@ TEST_F(QueueRwSpinLockTest, WriteUnlockByNonOwnerTraps) {
   lock.write_lock(n);
 
   fake_owner_traits::current = 2;
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH({ lock.write_unlock(n); }, "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 
   // Restore the real owner so the fixture's lock can be safely destroyed.
   fake_owner_traits::current = 1;
@@ -166,7 +170,10 @@ TEST_F(QueueRwSpinLockTest, RecursiveWriteLockByCurrentOwnerTraps) {
   test_lock::node n1;
   test_lock::node n2;
   lock.write_lock(n1);
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH({ lock.write_lock(n2); }, "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
   lock.write_unlock(n1);
 }
 
@@ -175,15 +182,23 @@ TEST_F(QueueRwSpinLockTest, DoubleWriteUnlockTraps) {
   test_lock::node n;
   lock.write_lock(n);
   lock.write_unlock(n);
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH({ lock.write_unlock(n); }, "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 }
 
 TEST_F(QueueRwSpinLockTest, ReadUnlockWithNoActiveReadersTraps) {
   test_lock lock;
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH({ lock.read_unlock(); }, "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 }
 
 TEST_F(QueueRwSpinLockTest, DestroyingWriteHeldLockTraps) {
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH(
       {
         test_lock lock;
@@ -191,15 +206,19 @@ TEST_F(QueueRwSpinLockTest, DestroyingWriteHeldLockTraps) {
         lock.write_lock(n);
       },
       "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 }
 
 TEST_F(QueueRwSpinLockTest, DestroyingReadHeldLockTraps) {
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH(
       {
         test_lock lock;
         lock.read_lock();
       },
       "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 }
 
 TEST_F(QueueRwSpinLockTest, DestroyingUnlockedLockIsFine) {
@@ -318,6 +337,8 @@ TEST(QueueRwSpinLockSoftlockTest, ContendedWriteLockTrapsAfterSoftlockLimitWhile
   // loop waiting for the reader count to reach zero -- against this
   // lock's own softlock_detector wired into that loop. It should trap
   // well before actually spinning forever.
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH(
       {
         lowlimit_lock::node n;
@@ -325,6 +346,7 @@ TEST(QueueRwSpinLockSoftlockTest, ContendedWriteLockTrapsAfterSoftlockLimitWhile
         lock.write_lock(n);
       },
       "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 
   lock.read_unlock();
 }
@@ -342,6 +364,8 @@ TEST(QueueRwSpinLockSoftlockTest, ContendedWriteLockTrapsAfterSoftlockLimitInAdm
   // against the `softlock_detector` that `queue_spin_lock::lock()`
   // already wires into its own contended spin. It should trap well
   // before actually spinning forever.
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH(
       {
         lowlimit_lock::node n2;
@@ -349,6 +373,7 @@ TEST(QueueRwSpinLockSoftlockTest, ContendedWriteLockTrapsAfterSoftlockLimitInAdm
         lock.write_lock(n2);
       },
       "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 
   // Restore the real owner so the lock can be safely destroyed.
   fake_owner_traits_low_softlock_limit::current = 1;

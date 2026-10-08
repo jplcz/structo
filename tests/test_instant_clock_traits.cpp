@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 #include <gtest/gtest.h>
+#include <reloco/lifetime.hpp>
 #include <structo/hw/instant_clock_traits.hpp>
 
 using structo::hw::cycles;
@@ -90,7 +91,10 @@ TEST_F(InstantClockTraitsTest, TrapTimeFailurePolicyTrapsOnRecover) {
   using policy = structo::hw::trap_time_failure_policy<isolated_tag>;
 
   time_manager dummy_mgr; // never dereferenced by recover(); only passed through
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH({ (void)policy::recover(dummy_mgr, error::not_initialized); }, "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 }
 #endif
 
@@ -125,7 +129,10 @@ TEST_F(InstantClockTraitsTest, TrapTimeFailurePolicyIsAppliedOnFailure) {
   // start() deliberately not called: try_monotonic_now() fails with error::not_initialized.
   kernel_time_manager_slot() = &mgr.value();
 
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH({ (void)reloco::instant_clock_traits<kernel_monotonic_clock_tag>::now(); }, "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 }
 #endif
 

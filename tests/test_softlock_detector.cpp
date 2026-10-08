@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 #include <gtest/gtest.h>
+#include <reloco/lifetime.hpp>
 #include <structo/sync/softlock_detector.hpp>
 
 using structo::sync::softlock_detector;
@@ -45,7 +46,10 @@ TEST(SoftlockDetectorTest, ExceedingLimitTraps) {
   softlock_detector detector(2);
   detector.tick();
   detector.tick();
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH({ detector.tick(); }, "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 }
 
 TEST(SoftlockDetectorTest, ResetClearsCount) {

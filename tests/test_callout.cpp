@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 #include <gtest/gtest.h>
+#include <reloco/lifetime.hpp>
 #include <structo/callout.hpp>
 
 namespace {
@@ -202,12 +203,15 @@ TEST_F(CalloutTest, ResetPeriodicStopsReArmingAfterCallbackDeactivates) {
 
 #if !defined(NDEBUG) || defined(RELOCO_ENABLE_ASSERTS)
 TEST(CalloutDeathTest, DestructorTrapsIfStillPending) {
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH(
       {
         fake_callout co;
         (void)co.reset(reloco::duration::from_millis(1), [](fake_callout &) noexcept {});
       },
       "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 }
 #endif
 

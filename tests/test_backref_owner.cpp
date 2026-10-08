@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 #include <gtest/gtest.h>
+#include <reloco/lifetime.hpp>
 #include <reloco/intrusive_c_tailq.hpp>
 #include <reloco/intrusive_splay_tree.hpp>
 #include <structo/backref_owner.hpp>
@@ -143,6 +144,8 @@ TEST(BackrefOwnerTest, TailqDetachAllClearsEveryHolder) {
 TEST(BackrefOwnerDeathTest, DestructionWithAttachedHolderTraps) {
   owner o{1};
   holder h;
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH(
       {
         tailq_registry reg;
@@ -150,6 +153,7 @@ TEST(BackrefOwnerDeathTest, DestructionWithAttachedHolderTraps) {
         (void)r;
       },
       "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
   // The dying registry still linked `h`; detach it manually so it is not
   // left pointing at a since-destroyed registry for any later test.
   h.parent.lock().reset(nullptr);

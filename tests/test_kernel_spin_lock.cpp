@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 #include <gtest/gtest.h>
+#include <reloco/lifetime.hpp>
 #include <structo/sync/kernel_spin_lock.hpp>
 #include <structo/sync/softlock_detector.hpp>
 
@@ -106,7 +107,10 @@ TEST_F(KernelSpinLockTest, UnlockByNonOwnerTraps) {
   lock.lock();
 
   fake_owner_traits::current = 2;
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH({ lock.unlock(); }, "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 
   // Restore the real owner so the fixture's lock can be safely destroyed.
   fake_owner_traits::current = 1;
@@ -116,7 +120,10 @@ TEST_F(KernelSpinLockTest, UnlockByNonOwnerTraps) {
 TEST_F(KernelSpinLockTest, RecursiveLockByCurrentOwnerTraps) {
   test_lock lock;
   lock.lock();
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH({ lock.lock(); }, "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
   lock.unlock();
 }
 
@@ -124,16 +131,22 @@ TEST_F(KernelSpinLockTest, DoubleUnlockTraps) {
   test_lock lock;
   lock.lock();
   lock.unlock();
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH({ lock.unlock(); }, "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 }
 
 TEST_F(KernelSpinLockTest, DestroyingHeldLockTraps) {
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH(
       {
         test_lock lock;
         lock.lock();
       },
       "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 }
 
 TEST_F(KernelSpinLockTest, DestroyingUnlockedLockIsFine) {
@@ -169,7 +182,10 @@ TEST(KernelSpinLockSoftlockTest, ContendedLockTrapsAfterSoftlockLimit) {
   // the softlock_detector wired into the contended loop -- it should
   // trap well before actually spinning forever.
   fake_owner_traits_low_softlock_limit::current = 2;
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH({ lock.lock(); }, "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 
   // Restore the real owner so the lock can be safely destroyed.
   fake_owner_traits_low_softlock_limit::current = 1;

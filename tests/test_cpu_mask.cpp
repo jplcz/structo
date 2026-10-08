@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 #include <gtest/gtest.h>
+#include <reloco/lifetime.hpp>
 #include <structo/arch/cpu_mask.hpp>
 
 #include <atomic>
@@ -72,7 +73,10 @@ TEST_F(CpuMaskTest, TrySingleRejectsOutOfRangeCpu) {
 
 #if !defined(NDEBUG) || defined(RELOCO_ENABLE_ASSERTS)
 TEST_F(CpuMaskTest, SingleTrapsOnOutOfRangeCpu) {
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH({ (void)core_mask::single(core_mask::max_cpus); }, "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 }
 #endif
 
@@ -351,7 +355,10 @@ TEST_F(CpuMaskTest, AtomicFallibleAccessorsReportOutOfRangeCpu) {
 #if !defined(NDEBUG) || defined(RELOCO_ENABLE_ASSERTS)
 TEST_F(CpuMaskTest, AtomicSetTrapsOnOutOfRangeCpu) {
   core_mask m;
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH({ m.atomic_set(core_mask::max_cpus); }, "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 }
 #endif
 

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 #include <gtest/gtest.h>
+#include <reloco/lifetime.hpp>
 #include <structo/arch/page_table_occupancy.hpp>
 #include <structo/arch/page_table_traits.hpp>
 
@@ -71,12 +72,18 @@ TEST_F(PageTableOccupancyTest, MultipleIncrementDecrementRoundTripBackToEmpty) {
 
 TEST_F(PageTableOccupancyTest, IncrementPastMaxTraps) {
   page_table_occupancy<std::uint8_t> occ(255);
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH({ occ.increment(); }, "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 }
 
 TEST_F(PageTableOccupancyTest, DecrementPastZeroTraps) {
   page_table_occupancy<std::uint32_t> occ;
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH({ (void)occ.decrement(); }, "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 }
 
 TEST_F(PageTableOccupancyTest, CountNonNullScansSpanAndIgnoresNullEntries) {
