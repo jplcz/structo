@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 #include <structo/bootldr/shell.hpp>
 #include <structo/bootldr/shell_commands.hpp>
+#include <structo/bootldr/text_editor.hpp>
 
 #include <reloco/array.hpp>
 #include <reloco/inline_string.hpp>
@@ -343,4 +344,59 @@ TEST(ShellCmdsRegistration, HookCommandsAreOptional) {
   EXPECT_EQ(sh.find("go"), nullptr);
   EXPECT_EQ(sh.find("reset"), nullptr);
   EXPECT_EQ(cmds.add_all().error(), reloco::error::invalid_state);
+}
+
+namespace {
+
+struct edit_result {
+  bool done = false;
+  bool saved = false;
+  reloco::error err{};
+};
+
+reloco::task<void> run_editor(scheduler &s, fake_uart &dev, reloco::string &buf, edit_result &out) {
+  auto r = co_await edit_text(reloco::allocator_arg, s.allocator(), s, hw::uart_ref(dev), buf);
+  out.done = true;
+  if (r)
+    out.saved = *r;
+  else
+    out.err = r.error();
+}
+
+} // namespace
+
+TEST(EditText, SaveKeepsEditsAndCancelRestores) {
+  fake_uart dev;
+  scheduler sched;
+  reloco::string buf(sched.allocator());
+  ASSERT_TRUE(buf.try_assign("boot\n").has_value());
+  edit_result res;
+  ASSERT_TRUE(sched.spawn(run_editor(sched, dev, buf, res)).has_value());
+  for (int i = 0; i < 3; ++i)
+    sched.run_once();
+  dev.type("\x1b[Bgo\x13"); // down, type "go", Ctrl-S
+  for (int i = 0; i < 20; ++i)
+    sched.run_once();
+  ASSERT_TRUE(res.done);
+  EXPECT_TRUE(res.saved);
+  EXPECT_EQ(buf.view(), "boot\ngo");
+  EXPECT_TRUE(dev.tx.contains("Ln 1"));
+
+  // Cancel: the first Ctrl-X asks for confirmation, the second discards.
+  fake_uart dev2;
+  edit_result res2;
+  ASSERT_TRUE(sched.spawn(run_editor(sched, dev2, buf, res2)).has_value());
+  for (int i = 0; i < 3; ++i)
+    sched.run_once();
+  dev2.type("zzz\x18");
+  for (int i = 0; i < 20; ++i)
+    sched.run_once();
+  EXPECT_FALSE(res2.done);
+  EXPECT_TRUE(dev2.tx.contains("unsaved changes"));
+  dev2.type("\x18");
+  for (int i = 0; i < 20; ++i)
+    sched.run_once();
+  ASSERT_TRUE(res2.done);
+  EXPECT_FALSE(res2.saved);
+  EXPECT_EQ(buf.view(), "boot\ngo");
 }

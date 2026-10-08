@@ -74,3 +74,24 @@ structo::bootldr::generic_commands cmds{sh, hooks}; // owns the command objects;
 | `cmp <a> <b> <len>` | prints a microfmt `mem_diff` at the first difference and fails |
 
 Failing commands print `error: <name>` (microfmt formats `reloco::error` by name).
+
+## Text editor
+
+```cpp
+// A shell command handler that edits a boot script stored in a heap string.
+// `script` is the dynamic buffer being edited (owned by the caller).
+// `sched` provides yielding so other tasks keep running; `uart` is the console.
+reloco::task<void> edit_cmd(reloco::allocator_arg_t, reloco::allocator_ref alloc,
+                            scheduler &sched, hw::uart_ref uart, reloco::string &script) {
+  // Returns true when saved (Ctrl-S), false when discarded (Ctrl-X, confirmed
+  // if modified); on false `script` keeps its original contents.
+  bool saved = co_await co_await edit_text(reloco::allocator_arg, alloc, sched, uart, script);
+  (void)saved;
+}
+```
+
+Keys: arrows, Home/End, PgUp/PgDn, Delete, Backspace, Tab (spaces), Ctrl-K kill line,
+Ctrl-S save, Ctrl-X cancel. `text_editor` is also usable sans-IO via `handle(key_event)`.
+
+Try it in a terminal: `build/examples/text_editor_linux_demo [FILE]` (see
+`examples/text_editor_linux_demo.cpp`; the file is only read, the result is printed on exit).
