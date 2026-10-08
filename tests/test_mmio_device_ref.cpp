@@ -7,6 +7,11 @@
 
 #include <cstring>
 
+#include <reloco/lifetime.hpp>
+
+// Test fixtures index raw buffers freely; bounds are checked by the assertions.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 using structo::hypervisor::mmio_device_ref;
 using reloco::error;
 using reloco::result;
@@ -184,3 +189,5 @@ TEST(MmioDeviceRefRomTest, NoWriteTraitMeansHardWiredReadOnly) {
   // try_reset is absent entirely too -- succeeds trivially.
   EXPECT_TRUE(ref.try_reset().has_value());
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE

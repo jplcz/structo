@@ -9,6 +9,11 @@
 #include <structo/virtio/virtio_mmio.hpp>
 #include <structo/virtio/virtio_rpmsg.hpp>
 
+#include <reloco/lifetime.hpp>
+
+// Test fixtures index raw buffers freely; bounds are checked by the assertions.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 namespace {
 
 using namespace structo;
@@ -354,3 +359,5 @@ TEST_F(VirtioRpmsgTest, EndpointTableRules) {
 }
 
 } // namespace
+
+RELOCO_END_UNSAFE_BUFFER_USAGE

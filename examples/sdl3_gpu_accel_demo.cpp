@@ -32,6 +32,11 @@
 #include <cmath>
 #include <cstdio>
 
+#include <reloco/lifetime.hpp>
+
+// Example code indexes raw buffers freely; bounds are checked by the surrounding logic.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 namespace {
 
 using structo::hw::gpu_accel_ref;
@@ -186,3 +191,5 @@ int main() {
   SDL_Quit();
   return 0;
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE

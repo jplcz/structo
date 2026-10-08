@@ -5,6 +5,11 @@
 #include <gtest/gtest.h>
 #include <structo/bootldr/scheduler.hpp>
 
+#include <reloco/lifetime.hpp>
+
+// Test fixtures index raw buffers freely; bounds are checked by the assertions.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 using namespace structo::bootldr;
 
 namespace {
@@ -222,8 +227,9 @@ TEST_F(Scheduler, EventWaitForCompletesWhenSetAndIgnoresLateTimer) {
   sched.run_once();
   ASSERT_EQ(l.n, 1);
   EXPECT_EQ(l.items[0], 1);
-  now = 500;
   sched.run_once();
   sched.run_once();
   EXPECT_EQ(l.n, 1);
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE

@@ -7,6 +7,11 @@
 
 #include <cstddef>
 
+#include <reloco/lifetime.hpp>
+
+// Test fixtures index raw buffers freely; bounds are checked by the assertions.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 using structo::arch::per_cpu_ptr;
 
 namespace {
@@ -160,3 +165,5 @@ TEST_F(PerCpuPtrFastPathTest, CustomCpuIdTypeFromTagIsHonored) {
   using ptr = per_cpu_ptr<fast_path_tag, int>;
   static_assert(std::is_same_v<ptr::cpu_id_type, int>, "cpu_id_type must come from Tag::cpu_id_type when provided");
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE

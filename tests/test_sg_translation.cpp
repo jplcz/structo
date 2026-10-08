@@ -11,6 +11,11 @@
 #include <array>
 #include <cstdint>
 
+#include <reloco/lifetime.hpp>
+
+// Test fixtures index raw buffers freely; bounds are checked by the assertions.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 namespace {
 
 using namespace structo;
@@ -622,4 +627,6 @@ TEST(TwoLevelSgCodecTest, WorksWithATwoSlotRaiiMapper) {
 }
 
 } // namespace
+
+RELOCO_END_UNSAFE_BUFFER_USAGE
 #endif

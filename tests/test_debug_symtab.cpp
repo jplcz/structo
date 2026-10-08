@@ -12,6 +12,11 @@
 #include <utility>
 #include <vector>
 
+#include <reloco/lifetime.hpp>
+
+// Test fixtures index raw buffers freely; bounds are checked by the assertions.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 using reloco::span;
 using reloco::vector;
 using structo::debug_symtab_view;
@@ -577,3 +582,5 @@ TEST(DebugSymtabHuffmanTest, TryCreateRejectsZeroMaxCodeLen) {
   auto view = debug_symtab_view::try_create(span<const std::byte>(blob.data(), blob.size()), /*verify_crc=*/false);
   EXPECT_FALSE(view.has_value());
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE

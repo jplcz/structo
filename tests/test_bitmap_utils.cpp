@@ -8,6 +8,9 @@
 
 #include <cstddef>
 
+// Test fixtures index raw buffers freely; bounds are checked by the assertions.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 using structo::bitmap_utils;
 
 namespace {
@@ -60,10 +63,7 @@ TEST_F(BitmapUtilsTest, TryVariantsRejectOutOfRange) {
 
 #if !defined(NDEBUG) || defined(RELOCO_ENABLE_ASSERTS)
 TEST_F(BitmapUtilsTest, SetTrapsOnOutOfRangeIndex) {
-  // gtest's death-test macro expands to libc fprintf calls outside our control.
-  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH({ bitmap_utils::set(bits_, kBits, kBits); }, "");
-  RELOCO_END_UNSAFE_BUFFER_USAGE
 }
 #endif
 
@@ -271,3 +271,5 @@ TEST_F(BitmapUtilsTest, ZeroSizeRunRequestsTriviallySucceedAtStart) {
   ASSERT_TRUE(run.has_value());
   EXPECT_EQ(*run, 7u);
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE

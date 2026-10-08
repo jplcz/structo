@@ -9,6 +9,11 @@
 #include <thread>
 #include <vector>
 
+#include <reloco/lifetime.hpp>
+
+// Test fixtures index raw buffers freely; bounds are checked by the assertions.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 namespace {
 
 using structo::sync::lock_striping;
@@ -190,3 +195,5 @@ TEST_F(LockStripingTest, DistinctKeysCanHashToDifferentStripesAndLockConcurrentl
   }
   t.join();
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE

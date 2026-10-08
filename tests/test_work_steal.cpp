@@ -3,7 +3,13 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 #include <gtest/gtest.h>
+#include <reloco/array.hpp>
 #include <structo/work_steal.hpp>
+
+#include <reloco/lifetime.hpp>
+
+// Test fixtures index raw buffers freely; bounds are checked by the assertions.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
 
 using structo::always_steal_policy;
 using structo::find_steal_candidate;
@@ -56,7 +62,7 @@ TEST_F(WorkStealTest, PerformancePolicyPrefersClosestCandidateOverBusiestOverall
   auto topo = make_two_cluster_topology();
   auto siblings = make_siblings(topo);
   // cpu1 (same cluster as cpu0) is lightly busier; cpu3 (cross-package) is the busiest overall.
-  std::size_t load[4] = {0, 2, 0, 10};
+  reloco::array<std::size_t, 4> load{0, 2, 0, 10};
   auto eligible = mask4::filled();
 
   auto victim =
@@ -68,7 +74,7 @@ TEST_F(WorkStealTest, PerformancePolicyPrefersClosestCandidateOverBusiestOverall
 TEST_F(WorkStealTest, PerformancePolicyRequiresMoreThanOneExtraTask) {
   auto topo = make_two_cluster_topology();
   auto siblings = make_siblings(topo);
-  std::size_t load[4] = {0, 1, 0, 0}; // only one extra task anywhere -- not worth it
+  reloco::array<std::size_t, 4> load{0, 1, 0, 0}; // only one extra task anywhere -- not worth it
   auto eligible = mask4::filled();
 
   auto victim =
@@ -79,7 +85,7 @@ TEST_F(WorkStealTest, PerformancePolicyRequiresMoreThanOneExtraTask) {
 TEST_F(WorkStealTest, PowerSavePolicyOnlyStealsWhenLocallyIdle) {
   auto topo = make_two_cluster_topology();
   auto siblings = make_siblings(topo);
-  std::size_t load[4] = {1, 0, 0, 5}; // cpu0 itself has one task -- not idle
+  reloco::array<std::size_t, 4> load{1, 0, 0, 5}; // cpu0 itself has one task -- not idle
   auto eligible = mask4::filled();
 
   auto victim =
@@ -90,7 +96,7 @@ TEST_F(WorkStealTest, PowerSavePolicyOnlyStealsWhenLocallyIdle) {
 TEST_F(WorkStealTest, PowerSavePolicyStealsFromAnyBusyNeighborWhenIdle) {
   auto topo = make_two_cluster_topology();
   auto siblings = make_siblings(topo);
-  std::size_t load[4] = {0, 0, 0, 3};
+  reloco::array<std::size_t, 4> load{0, 0, 0, 3};
   auto eligible = mask4::filled();
 
   auto victim =
@@ -102,7 +108,7 @@ TEST_F(WorkStealTest, PowerSavePolicyStealsFromAnyBusyNeighborWhenIdle) {
 TEST_F(WorkStealTest, EligibleMaskExcludesOfflineOrAlreadyTriedCpus) {
   auto topo = make_two_cluster_topology();
   auto siblings = make_siblings(topo);
-  std::size_t load[4] = {0, 0, 0, 3};
+  reloco::array<std::size_t, 4> load{0, 0, 0, 3};
   auto eligible = mask4::filled();
   eligible.clear(3); // e.g. offline, or already tried and failed this round
 
@@ -114,7 +120,7 @@ TEST_F(WorkStealTest, EligibleMaskExcludesOfflineOrAlreadyTriedCpus) {
 TEST_F(WorkStealTest, RetryByClearingFailedCandidateFindsNextClosest) {
   auto topo = make_two_cluster_topology();
   auto siblings = make_siblings(topo);
-  std::size_t load[4] = {0, 4, 0, 4}; // cpu1 (closer) and cpu3 both qualify for performance_steal_policy
+  reloco::array<std::size_t, 4> load{0, 4, 0, 4}; // cpu1 (closer) and cpu3 both qualify for performance_steal_policy
   auto eligible = mask4::filled();
 
   auto first =
@@ -132,7 +138,7 @@ TEST_F(WorkStealTest, RetryByClearingFailedCandidateFindsNextClosest) {
 TEST_F(WorkStealTest, AlwaysStealPolicyTakesAnyNonemptyCandidateRegardlessOfLocalLoad) {
   auto topo = make_two_cluster_topology();
   auto siblings = make_siblings(topo);
-  std::size_t load[4] = {7, 0, 0, 1}; // local cpu already has plenty of work
+  reloco::array<std::size_t, 4> load{7, 0, 0, 1}; // local cpu already has plenty of work
   auto eligible = mask4::filled();
 
   auto victim =
@@ -160,7 +166,7 @@ TEST_F(WorkStealTest, AlwaysStealPolicyAlwaysAttemptsRegardlessOfLocalLoad) {
 TEST_F(WorkStealTest, FindStealCandidateSkipsSearchWhenPolicyDeclinesToAttempt) {
   auto topo = make_two_cluster_topology();
   auto siblings = make_siblings(topo);
-  std::size_t load[4] = {1, 0, 0, 5}; // local isn't idle; power_save shouldn't even look
+  reloco::array<std::size_t, 4> load{1, 0, 0, 5}; // local isn't idle; power_save shouldn't even look
   auto eligible = mask4::filled();
   bool candidate_load_queried = false;
 
@@ -176,10 +182,12 @@ TEST_F(WorkStealTest, FindStealCandidateSkipsSearchWhenPolicyDeclinesToAttempt) 
 TEST_F(WorkStealTest, NoCandidateQualifiesReturnsEmpty) {
   auto topo = make_two_cluster_topology();
   auto siblings = make_siblings(topo);
-  std::size_t load[4] = {0, 0, 0, 0};
+  reloco::array<std::size_t, 4> load{0, 0, 0, 0};
   auto eligible = mask4::filled();
 
   auto victim =
       find_steal_candidate<always_steal_policy>(siblings, 0, eligible, [&](std::size_t cpu) { return load[cpu]; });
   EXPECT_FALSE(victim.has_value());
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE

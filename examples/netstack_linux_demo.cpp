@@ -35,6 +35,11 @@
 #include <termios.h>
 #include <unistd.h>
 
+#include <reloco/lifetime.hpp>
+
+// Example code indexes raw buffers freely; bounds are checked by the surrounding logic.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 using namespace structo;
 
 namespace {
@@ -333,6 +338,8 @@ int main(int argc, char **argv) {
   ::close(uart.fd);
   return rc;
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE
 
 #else
 

@@ -37,6 +37,11 @@
 #include <cstring>
 #include <vector>
 
+#include <reloco/lifetime.hpp>
+
+// Example code indexes raw buffers freely; bounds are checked by the surrounding logic.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 namespace {
 
 using namespace structo;
@@ -350,3 +355,5 @@ int main(int argc, char **argv) {
   SDL_Quit();
   return picture_ok ? 0 : 1;
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE

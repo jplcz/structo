@@ -10,6 +10,11 @@
 #include <utility>
 #include <vector>
 
+#include <reloco/lifetime.hpp>
+
+// Test fixtures index raw buffers freely; bounds are checked by the assertions.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 using structo::hw::rgb_color;
 using structo::hw::xrgb8888;
 using structo::hypervisor::mmio_device_ref;
@@ -166,3 +171,5 @@ TEST(MmioFramebufferDeviceExternal, RejectsATooSmallExternalBuffer) {
   auto maker = device::try_bind_external(span<std::byte>(backing.data(), backing.size()), 64, 32, 64 * 4);
   EXPECT_FALSE(maker.has_value());
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE

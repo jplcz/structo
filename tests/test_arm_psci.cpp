@@ -7,6 +7,11 @@
 
 #include <cstdint>
 
+#include <reloco/lifetime.hpp>
+
+// Test fixtures index raw buffers freely; bounds are checked by the assertions.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 using namespace structo::hypervisor;
 
 TEST(ArmPsciTest, DecodesCpuOnSmc64FunctionId) {
@@ -111,3 +116,5 @@ TEST(ArmPsciTest, IsConstexprEvaluable) {
   constexpr std::uint32_t version_raw = encode_psci_version({1, 1});
   static_assert(version_raw == 0x00010001U, "must be constexpr");
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE

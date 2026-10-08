@@ -9,6 +9,11 @@
 #include <cstring>
 #include <utility>
 
+#include <reloco/lifetime.hpp>
+
+// Test fixtures index raw buffers freely; bounds are checked by the assertions.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 using structo::hw::console_cell;
 using structo::hw::console_color;
 using structo::hw::console_ref;
@@ -162,3 +167,5 @@ TEST_F(MmioTextConsoleTest, OutOfRangeControlAccessIsRejected) {
   ASSERT_FALSE(read.has_value());
   EXPECT_EQ(read.error(), error::out_of_range);
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE

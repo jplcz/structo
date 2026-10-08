@@ -6,6 +6,11 @@
 #include <reloco/array.hpp>
 #include <structo/hw/framebuffer_console.hpp>
 
+#include <reloco/lifetime.hpp>
+
+// Test fixtures index raw buffers freely; bounds are checked by the assertions.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 using namespace structo::hw;
 
 namespace {
@@ -238,14 +243,16 @@ TEST(FramebufferConsoleTest, ConsoleRefSetCursorForwardsToSoftwareCursor) {
 
 TEST(ConsoleColorToRgbTest, MapsAllSixteenColorsToDistinctRgbValues) {
   reloco::array<rgb_color, 16> seen{};
-  for (int i = 0; i < 16; ++i) {
+  for (std::size_t i = 0; i < 16; ++i) {
     seen[i] = console_color_to_rgb(static_cast<console_color>(i));
   }
-  for (int i = 0; i < 16; ++i) {
-    for (int j = i + 1; j < 16; ++j) {
+  for (std::size_t i = 0; i < 16; ++i) {
+    for (std::size_t j = i + 1; j < 16; ++j) {
       EXPECT_NE(seen[i], seen[j]) << "colors " << i << " and " << j << " collide";
     }
   }
   EXPECT_EQ(console_color_to_rgb(console_color::black), rgb_color::black());
   EXPECT_EQ(console_color_to_rgb(console_color::white), rgb_color::white());
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE

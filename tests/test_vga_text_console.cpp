@@ -5,6 +5,11 @@
 #include <gtest/gtest.h>
 #include <structo/hw/vga_text_console.hpp>
 
+#include <reloco/lifetime.hpp>
+
+// Test fixtures index raw buffers freely; bounds are checked by the assertions.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 using namespace structo::hw;
 
 namespace {
@@ -105,3 +110,5 @@ TEST(VgaTextConsoleTest, AdaptsToConsoleRefAndSupportsScrollViaGetCell) {
   ASSERT_TRUE(c);
   EXPECT_EQ(c->ch, 'R'); // "Row1" moved up to row 0 after the scroll.
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE

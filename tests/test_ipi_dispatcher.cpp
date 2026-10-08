@@ -11,6 +11,11 @@
 #include <utility>
 #include <vector>
 
+#include <reloco/lifetime.hpp>
+
+// Test fixtures index raw buffers freely; bounds are checked by the assertions.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 using structo::arch::cpu_mask;
 using structo::arch::ipi_dispatcher;
 using structo::arch::ipi_percpu_state;
@@ -320,3 +325,5 @@ TEST_F(IpiDispatcherTest, SendIssuesHardwareIpiWithGivenMaskAndId) {
   EXPECT_EQ(g_sent_ipis[0].ipi_id, 99u);
   EXPECT_EQ(g_sent_ipis[0].targets, targets);
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE

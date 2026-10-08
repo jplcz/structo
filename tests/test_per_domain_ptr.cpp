@@ -8,6 +8,11 @@
 #include <cstddef>
 #include <type_traits>
 
+#include <reloco/lifetime.hpp>
+
+// Test fixtures index raw buffers freely; bounds are checked by the assertions.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 using structo::arch::per_domain_ptr;
 
 namespace {
@@ -165,3 +170,5 @@ TEST_F(PerDomainPtrFastPathTest, CustomDomainIdTypeFromTagIsHonored) {
   static_assert(std::is_same_v<ptr::domain_id_type, int>,
                 "domain_id_type must come from Tag::domain_id_type when provided");
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE

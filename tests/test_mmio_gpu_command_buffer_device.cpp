@@ -9,6 +9,11 @@
 #include <utility>
 #include <vector>
 
+#include <reloco/lifetime.hpp>
+
+// Test fixtures index raw buffers freely; bounds are checked by the assertions.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 using structo::hw::framebuffer;
 using structo::hw::gpu_accel_ref;
 using structo::hw::rgb_color;
@@ -251,3 +256,5 @@ TEST(GpuCommandCodec, PackUnpackColorRoundTrips) {
   rgb_color c{10, 20, 30, 40};
   EXPECT_EQ(unpack_gpu_color(pack_gpu_color(c)), c);
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE

@@ -13,6 +13,11 @@
 #include <cstdint>
 #include <utility>
 
+#include <reloco/lifetime.hpp>
+
+// Test fixtures index raw buffers freely; bounds are checked by the assertions.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 using structo::sync::guarded_spin_mutex;
 using structo::sync::irq_guard;
 using structo::sync::kernel_spin_lock;
@@ -230,3 +235,5 @@ TEST_F(GuardedSpinMutexTest, GuardGetAndGetMutMatchOperatorStar) {
   EXPECT_EQ(g.get(), 6);
   EXPECT_EQ(*g, 6);
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE

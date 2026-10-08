@@ -11,6 +11,11 @@
 
 #include <cstdio>
 
+#include <reloco/lifetime.hpp>
+
+// Test fixtures index raw buffers freely; bounds are checked by the assertions.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 using reloco::span;
 using structo::fdt::fdt_writer;
 
@@ -65,3 +70,5 @@ int main() {
 
   return 0;
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE
