@@ -67,6 +67,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <reloco/error.hpp>
+#include <reloco/lifetime.hpp>
 #include <reloco/span.hpp>
 
 namespace structo {
@@ -102,6 +103,10 @@ struct rgb_color {
 // ============================================================================
 // Pixel Formats
 // ============================================================================
+
+// Pixel codecs index a pixel's bytes at fixed offsets; callers guarantee
+// bytes_per_pixel bytes are available (the framebuffer bounds-checks first).
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
 
 /** @brief 3 bytes per pixel, stored red-then-green-then-blue. */
 struct rgb888 {
@@ -205,6 +210,8 @@ struct gray8 {
     return {v, v, v};
   }
 };
+
+RELOCO_END_UNSAFE_BUFFER_USAGE
 
 // ============================================================================
 // Framebuffer

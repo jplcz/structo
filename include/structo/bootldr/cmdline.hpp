@@ -24,6 +24,7 @@
  */
 
 #include <reloco/error.hpp>
+#include <reloco/lifetime.hpp>
 #include <reloco/span.hpp>
 #include <reloco/string_view.hpp>
 
@@ -31,6 +32,10 @@
 #include <cstdint>
 
 namespace structo::bootldr {
+
+// In-place tokenizer over a caller-provided (pointer, len) buffer; every
+// index is bounded by `len`/`argv.size()` in the loop conditions.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
 
 /**
  * @brief Splits `line` into NUL-terminated arguments, rewriting the buffer in place.
@@ -140,5 +145,7 @@ namespace structo::bootldr {
   }
   return value;
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE
 
 } // namespace structo::bootldr

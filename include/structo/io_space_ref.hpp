@@ -357,6 +357,11 @@ public:
   }
 
 private:
+  // The rep-access fallbacks index caller-provided (pointer, count) pairs
+  // that the public span-based entry points already derived from checked
+  // spans, and bit_copy's memcpy is between equally-sized objects.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
   // memcpy's between a wire-format unsigned integer and T, same
   // never-reinterpret_cast rationale as target_ptr's materialize/store.
   template <typename To, typename From> static To bit_copy(const From &from) noexcept {
@@ -532,6 +537,8 @@ private:
                                  &read_rep16_entry<Backend>, &read_rep32_entry<Backend>,  &read_rep64_entry<Backend>,
                                  &write_rep8_entry<Backend>, &write_rep16_entry<Backend>, &write_rep32_entry<Backend>,
                                  &write_rep64_entry<Backend>};
+
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 
   void *ctx_ = nullptr;
   const vtable *vtbl_ = nullptr;
