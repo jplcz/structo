@@ -423,7 +423,8 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_polled_net_device.cpp
         tests/test_slip_device.cpp
         tests/test_ipv4.cpp
-        tests/test_dhcp.cpp)
+        tests/test_dhcp.cpp
+        tests/test_tftp.cpp)
     target_link_libraries(jplcz_structo_coroutine_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)
     set_target_properties(jplcz_structo_coroutine_tests PROPERTIES
