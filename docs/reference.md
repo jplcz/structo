@@ -77,6 +77,7 @@ have a linked, standalone page going into more depth.
 | `net/dhcp_client.hpp` | `structo::net::dhcp_client`, `structo::net::dhcp_send_due` | C++20-only DHCPv4 client state machine (backoff, renew, expiry; caller-supplied millisecond clock) plus coroutine helper that transmits its messages through `ipv4_node` |
 | `net/tftp.hpp` | `structo::net::build_tftp_request`/`parse_tftp` | C++20-only TFTP (RFC 1350) packet codec: RRQ/WRQ/DATA/ACK/ERROR, octet mode |
 | `net/tftp_client.hpp` | `structo::net::tftp_client`, `structo::net::tftp_send_due` | C++20-only TFTP client state machine (read/write, lock-step, retransmit/timeout via caller-supplied millisecond clock) plus coroutine helper that transmits its packets through `ipv4_node` |
+| *(guide)* [`tftp_over_slip.md`](tftp_over_slip.md) | n/a | Step-by-step guide: TFTP client over a serial SLIP link (UART, SLIP, node, client, main loop, upload) |
 | `net/arp.hpp` | `structo::net::build_arp`/`parse_arp` | C++20-only ARP (RFC 826) Ethernet/IPv4 packet codec |
 | `net/arp_table.hpp` | `structo::net::arp_table` | C++20-only sans-IO ARP cache and resolver (answers requests, learns mappings, retries/expiry via caller-supplied millisecond clock, static entries, gratuitous announce) |
 | [`hw/rng.hpp`](hw_rng.md) | `structo::hw::hw_rng_ref`, `structo::hw::hw_rng_traits<Backend>` | Type-erased, non-owning handle over a hardware random/entropy source -- `try_generate64`/`try_generate32`/`try_fill`, with bounded retry on a backend's transient "not ready yet" condition -- via a customizable backend |
