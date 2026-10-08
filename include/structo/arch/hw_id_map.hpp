@@ -22,6 +22,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <reloco/lifetime.hpp>
 #include <type_traits>
 
 namespace structo::arch {
@@ -62,6 +63,10 @@ template <typename HwId> struct default_hw_id_hash {
 // -------------------------------------------------------------------------
 // Two-Tier Hardware ID Lookup Table
 // -------------------------------------------------------------------------
+// Every index is bounded by MaxCpus/L1Size/m_l2_size: L1 slots are masked with L1Size-1 and
+// cpu indices are checked against MaxCpus before use.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 /**
  * @brief Two-tier lookup: 64-byte direct hash filter (L1) -> sorted array (L2).
  * @tparam HwId    Hardware ID type (uint32_t for ARM MPIDR).
@@ -262,5 +267,7 @@ private:
   hw_id_type m_hw_by_cpu[max_cpus]{};    // Quick inverse validation map
   std::size_t m_l2_size{0};
 };
+
+RELOCO_END_UNSAFE_BUFFER_USAGE
 
 } // namespace structo::arch

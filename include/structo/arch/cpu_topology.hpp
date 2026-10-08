@@ -43,9 +43,13 @@
 
 #include <reloco/detail/assert.hpp>
 #include <reloco/error.hpp>
+#include <reloco/lifetime.hpp>
 #include <reloco/optional.hpp>
 
 namespace structo::arch {
+
+// Every cpu index is checked (or asserted) against MaxCpus and every level index against the level count.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
 
 /**
  * @brief Fixed-capacity table of per-CPU, per-level affinity group ids.
@@ -169,6 +173,8 @@ private:
   LevelId m_ids[max_cpus][max_levels]{};
   std::size_t m_level_count{0};
 };
+
+RELOCO_END_UNSAFE_BUFFER_USAGE
 
 /**
  * @brief Fallback topology decoder for when no real hierarchy is known:

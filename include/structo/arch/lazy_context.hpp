@@ -58,6 +58,7 @@
 #include <utility>
 
 #include <reloco/allocator.hpp>
+#include <reloco/array.hpp>
 #include <reloco/error.hpp>
 
 /*
@@ -676,7 +677,7 @@ public:
  * @tparam CpuId Type representing the CPU core index.
  */
 template <std::size_t MaxCpus, typename Context = void, typename CpuId = std::size_t> struct static_per_cpu_storage {
-  static inline Context *active_contexts[MaxCpus]{nullptr};
+  static inline reloco::array<Context *, MaxCpus> active_contexts{};
 
   /** @brief Returns the context currently resident on `cpu`, or `nullptr` if none/out-of-range. */
   static inline Context *get_active_context(CpuId cpu) noexcept {

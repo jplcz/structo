@@ -172,6 +172,7 @@
 #include <reloco/expected.hpp>
 #include <reloco/function_ref.hpp>
 #include <reloco/intrusive_c_list.hpp>
+#include <reloco/lifetime.hpp>
 #include <reloco/optional.hpp>
 #include <reloco/span.hpp>
 #include <reloco/spin_lock.hpp>
@@ -310,6 +311,9 @@ template <typename MaskT, std::size_t MaxReasons> struct ipi_percpu_state {
    * CPU, used to skip the shared lock entirely when nothing changed. */
   std::uint64_t last_seen_multicast_generation{0};
 };
+
+// Reason indices are bounds-checked against MaxReasons (assert/early-return) before indexing the per-CPU slot array.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
 
 /**
  * @brief Local IPI orchestrator; see the @file-level docs above for the
@@ -627,5 +631,7 @@ private:
   static inline reloco::c_list<message_type, &message_type::link_> multicast_queue_{};
   static inline std::atomic<std::uint64_t> multicast_generation_{0};
 };
+
+RELOCO_END_UNSAFE_BUFFER_USAGE
 
 } // namespace structo::arch

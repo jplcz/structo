@@ -166,6 +166,10 @@ struct physical_cpu_tag {};
 /** @brief Phantom `cpu_mask` tag for a VM's virtual CPU (vCPU) indices. */
 struct vcpu_tag {};
 
+// Word storage is a fixed-size array indexed by cpu/word_bits or a loop bounded by the word count;
+// every cpu index is checked against MaxCpus before it is used.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
 /**
  * @brief Fixed-capacity bitmask over `[0, MaxCpus)` logical CPU/vCPU indices.
  * @tparam Tag Phantom tag distinguishing e.g. physical-core masks from
@@ -910,5 +914,7 @@ private:
 
   std::uint64_t words_[word_count]{};
 };
+
+RELOCO_END_UNSAFE_BUFFER_USAGE
 
 } // namespace structo::arch

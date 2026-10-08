@@ -188,6 +188,7 @@
  * generically. Deferred to a future pass rather than bundled here.
  */
 
+#include <reloco/array.hpp>
 #include <reloco/error.hpp>
 #include <reloco/expected.hpp>
 #include <reloco/optional.hpp>
@@ -436,8 +437,8 @@ private:
   }
 
   std::size_t asid_bits_{0};
-  std::uint64_t bitmap_[word_count]{};
-  raw_type seq_[group_count]{};
+  reloco::array<std::uint64_t, word_count> bitmap_{};
+  reloco::array<raw_type, group_count> seq_{};
 };
 
 } // namespace structo::arch

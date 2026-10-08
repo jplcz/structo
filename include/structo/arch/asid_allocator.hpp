@@ -373,6 +373,7 @@
  */
 
 #include <reloco/allocator.hpp>
+#include <reloco/array.hpp>
 #include <reloco/default_allocator.hpp>
 #include <reloco/detail/assert.hpp>
 #include <reloco/error.hpp>
@@ -728,7 +729,7 @@ private:
   raw_type generation_{1};
   raw_type cursor_{0};
   vector<std::uint64_t> bitmap_;
-  context_id active_[MaxActive]{};
+  reloco::array<context_id, MaxActive> active_{};
 };
 
 } // namespace structo::arch

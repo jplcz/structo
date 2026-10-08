@@ -50,6 +50,7 @@
 #include <structo/arch/cpu_topology.hpp>
 #include <structo/fdt_index.hpp>
 
+#include <reloco/array.hpp>
 #include <reloco/error.hpp>
 #include <reloco/string_view.hpp>
 
@@ -86,10 +87,10 @@ template <std::size_t MaxCpus, std::size_t MaxLevels> struct fdt_cpu_topology_sc
   // `path[d]` is the group id assigned to the ancestor opened at depth `d`
   // (1-based: depth 1 is a direct child of `cpu-map`); `next_id[d]` is the
   // next fresh id to hand out at depth `d`.
-  std::size_t path[MaxLevels + 1]{};
-  std::size_t next_id[MaxLevels + 1]{};
+  reloco::array<std::size_t, MaxLevels + 1> path{};
+  reloco::array<std::size_t, MaxLevels + 1> next_id{};
   // `cpu_map_node[i]` is the `/cpus` node index of logical CPU `i`.
-  std::size_t cpu_map_node[MaxCpus]{};
+  reloco::array<std::size_t, MaxCpus> cpu_map_node{};
   std::size_t cpu_count{0};
   std::size_t max_levels_seen{0};
 };

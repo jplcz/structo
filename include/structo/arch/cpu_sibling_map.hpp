@@ -82,9 +82,13 @@
 
 #include <reloco/detail/assert.hpp>
 #include <reloco/error.hpp>
+#include <reloco/lifetime.hpp>
 #include <structo/arch/cpu_topology.hpp>
 
 namespace structo::arch {
+
+// Every cpu index is checked (or asserted) against MaxCpus and every slot index against count_[cpu] <= MaxCpus - 1.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
 
 /**
  * @brief Precomputed, closest-first ordering of every other CPU, built
@@ -210,5 +214,7 @@ private:
   std::size_t order_[MaxCpus][MaxCpus]{};
   std::size_t count_[MaxCpus]{};
 };
+
+RELOCO_END_UNSAFE_BUFFER_USAGE
 
 } // namespace structo::arch
