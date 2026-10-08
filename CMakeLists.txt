@@ -432,7 +432,8 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_scheduler.cpp
         tests/test_netstack.cpp
         tests/test_ppp.cpp
-        tests/test_shell.cpp)
+        tests/test_shell.cpp
+        tests/test_debug_menu.cpp)
     target_link_libraries(jplcz_structo_coroutine_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)
     # "At least C++20", not exactly 20: a newer global standard is kept.

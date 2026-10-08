@@ -62,4 +62,10 @@ if(UNIX)
     target_link_libraries(text_editor_linux_demo PRIVATE jplcz_structo jplcz_structo_warnings)
     target_compile_features(text_editor_linux_demo PRIVATE cxx_std_20)
     add_dependencies(jplcz_structo_examples text_editor_linux_demo)
+
+    # C++20-only terminal demo of bootldr::debug_menu.
+    add_executable(debug_menu_linux_demo debug_menu_linux_demo.cpp)
+    target_link_libraries(debug_menu_linux_demo PRIVATE jplcz_structo jplcz_structo_warnings)
+    target_compile_features(debug_menu_linux_demo PRIVATE cxx_std_20)
+    add_dependencies(jplcz_structo_examples debug_menu_linux_demo)
 endif()
