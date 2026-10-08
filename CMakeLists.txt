@@ -418,6 +418,14 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
     target_include_directories(jplcz_structo_tests PRIVATE tests examples)
     gtest_discover_tests(jplcz_structo_tests)
 
+    # Coroutine-based devices need C++20; own target so the main suite stays C++17.
+    add_executable(jplcz_structo_coroutine_tests tests/test_polled_net_device.cpp)
+    target_link_libraries(jplcz_structo_coroutine_tests PRIVATE
+        jplcz_structo jplcz_structo_warnings GTest::gtest_main)
+    set_target_properties(jplcz_structo_coroutine_tests PROPERTIES
+        CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF)
+    gtest_discover_tests(jplcz_structo_coroutine_tests TEST_PREFIX "Coroutine.")
+
     # tests/test_ipc_ring_fault_injection.cpp defines
     # RELOCO_ENABLE_FAULT_INJECTION, which changes the *body* of
     # reloco_ipc_ring.hpp's implicitly-inline (external/vague linkage)
