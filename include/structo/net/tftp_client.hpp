@@ -82,13 +82,13 @@ public:
   [[nodiscard]] span<const std::uint8_t> data() const noexcept { return span<const std::uint8_t>(rx_.data(), rx_len_); }
 
   /** @brief Begins downloading `filename` from `server`. */
-  [[nodiscard]] result<void> start_read(const ipv4_address &server, std::string_view filename,
+  [[nodiscard]] result<void> start_read(const ipv4_address &server, reloco::string_view filename,
                                         std::uint64_t now_ms) noexcept {
     return start(tftp_rrq, tftp_state::reading, server, filename, now_ms);
   }
 
   /** @brief Begins uploading `filename` to `server`; blocks are provided via `supply()`. */
-  [[nodiscard]] result<void> start_write(const ipv4_address &server, std::string_view filename,
+  [[nodiscard]] result<void> start_write(const ipv4_address &server, reloco::string_view filename,
                                          std::uint64_t now_ms) noexcept {
     return start(tftp_wrq, tftp_state::writing, server, filename, now_ms);
   }
@@ -165,7 +165,7 @@ public:
 
 private:
   [[nodiscard]] result<void> start(std::uint16_t op, tftp_state st, const ipv4_address &server,
-                                   std::string_view filename, std::uint64_t now_ms) noexcept {
+                                   reloco::string_view filename, std::uint64_t now_ms) noexcept {
     auto n = build_tftp_request(op, filename, span<std::uint8_t>(tx_));
     if (!n)
       return unexpected(n.error());
@@ -242,9 +242,9 @@ private:
   tftp_state state_ = tftp_state::idle;
   std::uint16_t block_ = 0; // last block received (read) or sent (write)
   std::uint16_t error_code_ = 0;
-  std::array<std::uint8_t, tftp_max_packet> tx_{};
+  reloco::array<std::uint8_t, tftp_max_packet> tx_{};
   std::size_t tx_len_ = 0;
-  std::array<std::uint8_t, tftp_block_size> rx_{};
+  reloco::array<std::uint8_t, tftp_block_size> rx_{};
   std::size_t rx_len_ = 0;
   std::uint64_t deadline_ms_ = 0;
   unsigned retries_ = 0;
@@ -264,7 +264,7 @@ template <std::size_t Mtu>
   auto msg = client.poll(now_ms);
   if (!msg)
     co_return;
-  std::array<std::uint8_t, udp_header_size + tftp_max_packet> datagram{};
+  reloco::array<std::uint8_t, udp_header_size + tftp_max_packet> datagram{};
   std::size_t n = co_await build_udp(client.local_port(), client.remote_port(), *msg, node.address(),
                                      client.server(), span<std::uint8_t>(datagram));
   auto sent = co_await node.send(ip_proto_udp, client.server(), span<const std::uint8_t>(datagram.data(), n));

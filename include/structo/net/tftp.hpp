@@ -10,7 +10,7 @@
  *
  * @code
  * // Request to read "boot.bin" (octet mode); `pkt` must hold at least 2 + name + 1 + 6 bytes.
- * std::array<std::uint8_t, structo::net::tftp_max_packet> pkt{};
+ * reloco::array<std::uint8_t, structo::net::tftp_max_packet> pkt{};
  * auto n = structo::net::build_tftp_request(structo::net::tftp_rrq, "boot.bin", pkt);
  *
  * // Decode a reply (the UDP payload) from the server.
@@ -23,7 +23,7 @@
 
 #if RELOCO_HAS_COROUTINES
 
-#include <string_view>
+#include <reloco/string_view.hpp>
 
 namespace structo::net {
 
@@ -39,7 +39,7 @@ struct tftp_packet {
   std::uint16_t block = 0;      ///< DATA/ACK block number
   std::uint16_t error_code = 0; ///< ERROR code (RFC 1350 appendix)
   span<const std::uint8_t> data;
-  std::string_view message; ///< ERROR text (may be empty)
+  reloco::string_view message; ///< ERROR text (may be empty)
 };
 
 namespace detail {
@@ -51,10 +51,10 @@ inline void tftp_put16(span<std::uint8_t> out, std::size_t at, std::uint16_t v) 
 
 /** @brief Builds an RRQ or WRQ (`op`) for `filename` in octet mode; `error::out_of_range` if it doesn't fit,
  * `error::invalid_argument` for an empty name, a NUL in it, or a different opcode. */
-[[nodiscard]] inline result<std::size_t> build_tftp_request(std::uint16_t op, std::string_view filename,
+[[nodiscard]] inline result<std::size_t> build_tftp_request(std::uint16_t op, reloco::string_view filename,
                                                             span<std::uint8_t> out) noexcept {
-  constexpr std::string_view mode = "octet";
-  if ((op != tftp_rrq && op != tftp_wrq) || filename.empty() || filename.find('\0') != std::string_view::npos)
+  constexpr reloco::string_view mode = "octet";
+  if ((op != tftp_rrq && op != tftp_wrq) || filename.empty() || filename.find('\0') != reloco::string_view::npos)
     return unexpected(error::invalid_argument);
   const std::size_t total = 2 + filename.size() + 1 + mode.size() + 1;
   if (out.size() < total)
@@ -92,7 +92,7 @@ inline void tftp_put16(span<std::uint8_t> out, std::size_t at, std::uint16_t v) 
 }
 
 /** @brief Builds ERROR(`code`, `message`). */
-[[nodiscard]] inline result<std::size_t> build_tftp_error(std::uint16_t code, std::string_view message,
+[[nodiscard]] inline result<std::size_t> build_tftp_error(std::uint16_t code, reloco::string_view message,
                                                           span<std::uint8_t> out) noexcept {
   if (out.size() < 5 + message.size())
     return unexpected(error::out_of_range);
@@ -130,7 +130,7 @@ inline void tftp_put16(span<std::uint8_t> out, std::size_t at, std::uint16_t v) 
     std::size_t len = d.size() - 4;
     if (len > 0 && d[d.size() - 1] == 0)
       --len; // strip the terminator
-    p.message = std::string_view(reinterpret_cast<const char *>(d.data() + 4), len);
+    p.message = reloco::string_view(reinterpret_cast<const char *>(d.data() + 4), len);
     return p;
   }
   default:

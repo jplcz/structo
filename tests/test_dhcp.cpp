@@ -7,15 +7,24 @@
 #include <structo/hw/slip_device.hpp>
 #include <structo/net/dhcp_client.hpp>
 
-#include <deque>
-#include <vector>
+#include <reloco/vec_deque.hpp>
+
+#include "net_test_support.hpp"
 
 using namespace structo;
 using namespace structo::net;
+using net_test::append;
+using net_test::bytes;
+using net_test::make_bytes;
+using net_test::push;
 
 namespace {
 
-using bytes = std::vector<std::uint8_t>;
+class Udp : public ::testing::Test {};
+class Dhcp : public ::testing::Test {};
+class DhcpClient : public ::testing::Test {};
+class DhcpNode : public ::testing::Test {};
+class IpConfig : public ::testing::Test {};
 
 constexpr hw::net_mac_address mac{2, 0, 0, 0, 0, 9};
 constexpr ipv4_address server{10, 0, 0, 1};
@@ -23,7 +32,7 @@ constexpr ipv4_address leased{10, 0, 0, 50};
 
 // Builds a server reply (OFFER/ACK/NAK) the way a DHCP server would.
 bytes server_reply(std::uint8_t type, std::uint32_t xid, std::uint32_t lease_s, std::uint32_t t1_s = 0) {
-  bytes b(dhcp_fixed_size, 0);
+  bytes b = make_bytes(dhcp_fixed_size, 0);
   b[0] = 2;
   b[1] = 1;
   b[2] = 6;
@@ -35,11 +44,13 @@ bytes server_reply(std::uint8_t type, std::uint32_t xid, std::uint32_t lease_s, 
   for (std::size_t i = 0; i < 6; ++i)
     b[28 + i] = mac[i];
   auto opt = [&](std::uint8_t code, std::initializer_list<std::uint8_t> v) {
-    b.push_back(code);
-    b.push_back(static_cast<std::uint8_t>(v.size()));
-    b.insert(b.end(), v.begin(), v.end());
+    push(b, code);
+    push(b, static_cast<std::uint8_t>(v.size()));
+    for (auto x : v)
+      push(b, x);
   };
-  b.insert(b.end(), {0x63, 0x82, 0x53, 0x63});
+  const bytes cookie = make_bytes({0x63, 0x82, 0x53, 0x63});
+  append(b, cookie);
   opt(53, {type});
   opt(54, {10, 0, 0, 1});
   opt(1, {255, 255, 255, 0});
@@ -49,16 +60,16 @@ bytes server_reply(std::uint8_t type, std::uint32_t xid, std::uint32_t lease_s, 
            static_cast<std::uint8_t>(lease_s >> 8), static_cast<std::uint8_t>(lease_s)});
   if (t1_s)
     opt(58, {0, 0, static_cast<std::uint8_t>(t1_s >> 8), static_cast<std::uint8_t>(t1_s)});
-  b.push_back(255);
+  push(b, 255);
   return b;
 }
 
 // Wraps a BOOTP payload as an IPv4/UDP packet from the server to the client port.
 bytes wrap(const bytes &bootp, ipv4_address dst = ipv4_address{255, 255, 255, 255}) {
-  bytes udp(udp_header_size + bootp.size());
+  bytes udp = make_bytes(udp_header_size + bootp.size(), 0);
   auto u = build_udp(dhcp_server_port, dhcp_client_port, bootp, server, dst, udp);
   EXPECT_TRUE(u.has_value());
-  bytes ip(ipv4_header_size + udp.size());
+  bytes ip = make_bytes(ipv4_header_size + udp.size(), 0);
   ipv4_header h;
   h.protocol = ip_proto_udp;
   h.src = server;
@@ -72,10 +83,10 @@ std::uint32_t xid_of(span<const std::uint8_t> m) {
          (static_cast<std::uint32_t>(m[6]) << 8) | m[7];
 }
 
-TEST(Udp, RoundTripAndChecksum) {
-  const bytes payload{1, 2, 3};
+TEST_F(Udp, RoundTripAndChecksum) {
+  const bytes payload = make_bytes({1, 2, 3});
   const ipv4_address a{10, 0, 0, 1}, b{10, 0, 0, 2};
-  bytes out(udp_header_size + payload.size());
+  bytes out = make_bytes(udp_header_size + payload.size(), 0);
   ASSERT_TRUE(build_udp(1000, 2000, payload, a, b, out).has_value());
   auto d = parse_udp(out, a, b);
   ASSERT_TRUE(d.has_value());
@@ -90,14 +101,14 @@ TEST(Udp, RoundTripAndChecksum) {
   EXPECT_TRUE(parse_udp(out, a, b).has_value());
 }
 
-TEST(Dhcp, BuildAndParseRoundTrip) {
+TEST_F(Dhcp, BuildAndParseRoundTrip) {
   dhcp_request_fields f;
   f.type = dhcp_request;
   f.xid = 0xAABBCCDD;
   f.mac = mac;
   f.requested_address = leased;
   f.server_id = server;
-  bytes out(dhcp_max_request_size);
+  bytes out = make_bytes(dhcp_max_request_size, 0);
   auto n = build_dhcp(f, out);
   ASSERT_TRUE(n.has_value());
   EXPECT_EQ(out[0], 1); // BOOTREQUEST
@@ -122,7 +133,7 @@ TEST(Dhcp, BuildAndParseRoundTrip) {
   auto bad = server_reply(dhcp_offer, 7, 600);
   bad[dhcp_fixed_size] = 0;
   EXPECT_FALSE(parse_dhcp(bad).has_value());
-  const bytes tiny(10, 0);
+  const bytes tiny = make_bytes(10, 0);
   EXPECT_FALSE(parse_dhcp(tiny).has_value());
 }
 
@@ -144,7 +155,7 @@ struct handshake {
   }
 };
 
-TEST(DhcpClient, FullLeaseCycleWithRenewAndExpiry) {
+TEST_F(DhcpClient, FullLeaseCycleWithRenewAndExpiry) {
   handshake h;
   EXPECT_EQ(h.c.state(), dhcp_state::init);
   const auto xid = h.discover();
@@ -196,7 +207,7 @@ TEST(DhcpClient, FullLeaseCycleWithRenewAndExpiry) {
   EXPECT_EQ(h.c.state(), dhcp_state::selecting);
 }
 
-TEST(DhcpClient, NakRestartsAndIgnoresOtherTraffic) {
+TEST_F(DhcpClient, NakRestartsAndIgnoresOtherTraffic) {
   handshake h;
   const auto xid = h.discover();
   EXPECT_TRUE(h.feed(wrap(server_reply(dhcp_offer, xid, 600))));
@@ -205,10 +216,10 @@ TEST(DhcpClient, NakRestartsAndIgnoresOtherTraffic) {
   EXPECT_EQ(h.c.state(), dhcp_state::init);
 
   // UDP to another port is not ours.
-  bytes udp(udp_header_size + 1);
-  const bytes one{0};
+  bytes udp = make_bytes(udp_header_size + 1, 0);
+  const bytes one = make_bytes({0});
   ASSERT_TRUE(build_udp(1, 2, one, server, leased, udp).has_value());
-  bytes ip(ipv4_header_size + udp.size());
+  bytes ip = make_bytes(ipv4_header_size + udp.size(), 0);
   ipv4_header hdr;
   hdr.protocol = ip_proto_udp;
   hdr.src = server;
@@ -220,8 +231,8 @@ TEST(DhcpClient, NakRestartsAndIgnoresOtherTraffic) {
 // ---- node integration over SLIP ------------------------------------------
 
 struct fake_uart {
-  std::deque<std::uint8_t> rx;
-  std::vector<std::uint8_t> tx;
+  reloco::vec_deque<std::uint8_t> rx;
+  bytes tx;
 };
 
 } // namespace
@@ -231,19 +242,18 @@ template <> struct structo::hw::uart_traits<fake_uart> {
   static reloco::result<bool> tx_ready(fake_uart &) noexcept { return true; }
   static reloco::result<bool> rx_ready(fake_uart &b) noexcept { return !b.rx.empty(); }
   static reloco::result<void> try_put_byte(fake_uart &b, std::uint8_t v) noexcept {
-    b.tx.push_back(v);
-    return {};
+    return b.tx.try_push_back(v);
   }
   static reloco::result<std::uint8_t> try_get_byte(fake_uart &b) noexcept {
-    auto v = b.rx.front();
-    b.rx.pop_front();
+    auto v = b.rx[0];
+    (void)b.rx.try_pop_front();
     return v;
   }
 };
 
 namespace {
 
-TEST(DhcpNode, LeasesAddressOverSlip) {
+TEST_F(DhcpNode, LeasesAddressOverSlip) {
   fake_uart uart;
   hw::slip_device<600> slip{hw::uart_ref{uart}};
   hw::polled_net_device<hw::slip_device<600>> pnd{slip};
@@ -268,13 +278,13 @@ TEST(DhcpNode, LeasesAddressOverSlip) {
   EXPECT_TRUE(tx.take().has_value());
 
   // Decode what went out on the wire: IPv4 0.0.0.0 -> 255.255.255.255, UDP 68 -> 67, DISCOVER.
-  std::array<std::uint8_t, 700> buf{};
+  reloco::array<std::uint8_t, 700> buf{};
   hw::slip_decoder dec(buf);
   bytes frame;
-  for (auto b : uart.tx)
-    if (dec.push(b)) {
+  for (std::size_t i = 0; i < uart.tx.size(); ++i)
+    if (dec.push(uart.tx[i])) {
       auto f = dec.frame();
-      frame.assign(f.begin(), f.end());
+      frame = make_bytes(f);
     }
   uart.tx.clear();
   auto ipp = parse_ipv4(frame);
@@ -289,10 +299,11 @@ TEST(DhcpNode, LeasesAddressOverSlip) {
   const auto xid = xid_of(udp->payload);
 
   auto inject = [&](const bytes &pkt) {
-    std::array<std::uint8_t, 800> w{};
+    reloco::array<std::uint8_t, 800> w{};
     auto n = hw::slip_encode(pkt, w);
     ASSERT_TRUE(n.has_value());
-    uart.rx.insert(uart.rx.end(), w.begin(), w.begin() + static_cast<std::ptrdiff_t>(n.value()));
+    for (std::size_t i = 0; i < n.value(); ++i)
+      ASSERT_TRUE(uart.rx.try_push_back(w[i]).has_value());
     pnd.poll();
   };
   inject(wrap(server_reply(dhcp_offer, xid, 3600)));
@@ -309,7 +320,7 @@ TEST(DhcpNode, LeasesAddressOverSlip) {
   EXPECT_EQ(ip.config().dns, (ipv4_address{10, 0, 0, 53}));
 }
 
-TEST(IpConfig, StaticConfigurationAndUnconfiguredNodeIgnoresPing) {
+TEST_F(IpConfig, StaticConfigurationAndUnconfiguredNodeIgnoresPing) {
   fake_uart uart;
   hw::slip_device<128> slip{hw::uart_ref{uart}};
   hw::polled_net_device<hw::slip_device<128>> pnd{slip};

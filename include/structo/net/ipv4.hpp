@@ -23,7 +23,7 @@
  *   handle_udp(pkt->payload);            // payload view into `frame`
  *
  * // Build one: protocol, src, dst, payload; `out` must not overlap `payload`.
- * std::array<std::uint8_t, 128> out;
+ * reloco::array<std::uint8_t, 128> out;
  * auto n = build_ipv4({ip_proto_udp, me, peer}, payload, out); // -> bytes written
  * @endcode
  */
@@ -35,7 +35,7 @@
 #include <reloco/error.hpp>
 #include <reloco/span.hpp>
 
-#include <array>
+#include <reloco/array.hpp>
 #include <cstddef>
 #include <cstdint>
 
@@ -51,7 +51,7 @@ inline constexpr std::size_t ipv4_header_size = 20; ///< Header without options.
 
 /** @brief IPv4 address in network byte order. */
 struct ipv4_address {
-  std::array<std::uint8_t, 4> octets{};
+  reloco::array<std::uint8_t, 4> octets{};
 
   constexpr ipv4_address() noexcept = default;
   constexpr ipv4_address(std::uint8_t a, std::uint8_t b, std::uint8_t c, std::uint8_t d) noexcept

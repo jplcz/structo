@@ -243,7 +243,7 @@ private:
   std::uint64_t lease_end_ms_ = 0;
   std::uint32_t generation_ = 0;
   std::uint32_t applied_generation_ = 0;
-  std::array<std::uint8_t, dhcp_max_request_size> buf_{};
+  reloco::array<std::uint8_t, dhcp_max_request_size> buf_{};
 };
 
 /**
@@ -259,7 +259,7 @@ template <std::size_t Mtu>
   if (!msg)
     co_return;
   const ipv4_address broadcast{255, 255, 255, 255};
-  std::array<std::uint8_t, udp_header_size + dhcp_max_request_size> datagram{};
+  reloco::array<std::uint8_t, udp_header_size + dhcp_max_request_size> datagram{};
   std::size_t n = co_await build_udp(dhcp_client_port, dhcp_server_port, *msg, node.address(), broadcast,
                                      span<std::uint8_t>(datagram));
   auto sent = co_await node.send(ip_proto_udp, broadcast, span<const std::uint8_t>(datagram.data(), n));

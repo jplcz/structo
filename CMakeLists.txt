@@ -424,7 +424,8 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_slip_device.cpp
         tests/test_ipv4.cpp
         tests/test_dhcp.cpp
-        tests/test_tftp.cpp)
+        tests/test_tftp.cpp
+        tests/test_arp.cpp)
     target_link_libraries(jplcz_structo_coroutine_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)
     set_target_properties(jplcz_structo_coroutine_tests PROPERTIES
@@ -507,7 +508,9 @@ if(JPLCZ_STRUCTO_BUILD_HEADER_CHECKS)
         list(APPEND JPLCZ_STRUCTO_HEADER_CHECK_TARGETS jplcz_structo_headers_cxx23)
     endif()
 
-    add_custom_target(jplcz_structo_check_public_headers
+    # Part of the default `all` target: every ordinary build compiles all
+    # public headers under C++17/20/23.
+    add_custom_target(jplcz_structo_check_public_headers ALL
         DEPENDS ${JPLCZ_STRUCTO_HEADER_CHECK_TARGETS}
     )
 endif()

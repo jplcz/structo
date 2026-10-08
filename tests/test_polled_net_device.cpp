@@ -5,18 +5,21 @@
 #include <gtest/gtest.h>
 #include <structo/hw/polled_net_device.hpp>
 
-#include <array>
-#include <deque>
-#include <vector>
+#include <reloco/vec_deque.hpp>
+
+#include "net_test_support.hpp"
 
 using namespace structo;
 using namespace structo::hw;
+using net_test::bytes;
+using net_test::bytes_equal;
+using net_test::make_bytes;
 
 namespace {
 
 struct fake_nic {
-  std::deque<std::vector<std::uint8_t>> rx;
-  std::vector<std::vector<std::uint8_t>> tx;
+  reloco::vec_deque<bytes> rx;
+  reloco::vector<bytes> tx;
   std::size_t tx_room = 0;
   bool up = true;
 };
@@ -32,17 +35,19 @@ struct fake_nic_backend {
     if (n.tx_room == 0)
       return reloco::unexpected(reloco::error::try_again);
     --n.tx_room;
-    n.tx.emplace_back(f.begin(), f.end());
+    if (!n.tx.try_push_back(make_bytes(f)))
+      return reloco::unexpected(reloco::error::allocation_failed);
     return {};
   }
   reloco::result<std::size_t> try_receive(reloco::span<std::uint8_t> dst) noexcept {
     if (n.rx.empty())
       return reloco::unexpected(reloco::error::try_again);
-    if (n.rx.front().size() > dst.size())
+    if (n.rx[0].size() > dst.size())
       return reloco::unexpected(reloco::error::out_of_range);
-    auto len = n.rx.front().size();
-    std::copy(n.rx.front().begin(), n.rx.front().end(), dst.begin());
-    n.rx.pop_front();
+    auto len = n.rx[0].size();
+    for (std::size_t i = 0; i < len; ++i)
+      dst[i] = n.rx[0][i];
+    (void)n.rx.try_pop_front();
     return len;
   }
 };
@@ -60,6 +65,7 @@ struct slip_backend {
 using fake_dev = polled_net_device<fake_nic_backend>;
 
 struct fixture {
+  void push_rx(bytes b) { ASSERT_TRUE(nic.rx.try_push_back(std::move(b)).has_value()); }
   fake_nic nic;
   fake_nic_backend be{nic};
   fake_dev dev{be};
@@ -68,14 +74,17 @@ struct fixture {
 
 namespace {
 
+class NetDeviceRef : public ::testing::Test {};
+class PolledNetDevice : public ::testing::Test {};
+
 reloco::task<std::size_t> echo_one(net_device_ref nic) {
-  std::array<std::uint8_t, 64> buf;
+  reloco::array<std::uint8_t, 64> buf;
   std::size_t n = co_await co_await nic.receive(buf);
   co_await co_await nic.send({buf.data(), n});
   co_return n;
 }
 
-TEST(NetDeviceRef, Basics) {
+TEST_F(NetDeviceRef, Basics) {
   fixture f;
   EXPECT_EQ(f.ref.mtu(), 64u);
   EXPECT_TRUE(f.ref.link_up().value());
@@ -91,26 +100,26 @@ TEST(NetDeviceRef, Basics) {
   EXPECT_FALSE(unbound);
   EXPECT_EQ(unbound.mtu(), 0u);
   EXPECT_EQ(unbound.link_up().error(), reloco::error::unsupported_operation);
-  std::array<std::uint8_t, 4> b;
+  reloco::array<std::uint8_t, 4> b;
   auto t = unbound.receive(b);
   t.resume();
   ASSERT_TRUE(t.done());
   EXPECT_EQ(t.take().error(), reloco::error::unsupported_operation);
 }
 
-TEST(PolledNetDevice, ImmediateCompletionNeverSuspends) {
+TEST_F(PolledNetDevice, ImmediateCompletionNeverSuspends) {
   fixture f;
-  f.nic.rx.push_back({1, 2, 3});
+  f.push_rx(make_bytes({1, 2, 3}));
   f.nic.tx_room = 1;
   auto t = echo_one(f.ref);
   t.resume();
   ASSERT_TRUE(t.done());
   EXPECT_EQ(t.take().value(), 3u);
   ASSERT_EQ(f.nic.tx.size(), 1u);
-  EXPECT_EQ(f.nic.tx[0], (std::vector<std::uint8_t>{1, 2, 3}));
+  EXPECT_TRUE(bytes_equal(f.nic.tx[0], make_bytes({1, 2, 3})));
 }
 
-TEST(PolledNetDevice, SuspendsUntilPolled) {
+TEST_F(PolledNetDevice, SuspendsUntilPolled) {
   fixture f;
   auto t = echo_one(f.ref);
   t.resume();
@@ -118,7 +127,7 @@ TEST(PolledNetDevice, SuspendsUntilPolled) {
   EXPECT_TRUE(f.dev.receive_pending());
   EXPECT_EQ(f.dev.poll(), 0u);
 
-  f.nic.rx.push_back({9, 8});
+  f.push_rx(make_bytes({9, 8}));
   EXPECT_EQ(f.dev.poll(), 1u); // frame received, then parks on TX
   EXPECT_FALSE(t.done());
   EXPECT_FALSE(f.dev.receive_pending());
@@ -129,19 +138,19 @@ TEST(PolledNetDevice, SuspendsUntilPolled) {
   EXPECT_EQ(f.dev.poll(), 1u);
   ASSERT_TRUE(t.done());
   EXPECT_EQ(t.take().value(), 2u);
-  EXPECT_EQ(f.nic.tx[0], (std::vector<std::uint8_t>{9, 8}));
+  EXPECT_TRUE(bytes_equal(f.nic.tx[0], make_bytes({9, 8})));
 }
 
-TEST(PolledNetDevice, HardErrorPropagates) {
+TEST_F(PolledNetDevice, HardErrorPropagates) {
   fixture f;
-  f.nic.rx.push_back(std::vector<std::uint8_t>(100, 0)); // larger than the 64-byte buffer
+  f.push_rx(make_bytes(100, 0)); // larger than the 64-byte buffer
   auto t = echo_one(f.ref);
   t.resume();
   ASSERT_TRUE(t.done());
   EXPECT_EQ(t.take().error(), reloco::error::out_of_range);
 }
 
-TEST(PolledNetDevice, SecondReceiverIsBusy) {
+TEST_F(PolledNetDevice, SecondReceiverIsBusy) {
   fixture f;
   auto a = echo_one(f.ref);
   auto b = echo_one(f.ref);
@@ -152,7 +161,7 @@ TEST(PolledNetDevice, SecondReceiverIsBusy) {
   EXPECT_EQ(b.take().error(), reloco::error::busy);
 }
 
-TEST(PolledNetDevice, DroppingParkedTaskUnparks) {
+TEST_F(PolledNetDevice, DroppingParkedTaskUnparks) {
   fixture f;
   {
     auto t = echo_one(f.ref);

@@ -42,7 +42,7 @@
  * structo::hw::net_device_ref dev{nic};                  // the coroutine interface
  *
  * reloco::task<void> echo(structo::hw::net_device_ref dev) {
- *   std::array<std::uint8_t, 1500> buf; // must outlive each co_await
+ *   reloco::array<std::uint8_t, 1500> buf; // must outlive each co_await
  *   for (;;) {
  *     // The inner co_await suspends until a frame arrives, yielding a
  *     // result<size_t>; the outer one unwraps it or ends the task with the error.

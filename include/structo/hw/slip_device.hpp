@@ -45,7 +45,7 @@
 #include <reloco/error.hpp>
 #include <reloco/span.hpp>
 
-#include <array>
+#include <reloco/array.hpp>
 #include <cstddef>
 #include <cstdint>
 
@@ -252,8 +252,8 @@ public:
 
 private:
   uart_ref uart_;
-  std::array<std::uint8_t, Mtu> rx_{};
-  std::array<std::uint8_t, slip_max_encoded_size(Mtu)> tx_{};
+  reloco::array<std::uint8_t, Mtu> rx_{};
+  reloco::array<std::uint8_t, slip_max_encoded_size(Mtu)> tx_{};
   slip_decoder dec_;
   std::size_t tx_len_ = 0;
   std::size_t tx_pos_ = 0;

@@ -132,7 +132,7 @@ private:
     if (tx_busy_)
       co_await unexpected(error::busy);
     flag_guard guard{tx_busy_};
-    std::array<std::uint8_t, Mtu> icmp{};
+    reloco::array<std::uint8_t, Mtu> icmp{};
     std::size_t m = co_await build_icmp_echo(icmp_echo_reply, req.id, req.seq, req.data, span<std::uint8_t>(icmp));
     ipv4_header h;
     h.protocol = ip_proto_icmp;
@@ -146,8 +146,8 @@ private:
 
   hw::net_device_ref dev_;
   ipv4_config cfg_;
-  std::array<std::uint8_t, Mtu> rx_{};
-  std::array<std::uint8_t, Mtu> tx_{};
+  reloco::array<std::uint8_t, Mtu> rx_{};
+  reloco::array<std::uint8_t, Mtu> tx_{};
   std::uint16_t next_id_ = 1;
   bool rx_busy_ = false;
   bool tx_busy_ = false;

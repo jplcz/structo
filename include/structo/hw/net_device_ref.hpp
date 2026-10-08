@@ -52,7 +52,7 @@
 #include <reloco/lifetime.hpp>
 #include <reloco/span.hpp>
 
-#include <array>
+#include <reloco/array.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -66,7 +66,7 @@ using namespace reloco;
 namespace hw {
 
 /** @brief 48-bit link-layer (Ethernet) address. */
-using net_mac_address = std::array<std::uint8_t, 6>;
+using net_mac_address = reloco::array<std::uint8_t, 6>;
 
 /** @brief Customization point; left undefined for backends that haven't opted in. */
 template <typename Backend> struct net_device_traits;
