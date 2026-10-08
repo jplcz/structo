@@ -33,6 +33,9 @@ Contents:
 12. [Direct virtqueues over shared memory, without a virtio bus](#12-direct-virtqueues-over-shared-memory-without-a-virtio-bus)
 13. [A custom hypercall virtio transport and a structo logger device](#13-a-custom-hypercall-virtio-transport-and-a-structo-logger-device)
 14. [rpmsg: message passing with a Linux or FreeBSD guest](#14-rpmsg-message-passing-with-a-linux-or-freebsd-guest)
+16. [Console, rng and balloon devices](#16-console-rng-and-balloon-devices)
+17. [GPU device (2D)](#17-gpu-device-2d)
+18. [Assigning virtio device IDs](#18-assigning-virtio-device-ids)
 
 ---
 
@@ -4629,3 +4632,53 @@ struct window_display {
 - Tests: `tests/test_virtio_gpu.cpp`, driving the device with the library's own `split_virtq_driver`.
 - Demo: `examples/sdl3_virtio_gpu_demo.cpp` runs a tiny in-process guest driver against the device and
   shows the result in an SDL3 window (built only when SDL3 is found).
+
+## 18. Assigning virtio device IDs
+
+Every `Function` reports a `device_id` through the transport (`DeviceID` register on MMIO). The
+number decides which guest driver binds, so it must not be invented casually.
+
+```cpp
+// Registered type: use the number from the virtio spec "Device Types" table and expose it as a
+// named constant, never a bare literal. The transport reads Function::device_id.
+namespace gpu { inline constexpr std::uint32_t device_id = 16; }
+
+// Private device: a number that is NOT in the spec table (see rules below). Keep it in one
+// named constant so it can be changed if the spec later claims it.
+namespace my_log { inline constexpr std::uint32_t device_id = 0x2001; }
+
+struct my_log_function {
+  static constexpr std::uint32_t device_id = my_log::device_id;  // reported by the transport
+  // ... queue_count, queue_max_size, device_features(), process(), ...
+};
+```
+
+**IDs implemented by structo**
+
+| ID | Device | Header |
+|----|--------|--------|
+| 2  | block   | `virtio_blk.hpp` |
+| 3  | console | `virtio_console.hpp` |
+| 4  | entropy (rng) | `virtio_rng.hpp` |
+| 5  | balloon | `virtio_balloon.hpp` |
+| 7  | rpmsg   | `virtio_rpmsg.hpp` |
+| 16 | GPU (2D) | `virtio_gpu.hpp` |
+
+**Rules**
+- **Registered IDs** are assigned only by the OASIS Virtio Technical Committee. To get one, propose a
+  device specification (config layout, queues, feature bits, behaviour) to the TC through
+  `virtio-comment` or `oasis-tcs/virtio-spec`. Do this only for generic, interoperable devices.
+- **ID 0** means "no device"; the guest ignores the slot.
+- **Private devices** must not reuse a number from the registered range, since a later spec revision
+  may assign it. Pick a high number, check it against the current spec table, and record it in your
+  own documentation. A private ID has no upstream guest driver, so you ship the guest driver too.
+- **Extending a registered device** is done with its device-specific feature bits (24-40), not with
+  a new ID.
+- **Hypercall and ivshmem transports** (sections 12-13) carry the same ID, so a guest driver written
+  for MMIO works unchanged.
+
+**PCI mapping** (for a future `virtio_pci` transport)
+- Vendor ID `0x1AF4`; modern device ID is `0x1040` plus the virtio ID; legacy/transitional use
+  `0x1000-0x103F`.
+- Do not mint your own `0x1AF4` device IDs outside that formula. A fully custom (non-virtio) PCI
+  device should use its own vendor ID.
