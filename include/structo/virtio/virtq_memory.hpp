@@ -98,7 +98,7 @@ template <typename Mem, typename Space> struct virtq_memory_traits;
 template <typename T, typename Mem, typename Space>
 [[nodiscard]] reloco::result<T> try_read_object(Mem &mem, phys_addr<void, Space> addr) noexcept {
   static_assert(std::is_trivially_copyable_v<T>, "try_read_object requires a trivially copyable type");
-  T value;
+  T value{}; // zeroed so the snapshot is defined even if the backend fills it only partially
   auto r = virtq_memory_traits<Mem, Space>::try_read(
       mem, addr, reloco::span<std::byte>(reinterpret_cast<std::byte *>(&value), sizeof(T)));
   if (!r)

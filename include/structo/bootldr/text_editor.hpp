@@ -349,16 +349,18 @@ public:
    * an insert failure is returned as the error (the key is ignored).
    */
   [[nodiscard]] reloco::result<edit_action> handle(const key_event &ev) noexcept {
-    reloco::result<void> r;
     switch (ev.code) {
     case key_code::character:
-      r = insert(ev.ch);
+      if (auto r = insert(ev.ch); !r)
+        return reloco::unexpected(r.error());
       break;
     case key_code::enter:
-      r = insert('\n');
+      if (auto r = insert('\n'); !r)
+        return reloco::unexpected(r.error());
       break;
     case key_code::tab:
-      r = insert_tab();
+      if (auto r = insert_tab(); !r)
+        return reloco::unexpected(r.error());
       break;
     case key_code::backspace:
       backspace();
@@ -401,8 +403,6 @@ public:
     case key_code::none:
       break;
     }
-    if (!r)
-      return reloco::unexpected(r.error());
     return edit_action::none;
   }
 
