@@ -1,0 +1,163 @@
+<!--
+SPDX-FileCopyrightText: 2026 Jarosław Pelczar <jarek@jpelczar.com>
+
+SPDX-License-Identifier: BSD-2-Clause
+-->
+
+# Guide: running the bootloader netstack over a serial port
+
+C++20 only. `bootldr::netstack` (`bootldr/netstack.hpp`) runs the network
+stack as two tasks of a `bootldr::scheduler`, over a SLIP link on a polled
+UART. Today it provides a static or DHCP-assigned IPv4 address and answers
+ping; it has **no socket-style protocols yet** (no UDP/TCP endpoints), only a
+raw packet hook.
+
+```
+netstack           (bootldr/netstack.hpp)       rx task + timer task, DHCP, ping
+scheduler          (bootldr/scheduler.hpp)      runs tasks, polls the device
+ipv4_node          (net/ipv4_node.hpp)          IPv4 carrier
+polled_net_device  (hw/polled_net_device.hpp)   parks coroutines until poll()
+slip_device        (hw/slip_device.hpp)         RFC 1055 framing
+uart_ref           (hw/uart_ref.hpp)            your UART
+```
+
+## 1. Host setup (Linux)
+
+```sh
+# Attach SLIP to the serial port; creates sl0.
+# -L: 3-wire cable, -s: baud rate (must match the board's uart_config).
+sudo slattach -L -p slip -s 115200 /dev/ttyUSB0 &
+
+# Point-to-point link: host 192.168.7.1 <-> board 192.168.7.2 (static case).
+sudo ip addr add 192.168.7.1 peer 192.168.7.2/32 dev sl0
+sudo ip link set sl0 mtu 1006 up   # must equal the Mtu used on the board
+```
+
+For **DHCP** instead of a static address, also run a DHCP server on `sl0`
+(the board then ignores the peer address above):
+
+```sh
+sudo dnsmasq --no-daemon --port=0 --interface=sl0 --bind-interfaces \
+     --dhcp-range=192.168.7.2,192.168.7.2,255.255.255.0,1h
+```
+
+## 2. Bind your UART
+
+Specialize `uart_traits` for your hardware once (see
+[tftp_over_slip.md](tftp_over_slip.md#2-bind-your-uart) and
+[uart_ref.md](uart_ref.md)): `configure`, `tx_ready`, `rx_ready`,
+`try_put_byte`, `try_get_byte`.
+
+## 3. Build and start the stack
+
+```cpp
+#include <structo/bootldr/netstack.hpp>
+#include <structo/hw/slip_device.hpp>
+
+using namespace structo;
+
+constexpr std::size_t mtu = 1006; // largest IP datagram; keep equal to the host's sl0 MTU
+
+// Monotonic millisecond clock (timer register, SysTick counter ...).
+// The scheduler uses it for sleeps; the stack uses it for DHCP timeouts.
+std::uint64_t now_ms(void *) noexcept;
+
+int main() {
+  my_uart hw_uart;
+  hw::uart_ref uart{hw_uart};                        // type-erased handle over your UART
+  hw::slip_device<mtu> slip{uart};                   // frames IP datagrams onto the UART
+  hw::polled_net_device<decltype(slip)> pnd{slip};   // adapts the polled device to coroutines
+  hw::net_device_ref nic{pnd};                       // the handle the stack talks to
+
+  bootldr::scheduler sched;                          // task table from reloco::default_allocator()
+  sched.set_clock(now_ms, nullptr);                  // required: sleeps and DHCP timers need time
+
+  bootldr::netstack_config cfg;
+  // Static address: used immediately, no server needed.
+  cfg.static_ip = net::ipv4_config::make_static(
+      {192, 168, 7, 2},    // our address
+      {255, 255, 255, 0},  // netmask
+      {192, 168, 7, 1});   // gateway (optional)
+  // Or DHCP: leave static_ip empty and set cfg.dhcp = true. A leased
+  // address replaces the static one; the lease is renewed automatically.
+  // cfg.dhcp = true;
+  // cfg.xid_seed = read_hw_random();                // makes DHCP transaction ids device-unique
+  // cfg.mac = {2, 0, 0, 0, 0, 1};                   // DHCP chaddr; SLIP has none, any local MAC works
+
+  bootldr::netstack<mtu> net{sched, nic, cfg};       // must outlive the scheduler run
+  if (!net.poll_with(pnd))                           // sched calls pnd.poll() at the start of every round
+    return 1;                                        // (allocation failed)
+  if (!net.start())                                  // spawns the rx and timer tasks
+    return 1;
+
+  // Your own work runs as further tasks of the same scheduler.
+  // sched.spawn(boot_flow(reloco::allocator_arg, sched.allocator(), sched, net));
+
+  sched.run();                                       // loops until every task finished (the
+                                                     // netstack tasks run until stop())
+}
+```
+
+The `Mtu` template argument sizes the RX and TX buffers inside the node, so
+the stack allocates nothing per packet. Everything else (task table, coroutine
+frames) comes from the scheduler's allocator.
+
+## 4. Waiting for the network from your own task
+
+```cpp
+// A boot task that must not start before the board has an IP address.
+reloco::task<void> boot_flow(reloco::allocator_arg_t, reloco::allocator_ref,
+                             bootldr::scheduler &sched, bootldr::netstack<mtu> &net) {
+  // Poll ready() every 100 ms. Inner co_await sleeps; the outer one unwraps
+  // the result<void> (it fails only if the scheduler has no clock).
+  while (!net.ready())
+    co_await co_await sched.sleep_for(100);
+  // net.config().address / .gateway / .dns now hold the active configuration.
+  // ... start the next stage ...
+}
+```
+
+## 5. Verify
+
+```sh
+ping -c3 192.168.7.2        # answered by the stack's ICMP echo handler
+```
+
+In code, `net.stats()` counts handled/dropped datagrams and RX/TX errors, and
+`net.dhcp_state()` shows the DHCP progress (`selecting` forever = no server
+reachable; check `slattach`, baud and MTU).
+
+## 6. Handling other protocols (raw hook)
+
+Anything that is not DHCP or an ICMP echo request goes to the packet handler
+(or is counted in `stats().rx_dropped`). It is the attach point for future UDP
+/TCP layers and can be used today to experiment:
+
+```cpp
+// Called from the rx task for every other IPv4 datagram addressed to us.
+// `pkt` (and its payload view) is valid only during the call: copy what you need.
+void on_packet(void *ctx, const net::ipv4_packet &pkt) noexcept {
+  if (pkt.header.protocol == net::ip_proto_udp) {
+    // parse_udp(pkt.payload, pkt.header.src, pkt.header.dst) ...
+  }
+}
+
+net.set_packet_handler(on_packet, /*ctx=*/nullptr);
+```
+
+The handler must not block (no waiting inside it); hand the data to another
+task, e.g. through a `bootldr::scheduler::event`. To transmit, use
+`net.ip().send(proto, dst, payload)` from a task (one send in flight at a time;
+the stack's own DHCP sender shares this slot, so a second concurrent send
+fails with `error::busy`: retry after a `yield()`).
+
+## Notes
+
+- Drive everything from one thread; the scheduler is not thread-safe. If an
+  interrupt handler feeds the UART, keep it to filling a FIFO that
+  `try_get_byte` drains.
+- `net.stop()` cancels the tasks; the destructor does the same, so declare
+  the stack *after* the scheduler (destroyed first).
+- For a TFTP client on top of the same link see
+  [tftp_over_slip.md](tftp_over_slip.md); it currently drives `ipv4_node`
+  directly rather than through `netstack`.

@@ -77,6 +77,7 @@ have a linked, standalone page going into more depth.
 | `net/dhcp_client.hpp` | `structo::net::dhcp_client`, `structo::net::dhcp_send_due` | C++20-only DHCPv4 client state machine (backoff, renew, expiry; caller-supplied millisecond clock) plus coroutine helper that transmits its messages through `ipv4_node` |
 | `net/tftp.hpp` | `structo::net::build_tftp_request`/`parse_tftp` | C++20-only TFTP (RFC 1350) packet codec: RRQ/WRQ/DATA/ACK/ERROR, octet mode |
 | `net/tftp_client.hpp` | `structo::net::tftp_client`, `structo::net::tftp_send_due` | C++20-only TFTP client state machine (read/write, lock-step, retransmit/timeout via caller-supplied millisecond clock) plus coroutine helper that transmits its packets through `ipv4_node` |
+| *(guide)* [`netstack_bootloader.md`](netstack_bootloader.md) | n/a | Step-by-step guide: running `bootldr::netstack` over a serial SLIP port (host setup, UART, scheduler, static/DHCP, verification) |
 | *(guide)* [`tftp_over_slip.md`](tftp_over_slip.md) | n/a | Step-by-step guide: TFTP client over a serial SLIP link (UART, SLIP, node, client, main loop, upload) |
 | `net/arp.hpp` | `structo::net::build_arp`/`parse_arp` | C++20-only ARP (RFC 826) Ethernet/IPv4 packet codec |
 | `net/arp_table.hpp` | `structo::net::arp_table` | C++20-only sans-IO ARP cache and resolver (answers requests, learns mappings, retries/expiry via caller-supplied millisecond clock, static entries, gratuitous announce) |
@@ -256,5 +257,6 @@ Usage guide: [virtq.md](virtq.md). Split and packed rings are both supported by 
 
 | Header | Type(s) | One-line summary |
 |---|---|---|
+| `bootldr/netstack.hpp` | `bootldr::netstack<Mtu>`, `bootldr::netstack_config`, `bootldr::netstack_stats` | C++20 network stack for the bootloader running as scheduler tasks: static IP or DHCP, ping, raw packet handler hook; no socket protocols yet |
 | `bootldr/scheduler.hpp` | `bootldr::scheduler`, `scheduler::event`, `bootldr::spawn_mode`, `bootldr::task_id` | C++20 cooperative coroutine scheduler for `reloco::task<void>`; storage from a `reloco::allocator_ref`; `yield`/`sleep_for`/`sleep_until`/`join`/`event` awaitables, pollers, fault handler |
 | [`bootldr/xmodem.hpp`](xmodem.md) | `bootldr::xmodem_receiver`, `bootldr::xmodem_sender`, `bootldr::receive`/`send`, `bootldr::xmodem_crc16` | Allocation-free, sans-IO XMODEM / XMODEM-CRC / XMODEM-1K state machines for loading images over a serial line, plus blocking drivers over `hw::uart_ref` |

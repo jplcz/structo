@@ -426,7 +426,8 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_dhcp.cpp
         tests/test_tftp.cpp
         tests/test_arp.cpp
-        tests/test_scheduler.cpp)
+        tests/test_scheduler.cpp
+        tests/test_netstack.cpp)
     target_link_libraries(jplcz_structo_coroutine_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)
     set_target_properties(jplcz_structo_coroutine_tests PROPERTIES

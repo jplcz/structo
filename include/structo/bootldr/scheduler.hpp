@@ -180,6 +180,9 @@ public:
     clock_ctx_ = ctx;
   }
 
+  /** @brief Current time from the configured clock, or 0 if none is set. */
+  [[nodiscard]] std::uint64_t now_ms() const noexcept { return clock_ ? clock_(clock_ctx_) : 0; }
+
   /** @brief Registers a function called once at the start of every round (poll a device, kick a watchdog ...). */
   [[nodiscard]] reloco::result<void> add_poller(hook_fn fn, void *ctx) noexcept {
     return pollers_.try_push_back(poller{fn, ctx});
