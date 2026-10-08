@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 #include <gtest/gtest.h>
+#include <reloco/array.hpp>
 #include <structo/hw/vt100.hpp>
 
 using namespace structo::hw;
@@ -13,7 +14,7 @@ constexpr std::size_t kCols = 20;
 constexpr std::size_t kRows = 6;
 
 struct fake_console {
-  console_cell cells[kCols * kRows]{};
+  reloco::array<console_cell, kCols * kRows> cells{};
 };
 
 } // namespace

@@ -116,6 +116,7 @@
 #include <reloco/array.hpp>
 #include <reloco/detail/assert.hpp>
 #include <reloco/intrusive_c_tailq.hpp>
+#include <reloco/lifetime.hpp>
 #include <reloco/optional.hpp>
 
 #if !defined(__GNUC__) && !defined(__clang__)
@@ -357,6 +358,9 @@ public:
   [[nodiscard]] std::size_t size() const & noexcept { return size_; }
 
 private:
+  // prio < max_priorities is a class invariant, so bitmap_ indices are in range.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
   void set_bit(std::size_t prio) & noexcept {
     bitmap_[prio / bits_per_word] |= (std::uint64_t{1} << (prio % bits_per_word));
   }
@@ -377,6 +381,8 @@ private:
     }
     return nullopt;
   }
+
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 
   reloco::array<c_tailq<Entry, Hook>, NumPriorities> buckets_{};
   std::uint64_t bitmap_[word_count] = {};

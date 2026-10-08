@@ -26,6 +26,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <reloco/lifetime.hpp>
 
 namespace structo {
 namespace examples {
@@ -1754,7 +1755,10 @@ struct dejavu_sans_mono_8x16 {
     if (code < 0x20 || code > 0x7E) {
       return blank;
     }
+    // code is range-checked to [0x20, 0x7E] above.
+    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
     return glyphs[code - 0x20];
+    RELOCO_END_UNSAFE_BUFFER_USAGE
   }
 };
 

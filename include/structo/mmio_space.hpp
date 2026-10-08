@@ -79,6 +79,7 @@
 #include "io_space_ref.hpp"
 
 #include <reloco/error.hpp>
+#include <reloco/lifetime.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -115,7 +116,10 @@ private:
       return reloco::unexpected(reloco::error::unsupported_operation);
     if (size_ != 0 && (addr > size_ || size_ - addr < sizeof(T)))
       return reloco::unexpected(reloco::error::out_of_range);
+    // The window check above guarantees addr + sizeof(T) <= size_.
+    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
     return reinterpret_cast<volatile T *>(base_ + addr);
+    RELOCO_END_UNSAFE_BUFFER_USAGE
   }
 
   volatile std::byte *base_ = nullptr;

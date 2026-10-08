@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 #include <gtest/gtest.h>
+#include <reloco/array.hpp>
 #include <structo/bootldr/cmdline.hpp>
 
 using namespace structo::bootldr;
@@ -11,18 +12,16 @@ namespace {
 
 struct split_result {
   reloco::result<std::size_t> n{std::size_t{0}};
-  char buf[128];
-  char *argv[8];
+  reloco::array<char, 128> buf{};
+  reloco::array<char *, 8> argv{};
 };
 
-void split(split_result &s, const char *text, std::size_t max_args = 8) {
-  std::size_t len = 0;
-  while (text[len] != '\0') {
-    s.buf[len] = text[len];
-    ++len;
-  }
+void split(split_result &s, reloco::string_view text, std::size_t max_args = 8) {
+  const std::size_t len = text.size();
+  for (std::size_t i = 0; i < len; ++i)
+    s.buf[i] = text[i];
   s.buf[len] = '\0';
-  s.n = split_command_line(s.buf, len, reloco::span<char *>(s.argv, max_args));
+  s.n = split_command_line(s.buf.data(), len, reloco::span<char *>(s.argv.data(), max_args));
 }
 
 std::uint64_t num(reloco::string_view text) {
@@ -31,13 +30,7 @@ std::uint64_t num(reloco::string_view text) {
   return r ? *r : 0;
 }
 
-bool is(const char *a, const char *b) {
-  while (*a && *a == *b) {
-    ++a;
-    ++b;
-  }
-  return *a == *b;
-}
+bool is(const char *a, reloco::string_view b) { return reloco::string_view(a) == b; }
 
 } // namespace
 

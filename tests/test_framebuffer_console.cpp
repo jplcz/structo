@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 #include <gtest/gtest.h>
+#include <reloco/array.hpp>
 #include <structo/hw/framebuffer_console.hpp>
 
 using namespace structo::hw;
@@ -236,7 +237,7 @@ TEST(FramebufferConsoleTest, ConsoleRefSetCursorForwardsToSoftwareCursor) {
 }
 
 TEST(ConsoleColorToRgbTest, MapsAllSixteenColorsToDistinctRgbValues) {
-  rgb_color seen[16];
+  reloco::array<rgb_color, 16> seen{};
   for (int i = 0; i < 16; ++i) {
     seen[i] = console_color_to_rgb(static_cast<console_color>(i));
   }

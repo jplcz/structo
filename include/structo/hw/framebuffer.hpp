@@ -386,12 +386,17 @@ private:
                         std::size_t stride_bytes) noexcept
       : buffer_(buffer), width_(width), height_(height), stride_bytes_(stride_bytes) {}
 
+  // Callers bounds-check (x, y) against width_/height_ before computing a pointer.
   [[nodiscard]] std::byte *pixel_ptr(std::size_t x, std::size_t y) noexcept {
+    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
     return buffer_.data() + (y * stride_bytes_) + (x * bytes_per_pixel);
+    RELOCO_END_UNSAFE_BUFFER_USAGE
   }
 
   [[nodiscard]] const std::byte *pixel_ptr(std::size_t x, std::size_t y) const noexcept {
+    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
     return buffer_.data() + (y * stride_bytes_) + (x * bytes_per_pixel);
+    RELOCO_END_UNSAFE_BUFFER_USAGE
   }
 
   struct clipped_rect {

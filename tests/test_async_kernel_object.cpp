@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 #include <gtest/gtest.h>
+#include <reloco/lifetime.hpp>
 #include <structo/async_kernel_object.hpp>
 
 namespace {
@@ -259,6 +260,8 @@ TEST_F(AsyncKernelObjectTest, StateIsAccessibleOnlyThroughTraits) {
 }
 
 #if !defined(NDEBUG) || defined(RELOCO_ENABLE_ASSERTS)
+// EXPECT_DEATH expands to gtest-internal fprintf/pointer code we cannot change.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
 TEST(AsyncKernelObjectDeathTest, DestructorTrapsIfStillPending) {
   EXPECT_DEATH(
       {
@@ -267,6 +270,7 @@ TEST(AsyncKernelObjectDeathTest, DestructorTrapsIfStillPending) {
       },
       "");
 }
+RELOCO_END_UNSAFE_BUFFER_USAGE
 #endif
 
 } // namespace

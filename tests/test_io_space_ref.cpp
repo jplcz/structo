@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 #include <gtest/gtest.h>
+#include <reloco/lifetime.hpp>
 #include <structo/io_space_ref.hpp>
 
 #include <array>
@@ -23,6 +24,10 @@ struct fake_mmio {
 };
 
 } // namespace
+
+// These mock backends emulate raw device registers with explicit bounds
+// checks before every access.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
 
 template <> struct structo::io_space_traits<fake_mmio> {
   static reloco::result<std::uint8_t> read8(fake_mmio &b, std::uint64_t addr) noexcept {
@@ -126,6 +131,8 @@ template <> struct structo::io_space_traits<fake_port> {
     return {};
   }
 };
+
+RELOCO_END_UNSAFE_BUFFER_USAGE
 
 namespace {
 
