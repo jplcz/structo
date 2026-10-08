@@ -82,6 +82,7 @@
 #include <reloco/allocator.hpp>
 #include <reloco/default_allocator.hpp>
 #include <reloco/error.hpp>
+#include <reloco/lifetime.hpp>
 #include <reloco/expected.hpp>
 #include <reloco/span.hpp>
 #include <utility>
@@ -177,7 +178,10 @@ public:
     const std::size_t cell_bytes = columns * rows * 2;
     const std::size_t aligned_bytes = (cell_bytes + page_size - 1) & ~(page_size - 1);
 
+    // allocate() returns a block of at least aligned_bytes, which is only checked for failure here.
+    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
     auto res = alloc.allocate(aligned_bytes, page_size);
+    RELOCO_END_UNSAFE_BUFFER_USAGE
     if (!res) {
       return unexpected(res.error());
     }
@@ -190,8 +194,8 @@ public:
     console.owned_size_ = res->size; // the allocator's own *absorbed* size, not `aligned_bytes` -- see
                                       // reloco/docs/allocator-capacity-absorption.md: `deallocate()` must be
                                       // called back with this exact size, not the originally requested one.
-    for (std::size_t i = 0; i < console.owned_size_; ++i) {
-      console.owned_base_[i] = std::byte{0}; // no stale allocator memory leaks into the guest-mapped padding
+    for (std::byte &b : span<std::byte>(console.owned_base_, console.owned_size_)) {
+      b = std::byte{0}; // no stale allocator memory leaks into the guest-mapped padding
     }
 
     auto text = hw::vga_text_console::try_create(span<std::byte>(console.owned_base_, cell_bytes), columns, rows);
@@ -245,7 +249,10 @@ private:
   // that way).
   void release() noexcept {
     if (owned_base_ != nullptr) {
+      // owned_base_/owned_size_ are exactly the block returned by allocate().
+      RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
       alloc_.deallocate(owned_base_, owned_size_);
+      RELOCO_END_UNSAFE_BUFFER_USAGE
       owned_base_ = nullptr;
       owned_size_ = 0;
       text_ = hw::vga_text_console();
@@ -315,7 +322,10 @@ template <> struct mmio_device_traits<mmio_text_console> {
     if (dst.size() != sizeof(value)) {
       return unexpected(error::invalid_argument);
     }
+    // dst.size() was checked equal to sizeof(value) above.
+    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
     __builtin_memcpy(dst.data(), &value, sizeof(value));
+    RELOCO_END_UNSAFE_BUFFER_USAGE
     return {};
   }
 
@@ -327,7 +337,10 @@ template <> struct mmio_device_traits<mmio_text_console> {
       return unexpected(error::invalid_argument);
     }
     std::uint32_t value;
+    // src.size() was checked equal to sizeof(value) above.
+    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
     __builtin_memcpy(&value, src.data(), sizeof(value));
+    RELOCO_END_UNSAFE_BUFFER_USAGE
     switch (offset) {
     case mmio_text_console::control_off_cursor_x:
       c.move_cursor(value, c.cursor_y());

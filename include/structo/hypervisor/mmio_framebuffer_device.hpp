@@ -86,6 +86,7 @@
 #include <reloco/allocator.hpp>
 #include <reloco/default_allocator.hpp>
 #include <reloco/error.hpp>
+#include <reloco/lifetime.hpp>
 #include <reloco/expected.hpp>
 #include <reloco/span.hpp>
 #include <utility>
@@ -195,7 +196,10 @@ public:
     const std::size_t pixel_bytes = stride * height;
     const std::size_t aligned_bytes = (pixel_bytes + page_size - 1) & ~(page_size - 1);
 
+    // allocate() returns a block of at least aligned_bytes, which is only checked for failure here.
+    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
     auto res = alloc.allocate(aligned_bytes, page_size);
+    RELOCO_END_UNSAFE_BUFFER_USAGE
     if (!res) {
       return unexpected(res.error());
     }
@@ -204,8 +208,8 @@ public:
     // (a non-owning view over a leading sub-span of it). See mmio_text_console.hpp's docs for why.
     dev.owned_base_ = static_cast<std::byte *>(res->ptr);
     dev.owned_size_ = res->size; // the allocator's absorbed size -- what deallocate() must be called with
-    for (std::size_t i = 0; i < dev.owned_size_; ++i) {
-      dev.owned_base_[i] = std::byte{0};
+    for (std::byte &b : span<std::byte>(dev.owned_base_, dev.owned_size_)) {
+      b = std::byte{0};
     }
 
     auto fb = hw::framebuffer<PixelFormat>::try_create(span<std::byte>(dev.owned_base_, pixel_bytes), width, height,
@@ -288,7 +292,10 @@ public:
 private:
   void release() noexcept {
     if (owned_base_ != nullptr) {
+      // owned_base_/owned_size_ are exactly the block returned by allocate().
+      RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
       alloc_.deallocate(owned_base_, owned_size_);
+      RELOCO_END_UNSAFE_BUFFER_USAGE
       owned_base_ = nullptr;
       owned_size_ = 0;
       fb_ = hw::framebuffer<PixelFormat>();
@@ -341,7 +348,10 @@ template <typename PixelFormat> struct mmio_device_traits<mmio_framebuffer_devic
     if (dst.size() != sizeof(value)) {
       return unexpected(error::invalid_argument);
     }
+    // dst.size() was checked equal to sizeof(value) above.
+    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
     __builtin_memcpy(dst.data(), &value, sizeof(value));
+    RELOCO_END_UNSAFE_BUFFER_USAGE
     return {};
   }
 

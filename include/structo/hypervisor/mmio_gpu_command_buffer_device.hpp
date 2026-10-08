@@ -86,6 +86,7 @@
 #include <reloco/allocator.hpp>
 #include <reloco/default_allocator.hpp>
 #include <reloco/error.hpp>
+#include <reloco/lifetime.hpp>
 #include <reloco/expected.hpp>
 #include <reloco/span.hpp>
 #include <utility>
@@ -148,6 +149,8 @@ struct gpu_command {
 [[nodiscard]] inline gpu_command decode_gpu_command(span<const std::byte> slot) noexcept {
   gpu_command cmd;
   std::uint32_t opcode_raw = 0;
+  // Every offset+4 is within the documented command_slot_size (24) bytes the caller must pass.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   __builtin_memcpy(&opcode_raw, slot.data() + 0, 4);
   cmd.opcode = static_cast<gpu_command_opcode>(opcode_raw);
   __builtin_memcpy(&cmd.x0, slot.data() + 4, 4);
@@ -155,6 +158,7 @@ struct gpu_command {
   __builtin_memcpy(&cmd.x1, slot.data() + 12, 4);
   __builtin_memcpy(&cmd.y1, slot.data() + 16, 4);
   __builtin_memcpy(&cmd.color, slot.data() + 20, 4);
+  RELOCO_END_UNSAFE_BUFFER_USAGE
   return cmd;
 }
 
@@ -164,12 +168,15 @@ struct gpu_command {
  * guest driver to. */
 inline void encode_gpu_command(const gpu_command &cmd, span<std::byte> slot) noexcept {
   auto opcode_raw = static_cast<std::uint32_t>(cmd.opcode);
+  // Every offset+4 is within the documented command_slot_size (24) bytes the caller must pass.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   __builtin_memcpy(slot.data() + 0, &opcode_raw, 4);
   __builtin_memcpy(slot.data() + 4, &cmd.x0, 4);
   __builtin_memcpy(slot.data() + 8, &cmd.y0, 4);
   __builtin_memcpy(slot.data() + 12, &cmd.x1, 4);
   __builtin_memcpy(slot.data() + 16, &cmd.y1, 4);
   __builtin_memcpy(slot.data() + 20, &cmd.color, 4);
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 }
 
 /** @brief Dispatches one decoded @ref gpu_command to @p target, per the per-opcode operand-reuse rules
@@ -298,7 +305,10 @@ public:
     const std::size_t bytes = capacity * command_slot_size;
     const std::size_t aligned_bytes = (bytes + page_size - 1) & ~(page_size - 1);
 
+    // allocate() returns a block of at least aligned_bytes, which is only checked for failure here.
+    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
     auto res = alloc.allocate(aligned_bytes, page_size);
+    RELOCO_END_UNSAFE_BUFFER_USAGE
     if (!res) {
       return unexpected(res.error());
     }
@@ -307,8 +317,8 @@ public:
     // ownership is never recovered indirectly through some other composed view later on.
     dev.owned_base_ = static_cast<std::byte *>(res->ptr);
     dev.owned_size_ = res->size; // the allocator's absorbed size -- what deallocate() must be called with
-    for (std::size_t i = 0; i < dev.owned_size_; ++i) {
-      dev.owned_base_[i] = std::byte{0}; // every slot decodes as `nop` until the guest fills it in
+    for (std::byte &b : span<std::byte>(dev.owned_base_, dev.owned_size_)) {
+      b = std::byte{0}; // every slot decodes as `nop` until the guest fills it in
     }
     dev.capacity_ = capacity;
     dev.target_ = target;
@@ -364,7 +374,7 @@ public:
     std::size_t n = count_;
     span<std::byte> buf = command_buffer();
     for (std::size_t i = 0; i < n; ++i) {
-      span<std::byte> slot(buf.data() + i * command_slot_size, command_slot_size);
+      span<std::byte> slot = buf.subspan(i * command_slot_size, command_slot_size);
       gpu_command cmd = decode_gpu_command(slot);
       execute_gpu_command(target_, cmd);
     }
@@ -383,7 +393,10 @@ public:
 private:
   void release() noexcept {
     if (owned_base_ != nullptr) {
+      // owned_base_/owned_size_ are exactly the block returned by allocate().
+      RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
       alloc_.deallocate(owned_base_, owned_size_);
+      RELOCO_END_UNSAFE_BUFFER_USAGE
       owned_base_ = nullptr;
       owned_size_ = 0;
       capacity_ = 0;
@@ -427,7 +440,10 @@ template <> struct mmio_device_traits<mmio_gpu_command_buffer_device> {
     if (dst.size() != sizeof(value)) {
       return unexpected(error::invalid_argument);
     }
+    // dst.size() was checked equal to sizeof(value) above.
+    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
     __builtin_memcpy(dst.data(), &value, sizeof(value));
+    RELOCO_END_UNSAFE_BUFFER_USAGE
     return {};
   }
 
@@ -436,7 +452,10 @@ template <> struct mmio_device_traits<mmio_gpu_command_buffer_device> {
       return unexpected(error::invalid_argument);
     }
     std::uint32_t value;
+    // src.size() was checked equal to sizeof(value) above.
+    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
     __builtin_memcpy(&value, src.data(), sizeof(value));
+    RELOCO_END_UNSAFE_BUFFER_USAGE
     switch (offset) {
     case device::control_off_count:
       return d.set_count(value);
