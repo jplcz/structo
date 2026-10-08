@@ -133,7 +133,8 @@ reloco::result<std::size_t> try_populate_hw_id_lut_from_fdt(fdt::fdt_reader read
   // Reused per depth-2 child of /cpus -- only one is ever open at a time.
   bool tracking_child = false;
   bool child_disabled = false;
-  reloco::optional<reloco::span<const std::byte>> child_pending_reg;
+  bool child_has_reg = false;
+  reloco::span<const std::byte> child_pending_reg;
 
   for (auto ev : reader) {
     if (!ev)
@@ -151,7 +152,8 @@ reloco::result<std::size_t> try_populate_hw_id_lut_from_fdt(fdt::fdt_reader read
       } else if (own_depth == 2 && in_cpus) {
         tracking_child = true;
         child_disabled = false;
-        child_pending_reg = reloco::nullopt;
+        child_has_reg = false;
+        child_pending_reg = {};
       }
       break;
     }
@@ -169,6 +171,7 @@ reloco::result<std::size_t> try_populate_hw_id_lut_from_fdt(fdt::fdt_reader read
           if (s && *s != "okay")
             child_disabled = true;
         } else if (ev->prop.name == "reg") {
+          child_has_reg = true;
           child_pending_reg = ev->prop.value;
         }
       }
@@ -177,8 +180,8 @@ reloco::result<std::size_t> try_populate_hw_id_lut_from_fdt(fdt::fdt_reader read
     case fdt::fdt_event_kind::end_node: {
       --depth;
       if (depth == 2 && in_cpus && tracking_child) {
-        if (!child_disabled && child_pending_reg.has_value()) {
-          auto hw_id_wide = detail::fdt_cpu_read_be_cells(*child_pending_reg, cpus_address_cells);
+        if (!child_disabled && child_has_reg) {
+          auto hw_id_wide = detail::fdt_cpu_read_be_cells(child_pending_reg, cpus_address_cells);
           if (!hw_id_wide)
             return reloco::unexpected(hw_id_wide.error());
           if (registered >= hw_id_lut<HwId, MaxCpus, L1Size, Hash>::max_cpus)
