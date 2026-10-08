@@ -277,10 +277,13 @@ private:
   static std::uint32_t u32(u32span s, std::size_t off) noexcept { return load_le<std::uint32_t>(s.subspan(off)); }
 
   void release(resource &r) noexcept {
+    // pixels/entries and their *_alloc sizes are exactly what allocate() returned for this resource.
+    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
     if (r.pixels != nullptr)
       alloc_.deallocate(r.pixels, r.pixels_alloc);
     if (r.entries != nullptr)
       alloc_.deallocate(r.entries, r.entries_alloc);
+    RELOCO_END_UNSAFE_BUFFER_USAGE
     used_bytes_ -= r.pixel_bytes;
     r = resource{};
   }
@@ -405,7 +408,10 @@ private:
       }
     if (slot == nullptr)
       return gpu::resp_err_out_of_memory;
+    // allocate() is only checked for failure here; its block is used with the size it reports.
+    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
     auto block = alloc_.allocate(static_cast<std::size_t>(bytes), 64);
+    RELOCO_END_UNSAFE_BUFFER_USAGE
     if (!block)
       return gpu::resp_err_out_of_memory;
     auto mem_span = reloco::span<std::byte>(static_cast<std::byte *>(block->ptr), block->size);
@@ -553,7 +559,10 @@ private:
       return gpu::resp_err_unspec; // already has backing
 
     const std::size_t bytes = std::size_t{count} * sizeof(backing_entry);
+    // allocate() is only checked for failure here; its block is used with the size it reports.
+    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
     auto block = alloc_.allocate(bytes, alignof(backing_entry));
+    RELOCO_END_UNSAFE_BUFFER_USAGE
     if (!block)
       return gpu::resp_err_out_of_memory;
     auto *entries = static_cast<backing_entry *>(block->ptr);
@@ -561,6 +570,7 @@ private:
 
     std::uint64_t total = 0;
     reloco::array<std::byte, 16 * 16> chunk{};
+    const u32span chunk_span(chunk.data(), chunk.size());
     std::uint32_t done = 0;
     bool ok = true;
     while (done < count && ok) {
@@ -570,7 +580,7 @@ private:
         break;
       }
       for (std::uint32_t i = 0; i < n; ++i) {
-        const u32span e(chunk.data() + std::size_t{i} * 16, 16);
+        const u32span e = chunk_span.subspan(std::size_t{i} * 16, 16);
         const std::uint64_t addr = load_le<std::uint64_t>(e);
         const std::uint32_t len = u32(e, 8);
         if (len > ~std::uint64_t{0} - addr) { // addr + len would wrap
@@ -583,7 +593,10 @@ private:
       done += n;
     }
     if (!ok) {
+      // block is the allocation just made above, released with its own reported size.
+      RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
       alloc_.deallocate(block->ptr, block->size);
+      RELOCO_END_UNSAFE_BUFFER_USAGE
       return gpu::resp_err_invalid_parameter;
     }
     r->entries = entries;
@@ -597,8 +610,12 @@ private:
     resource *r = find(u32(req, 24));
     if (r == nullptr)
       return gpu::resp_err_invalid_resource_id;
-    if (r->entries != nullptr)
+    if (r->entries != nullptr) {
+      // entries/entries_alloc are exactly what allocate() returned in cmd_attach_backing.
+      RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
       alloc_.deallocate(r->entries, r->entries_alloc);
+      RELOCO_END_UNSAFE_BUFFER_USAGE
+    }
     r->entries = nullptr;
     r->entries_alloc = 0;
     r->entry_count = 0;

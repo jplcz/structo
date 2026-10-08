@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 #include <gtest/gtest.h>
+#include <reloco/lifetime.hpp>
 #include <structo/arch/asid_allocator.hpp>
 
 #include <cstddef>
@@ -182,7 +183,10 @@ TEST_F(AsidAllocatorTest, TryActiveReportsOutOfRangeSlot) {
 #if !defined(NDEBUG) || defined(RELOCO_ENABLE_ASSERTS)
 TEST_F(AsidAllocatorTest, ActiveTrapsOnOutOfRangeSlot) {
   auto alloc = proc4::try_create(4).value();
+  // gtest's death-test macro expands to libc fprintf calls outside our control.
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
   EXPECT_DEATH({ (void)alloc.active(proc4::max_active); }, "");
+  RELOCO_END_UNSAFE_BUFFER_USAGE
 }
 #endif
 

@@ -411,7 +411,8 @@ private:
     pkt_[0] = big ? xmodem_ctl::stx : xmodem_ctl::soh;
     pkt_[1] = blk_;
     pkt_[2] = static_cast<std::uint8_t>(~blk_);
-    const span<std::uint8_t> data = span<std::uint8_t>(pkt_.data(), pkt_.size()).subspan(3);
+    const span<std::uint8_t> frame(pkt_.data(), pkt_.size());
+    const span<std::uint8_t> data = frame.subspan(3);
     for (std::size_t i = 0; i < size; ++i)
       data[i] = i < last_payload_ ? image_[offset_ + i] : xmodem_ctl::sub;
 

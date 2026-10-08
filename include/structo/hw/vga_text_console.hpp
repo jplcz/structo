@@ -114,10 +114,7 @@ private:
                    reloco::optional<cursor_sink> on_move_cursor) noexcept
       : buffer_(buffer), columns_(columns), rows_(rows), on_move_cursor_(on_move_cursor) {}
 
-  [[nodiscard]] reloco::span<std::byte> cell_ptr(std::size_t x, std::size_t y) noexcept {
-    return buffer_.subspan((y * columns_ + x) * 2, 2);
-  }
-  [[nodiscard]] reloco::span<const std::byte> cell_ptr(std::size_t x, std::size_t y) const noexcept {
+  [[nodiscard]] reloco::span<std::byte> cell_ptr(std::size_t x, std::size_t y) const noexcept {
     return buffer_.subspan((y * columns_ + x) * 2, 2);
   }
 

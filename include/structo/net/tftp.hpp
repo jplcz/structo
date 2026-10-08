@@ -130,7 +130,8 @@ inline void tftp_put16(span<std::uint8_t> out, std::size_t at, std::uint16_t v) 
     std::size_t len = d.size() - 4;
     if (len > 0 && d[d.size() - 1] == 0)
       --len; // strip the terminator
-    p.message = reloco::string_view(reinterpret_cast<const char *>(d.subspan(4).data()), len);
+    const auto tail = d.subspan(4);
+    p.message = reloco::string_view(reinterpret_cast<const char *>(tail.data()), len);
     return p;
   }
   default:
