@@ -98,9 +98,6 @@ public:
   }
 
 private:
-  using alloc_arg = reloco::allocator_arg_t;
-  using alloc_ref = reloco::allocator_ref;
-
   static constexpr std::size_t chunk = 4096;
 
   // Prints "usage: <help>" for the running command and returns the error to fail with.
@@ -126,14 +123,14 @@ private:
     return reinterpret_cast<volatile std::uint8_t *>(static_cast<std::uintptr_t>(address));
   }
 
-  static reloco::task<void> echo_cmd(alloc_arg, alloc_ref, command_call &call) noexcept {
+  static reloco::task<void> echo_cmd(command_call &call) noexcept {
     for (std::size_t i = 1; i < call.argc(); ++i)
       (void)call.print(i == 1 ? "{}" : " {}", call.arg(i));
     (void)call.write("\n");
     co_return;
   }
 
-  static reloco::task<void> sleep_cmd(alloc_arg, alloc_ref, command_call &call) noexcept {
+  static reloco::task<void> sleep_cmd(command_call &call) noexcept {
     if (call.argc() != 2)
       co_await reloco::unexpected(usage(call));
     auto ms = parse_number(call.arg(1));
@@ -142,12 +139,12 @@ private:
     co_await co_await call.sh().sched().sleep_for(*ms); // fails with invalid_state without a clock
   }
 
-  static reloco::task<void> uptime_cmd(alloc_arg, alloc_ref, command_call &call) noexcept {
+  static reloco::task<void> uptime_cmd(command_call &call) noexcept {
     (void)call.print("{} ms\n", call.sh().sched().now_ms());
     co_return;
   }
 
-  static reloco::task<void> md_cmd(alloc_arg, alloc_ref, command_call &call) noexcept {
+  static reloco::task<void> md_cmd(command_call &call) noexcept {
     if (call.argc() < 2 || call.argc() > 3)
       co_await reloco::unexpected(usage(call));
     auto addr = parse_number(call.arg(1));
@@ -165,7 +162,7 @@ private:
     }
   }
 
-  static reloco::task<void> mw_cmd(alloc_arg, alloc_ref, command_call &call) noexcept {
+  static reloco::task<void> mw_cmd(command_call &call) noexcept {
     if (call.argc() < 3 || call.argc() > 4)
       co_await reloco::unexpected(usage(call));
     auto addr = parse_number(call.arg(1));
@@ -193,7 +190,7 @@ private:
     }
   }
 
-  static reloco::task<void> cp_cmd(alloc_arg, alloc_ref, command_call &call) noexcept {
+  static reloco::task<void> cp_cmd(command_call &call) noexcept {
     if (call.argc() != 4)
       co_await reloco::unexpected(usage(call));
     auto dst = parse_number(call.arg(1));
@@ -219,7 +216,7 @@ private:
     (void)call.print("{} bytes copied\n", *len);
   }
 
-  static reloco::task<void> cmp_cmd(alloc_arg, alloc_ref, command_call &call) noexcept {
+  static reloco::task<void> cmp_cmd(command_call &call) noexcept {
     if (call.argc() != 4)
       co_await reloco::unexpected(usage(call));
     auto a = parse_number(call.arg(1));
@@ -251,7 +248,7 @@ private:
     (void)call.print("equal ({} bytes)\n", *len);
   }
 
-  static reloco::task<void> fill_cmd(alloc_arg, alloc_ref, command_call &call) noexcept {
+  static reloco::task<void> fill_cmd(command_call &call) noexcept {
     if (call.argc() != 4)
       co_await reloco::unexpected(usage(call));
     auto addr = parse_number(call.arg(1));
@@ -267,7 +264,7 @@ private:
     }
   }
 
-  static reloco::task<void> go_cmd(alloc_arg, alloc_ref, command_call &call) noexcept {
+  static reloco::task<void> go_cmd(command_call &call) noexcept {
     auto &self = *static_cast<generic_commands *>(call.ctx());
     auto addr = call.argc() == 2 ? parse_number(call.arg(1)) : reloco::result<std::uint64_t>(reloco::unexpected(reloco::error::invalid_argument));
     if (!addr)
@@ -276,7 +273,7 @@ private:
     self.hooks_.go(self.hooks_.ctx, *addr);
   }
 
-  static reloco::task<void> reset_cmd(alloc_arg, alloc_ref, command_call &call) noexcept {
+  static reloco::task<void> reset_cmd(command_call &call) noexcept {
     auto &self = *static_cast<generic_commands *>(call.ctx());
     (void)call.write("resetting\n");
     self.hooks_.reset(self.hooks_.ctx);

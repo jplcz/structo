@@ -25,10 +25,10 @@
  * reloco::string script(sched.allocator());
  * (void)script.try_assign("tftp kernel.bin 0x80000\ngo 0x80000\n");
  *
- * // A command handler (or any task) can then co_await the editor; allocator_arg/allocator
- * // are for the coroutine frame, the next arguments are the scheduler that runs it and the console.
+ * // A command handler (or any task) can then co_await the editor; the arguments are the
+ * // scheduler that runs it, the console and the text.
  * structo::bootldr::editor_options opt;     // 24 rows x 80 columns, tab width 2 by default
- * auto saved = co_await structo::bootldr::edit_text(reloco::allocator_arg, sched.allocator(), sched, uart, script, opt);
+ * auto saved = co_await structo::bootldr::edit_text(sched, uart, script, opt);
  * if (saved && *saved) {
  *   // true: the user pressed Ctrl-S, `script` holds the new text
  * } else {
@@ -534,10 +534,9 @@ struct editor_options {
  * its original text). Fails with the UART's or the allocator's error. Other scheduler tasks keep
  * running between keys. The caller must not use the UART or touch `buf` meanwhile.
  */
-[[nodiscard]] inline reloco::task<bool> edit_text(reloco::allocator_arg_t, reloco::allocator_ref alloc,
-                                                  scheduler &sched, hw::uart_ref uart, reloco::string &buf,
+[[nodiscard]] inline reloco::task<bool> edit_text(scheduler &sched, hw::uart_ref uart, reloco::string &buf,
                                                   const editor_options &opt = {}) noexcept {
-  reloco::string original(alloc); // to restore on cancel
+  reloco::string original(buf.get_allocator()); // to restore on cancel
   if (auto r = original.try_assign(buf.view()); !r)
     co_await reloco::unexpected(r.error());
 

@@ -102,10 +102,10 @@ public:
   [[nodiscard]] reloco::result<void> start() noexcept {
     if (running_)
       return reloco::unexpected(reloco::error::invalid_state);
-    auto rx = sched_->spawn(rx_loop(reloco::allocator_arg, sched_->allocator(), *this));
+    auto rx = sched_->spawn(rx_loop(*this));
     if (!rx)
       return reloco::unexpected(rx.error());
-    auto tick = sched_->spawn(timer_loop(reloco::allocator_arg, sched_->allocator(), *this));
+    auto tick = sched_->spawn(timer_loop(*this));
     if (!tick) {
       (void)sched_->cancel(*rx);
       return reloco::unexpected(tick.error());
@@ -167,7 +167,7 @@ private:
   }
   static net::ipv4_address local_address(void *self) noexcept { return static_cast<netstack *>(self)->ip_.address(); }
 
-  static reloco::task<void> rx_loop(reloco::allocator_arg_t, reloco::allocator_ref, netstack &n) noexcept {
+  static reloco::task<void> rx_loop(netstack &n) noexcept {
     for (;;) {
       auto pkt = co_await n.ip_.receive();
       if (!pkt) {
@@ -189,7 +189,7 @@ private:
     }
   }
 
-  static reloco::task<void> timer_loop(reloco::allocator_arg_t, reloco::allocator_ref, netstack &n) noexcept {
+  static reloco::task<void> timer_loop(netstack &n) noexcept {
     for (;;) {
       n.sync_ppp();
       if (n.cfg_.dhcp) {

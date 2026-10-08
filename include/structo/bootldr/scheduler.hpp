@@ -22,9 +22,9 @@
  * The scheduler takes a `reloco::allocator_ref` (default: the process-wide
  * default allocator). It is used for the task table; waiting itself never
  * allocates (wait entries are intrusive and live in the suspended coroutine
- * frames). Coroutine *frames* are allocated by `reloco::task` from whatever
- * allocator you pass to the coroutine, so use `sched.allocator()` to keep
- * everything in one pool. Allocation failure is reported as
+ * frames). Coroutine *frames* are allocated by `reloco::task` from
+ * `reloco::default_allocator()`, independent of the scheduler's allocator.
+ * Allocation failure is reported as
  * `error::allocation_failed` (from `spawn`) or, for a frame that could not
  * be allocated, as that task's failure; nothing throws or traps.
  *
@@ -43,8 +43,8 @@
  * sched.set_clock(now_ms, nullptr);                  // required for sleep_for()/sleep_until()
  * sched.add_poller(poll_net, &pnd);                  // called once per round, before tasks run
  *
- * // Coroutine frames are allocated from the scheduler's allocator too.
- * reloco::task<void> blink(reloco::allocator_arg_t, reloco::allocator_ref, structo::bootldr::scheduler &s) {
+ * // Coroutines simply take their normal parameters.
+ * reloco::task<void> blink(structo::bootldr::scheduler &s) {
  *   for (;;) {
  *     toggle_led();
  *     // Inner co_await sleeps; the outer one unwraps the result<void> (error if no clock is set).
@@ -52,13 +52,13 @@
  *   }
  * }
  *
- * reloco::task<void> load_image(reloco::allocator_arg_t, reloco::allocator_ref, structo::bootldr::scheduler &s) {
+ * reloco::task<void> load_image(structo::bootldr::scheduler &s) {
  *   co_await download_over_tftp();                 // any coroutine work; others run while it waits
  *   co_await s.yield();                            // let the other tasks run now
  * }
  *
- * auto id = sched.spawn(blink(reloco::allocator_arg, sched.allocator(), sched)); // detached: fire and forget
- * auto main_job = sched.spawn(load_image(reloco::allocator_arg, sched.allocator(), sched),
+ * auto id = sched.spawn(blink(sched)); // detached: fire and forget
+ * auto main_job = sched.spawn(load_image(sched),
  *                             structo::bootldr::spawn_mode::joinable); // keep the result for join()
  * sched.run();                                      // returns when every task has finished
  * @endcode
@@ -171,7 +171,7 @@ public:
   // Destroy the task frames first: their awaiters unlink from the lists below.
   ~scheduler() { slots_.clear(); }
 
-  /** @brief The allocator to pass to coroutines (`allocator_arg, sched.allocator()`) so frames share the scheduler's pool. */
+  /** @brief The scheduler's own bookkeeping allocator (task table); not used for coroutine frames. */
   [[nodiscard]] reloco::allocator_ref allocator() const noexcept { return alloc_; }
 
   /** @brief Monotonic millisecond clock; required for `sleep_for()`/`sleep_until()`. */

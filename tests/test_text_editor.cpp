@@ -38,8 +38,9 @@ namespace {
 void type(text_editor &ed, key_decoder &dec, reloco::string_view bytes) {
   for (std::size_t i = 0; i < bytes.size(); ++i) {
     const key_event ev = dec.feed(static_cast<std::uint8_t>(bytes[i]));
-    if (ev.code != key_code::none)
+    if (ev.code != key_code::none) {
       ASSERT_TRUE(ed.handle(ev).has_value());
+    }
   }
 }
 

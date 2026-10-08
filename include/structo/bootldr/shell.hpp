@@ -20,11 +20,9 @@
  * Line editing: Backspace/DEL erase one character, Ctrl-U erases the line, Ctrl-C abandons it.
  *
  * ```cpp
- * // A command handler: a coroutine, noexcept, taking (allocator_arg, allocator, call).
- * // allocator_arg/allocator are for the coroutine frame; the shell passes the scheduler's allocator.
+ * // A command handler: a coroutine, noexcept, taking the command_call.
  * // `call.arg(0)` is the command name, `call.arg(1..)` its arguments, `call.ctx()` the pointer given at registration.
- * static reloco::task<void> cmd_peek(reloco::allocator_arg_t, reloco::allocator_ref,
- *                                    structo::bootldr::command_call &call) noexcept {
+ * static reloco::task<void> cmd_peek(structo::bootldr::command_call &call) noexcept {
  *   if (call.argc() != 2)
  *     co_await reloco::unexpected(reloco::error::invalid_argument); // fail: the shell prints "error: N"
  *   auto addr = structo::bootldr::parse_number(call.arg(1));        // "0x1000", "4096", "0b101", ...
@@ -72,7 +70,7 @@ class command_call;
 class shell_command {
 public:
   /** @brief Handler coroutine. Fail with `co_await reloco::unexpected(err)` to make the shell print the error. */
-  using handler_fn = reloco::task<void> (*)(reloco::allocator_arg_t, reloco::allocator_ref, command_call &) noexcept;
+  using handler_fn = reloco::task<void> (*)(command_call &) noexcept;
 
   /** @param name single word without spaces. @param help one-line usage text for `help`. @param ctx returned by `command_call::ctx()`. */
   shell_command(reloco::string_view name, reloco::string_view help, handler_fn handler, void *ctx = nullptr) noexcept
@@ -174,8 +172,7 @@ protected:
   hw::uart_ref uart_;
 
 private:
-  static reloco::task<void> help_handler(reloco::allocator_arg_t, reloco::allocator_ref,
-                                         command_call &call) noexcept;
+  static reloco::task<void> help_handler(command_call &call) noexcept;
 
   reloco::c_tailq<shell_command, &shell_command::link_> commands_;
   shell_command help_;
@@ -214,8 +211,7 @@ private:
   void *ctx_;
 };
 
-inline reloco::task<void> shell_base::help_handler(reloco::allocator_arg_t, reloco::allocator_ref,
-                                                   command_call &call) noexcept {
+inline reloco::task<void> shell_base::help_handler(command_call &call) noexcept {
   auto &self = *static_cast<shell_base *>(call.ctx());
   if (call.argc() == 2) { // "help <command>"
     shell_command *c = self.find(call.arg(1));
@@ -246,7 +242,7 @@ public:
   [[nodiscard]] reloco::result<void> start() noexcept {
     if (running_)
       return reloco::unexpected(reloco::error::invalid_state);
-    auto id = sched_->spawn(loop(reloco::allocator_arg, sched_->allocator(), *this));
+    auto id = sched_->spawn(loop(*this));
     if (!id)
       return reloco::unexpected(id.error());
     id_ = *id;
@@ -273,7 +269,7 @@ public:
    * being typed, `error::invalid_argument` for a syntax error, `error::not_found` for an unknown command, or
    * the command's own error. Nothing is printed for those failures.
    */
-  [[nodiscard]] static reloco::task<void> execute(reloco::allocator_arg_t, reloco::allocator_ref alloc, shell &sh,
+  [[nodiscard]] static reloco::task<void> execute(shell &sh,
                                                   reloco::string_view line) noexcept {
     if (sh.busy_ || sh.len_ != 0)
       co_await reloco::unexpected(reloco::error::busy);
@@ -281,7 +277,7 @@ public:
       co_await reloco::unexpected(reloco::error::out_of_range);
     for (std::size_t i = 0; i < line.size(); ++i)
       sh.line_[i] = line[i];
-    co_await co_await run_line(reloco::allocator_arg, alloc, sh, line.size());
+    co_await co_await run_line(sh, line.size());
   }
 
 private:
@@ -292,7 +288,7 @@ private:
   };
 
   // Tokenizes line_[0..len) and runs the command; the buffer must stay untouched while it runs (busy_).
-  static reloco::task<void> run_line(reloco::allocator_arg_t, reloco::allocator_ref alloc, shell &sh,
+  static reloco::task<void> run_line(shell &sh,
                                      std::size_t len) noexcept {
     busy_guard guard{sh.busy_};
     auto n = split_command_line(sh.line_.data(), len, reloco::span<char *>(sh.argv_.data(), MaxArgs));
@@ -311,10 +307,10 @@ private:
       co_await reloco::unexpected(reloco::error::not_found);
     }
     command_call call{sh, reloco::span<char *>(sh.argv_.data(), *n), cmd->ctx_};
-    co_await co_await cmd->handler_(reloco::allocator_arg, alloc, call);
+    co_await co_await cmd->handler_(call);
   }
 
-  static reloco::task<void> loop(reloco::allocator_arg_t, reloco::allocator_ref alloc, shell &sh) noexcept {
+  static reloco::task<void> loop(shell &sh) noexcept {
     (void)sh.write(sh.prompt_);
     bool last_cr = false;
     for (;;) {
@@ -340,7 +336,7 @@ private:
         const std::size_t len = sh.len_;
         sh.len_ = 0;
         sh.reported_ = false;
-        auto r = co_await run_line(reloco::allocator_arg, alloc, sh, len);
+        auto r = co_await run_line(sh, len);
         if (!r && !sh.reported_) {
           (void)sh.print("error: {}\n", r.error());
         }

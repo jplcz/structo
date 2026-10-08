@@ -12,11 +12,9 @@ commands. Commands are coroutines, so a long command (a TFTP download) does not
 stop the netstack or other tasks.
 
 ```cpp
-// A command handler: a noexcept coroutine taking (allocator_arg, allocator, call).
-// The first two arguments are for the coroutine frame; the shell passes the scheduler's allocator.
+// A command handler: a noexcept coroutine taking the command_call.
 // call.arg(0) is the command name, call.arg(1..) are its arguments, call.ctx() is the pointer given at registration.
-reloco::task<void> cmd_tftp(reloco::allocator_arg_t, reloco::allocator_ref,
-                            structo::bootldr::command_call &call) noexcept {
+reloco::task<void> cmd_tftp(structo::bootldr::command_call &call) noexcept {
   // usage: tftp <file> <load address>
   if (call.argc() != 3) {
     (void)call.print("usage: tftp <file> <addr>\n");
@@ -46,7 +44,7 @@ structo::bootldr::shell_command tftp_cmd{    // owned by us; must outlive its re
 - Line editing: Backspace/DEL, Ctrl-U (erase line), Ctrl-C (drop line).
 - Quoting: `"a b"`, `'a b'`, `a\ b`; `#` starts a comment.
 - `help` lists all commands. Errors from a handler print `error: <code>`.
-- `shell::execute(allocator_arg, alloc, sh, "tftp kernel.bin 0x80000")` runs a line
+- `shell::execute(sh, "tftp kernel.bin 0x80000")` runs a line
   without the console (boot scripts); it fails with `busy` while a command runs.
 
 ## Generic commands
@@ -81,11 +79,10 @@ Failing commands print `error: <name>` (microfmt formats `reloco::error` by name
 // A shell command handler that edits a boot script stored in a heap string.
 // `script` is the dynamic buffer being edited (owned by the caller).
 // `sched` provides yielding so other tasks keep running; `uart` is the console.
-reloco::task<void> edit_cmd(reloco::allocator_arg_t, reloco::allocator_ref alloc,
-                            scheduler &sched, hw::uart_ref uart, reloco::string &script) {
+reloco::task<void> edit_cmd(scheduler &sched, hw::uart_ref uart, reloco::string &script) {
   // Returns true when saved (Ctrl-S), false when discarded (Ctrl-X, confirmed
   // if modified); on false `script` keeps its original contents.
-  bool saved = co_await co_await edit_text(reloco::allocator_arg, alloc, sched, uart, script);
+  bool saved = co_await co_await edit_text(sched, uart, script);
   (void)saved;
 }
 ```

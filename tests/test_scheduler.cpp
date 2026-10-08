@@ -66,7 +66,7 @@ reloco::task<void> forever(scheduler &s) {
     co_await s.yield();
 }
 
-reloco::task<void> with_allocator(reloco::allocator_arg_t, reloco::allocator_ref, scheduler &s, log &l) {
+reloco::task<void> with_allocator(scheduler &s, log &l) {
   co_await s.yield();
   l.add(7);
 }
@@ -170,7 +170,7 @@ TEST_F(Scheduler, PollersRunEveryRoundAndCancelStopsTask) {
 
 TEST_F(Scheduler, FramesCanUseSchedulerAllocator) {
   log l;
-  ASSERT_TRUE(sched.spawn(with_allocator(reloco::allocator_arg, sched.allocator(), sched, l)).has_value());
+  ASSERT_TRUE(sched.spawn(with_allocator(sched, l)).has_value());
   sched.run();
   EXPECT_EQ(l.n, 1);
 }

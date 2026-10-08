@@ -47,7 +47,7 @@ template <> struct structo::hw::uart_traits<fake_uart> {
 namespace {
 
 // "sum a b": parses two numbers and prints the total.
-reloco::task<void> cmd_sum(reloco::allocator_arg_t, reloco::allocator_ref, command_call &call) noexcept {
+reloco::task<void> cmd_sum(command_call &call) noexcept {
   if (call.argc() != 3)
     co_await reloco::unexpected(reloco::error::invalid_argument);
   auto a = parse_number(call.arg(1));
@@ -58,13 +58,13 @@ reloco::task<void> cmd_sum(reloco::allocator_arg_t, reloco::allocator_ref, comma
 }
 
 // "slow": suspends on the scheduler before printing, showing commands are coroutines.
-reloco::task<void> cmd_slow(reloco::allocator_arg_t, reloco::allocator_ref, command_call &call) noexcept {
+reloco::task<void> cmd_slow(command_call &call) noexcept {
   for (int i = 0; i < 3; ++i)
     co_await call.sh().sched().yield();
   (void)call.write("done\n");
 }
 
-reloco::task<void> cmd_ctx(reloco::allocator_arg_t, reloco::allocator_ref, command_call &call) noexcept {
+reloco::task<void> cmd_ctx(command_call &call) noexcept {
   ++*static_cast<int *>(call.ctx());
   co_return;
 }
@@ -155,14 +155,14 @@ TEST_F(Shell, CrLfIsOneLineEnd) {
 TEST_F(Shell, CommandsAreCoroutinesAndOtherTasksKeepRunning) {
   int ticks = 0;
   struct ticker {
-    static reloco::task<void> run(reloco::allocator_arg_t, reloco::allocator_ref, scheduler &s, int &n) {
+    static reloco::task<void> run(scheduler &s, int &n) {
       for (;;) {
         ++n;
         co_await s.yield();
       }
     }
   };
-  ASSERT_TRUE(sched.spawn(ticker::run(reloco::allocator_arg, sched.allocator(), sched, ticks)).has_value());
+  ASSERT_TRUE(sched.spawn(ticker::run(sched, ticks)).has_value());
   dev.type("slow\r");
   run();
   EXPECT_TRUE(out_has("done\r\n"));
@@ -213,7 +213,7 @@ TEST_F(Shell, CommandUnregistersWhenDestroyed) {
 TEST_F(Shell, ExecuteRunsALineWithoutTheConsole) {
   sh.stop(); // no interactive loop
   const reloco::string_view line = "sum 40 2";
-  auto t = shell<64, 8>::execute(reloco::allocator_arg, sched.allocator(), sh, line);
+  auto t = shell<64, 8>::execute(sh, line);
   ASSERT_TRUE(sched.spawn(std::move(t), spawn_mode::joinable).has_value());
   run(5);
   EXPECT_TRUE(out_has("42\r\n"));
@@ -355,7 +355,7 @@ struct edit_result {
 };
 
 reloco::task<void> run_editor(scheduler &s, fake_uart &dev, reloco::string &buf, edit_result &out) {
-  auto r = co_await edit_text(reloco::allocator_arg, s.allocator(), s, hw::uart_ref(dev), buf);
+  auto r = co_await edit_text(s, hw::uart_ref(dev), buf);
   out.done = true;
   if (r)
     out.saved = *r;

@@ -91,7 +91,7 @@ int main() {
     return 1;
 
   // Your own work runs as further tasks of the same scheduler.
-  // sched.spawn(boot_flow(reloco::allocator_arg, sched.allocator(), sched, net));
+  // sched.spawn(boot_flow(sched, net));
 
   sched.run();                                       // loops until every task finished (the
                                                      // netstack tasks run until stop())
@@ -106,8 +106,7 @@ frames) comes from the scheduler's allocator.
 
 ```cpp
 // A boot task that must not start before the board has an IP address.
-reloco::task<void> boot_flow(reloco::allocator_arg_t, reloco::allocator_ref,
-                             bootldr::scheduler &sched, bootldr::netstack<mtu> &net) {
+reloco::task<void> boot_flow(bootldr::scheduler &sched, bootldr::netstack<mtu> &net) {
   // Poll ready() every 100 ms. Inner co_await sleeps; the outer one unwraps
   // the result<void> (it fails only if the scheduler has no clock).
   while (!net.ready())

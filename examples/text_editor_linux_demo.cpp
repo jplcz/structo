@@ -75,9 +75,9 @@ struct outcome {
 };
 
 // Wraps edit_text so main can see when the editor has finished.
-reloco::task<void> editor_task(reloco::allocator_arg_t, reloco::allocator_ref alloc, bootldr::scheduler &sched,
+reloco::task<void> editor_task(bootldr::scheduler &sched,
                                tty_uart &uart, reloco::string &text, outcome &out) noexcept {
-  auto r = co_await bootldr::edit_text(reloco::allocator_arg, alloc, sched, hw::uart_ref(uart), text);
+  auto r = co_await bootldr::edit_text(sched, hw::uart_ref(uart), text);
   out.saved = r && *r;
   out.done = true;
 }
@@ -120,7 +120,7 @@ int main(int argc, char **argv) {
 
   tty_uart uart;
   outcome out;
-  if (!sched.spawn(editor_task(reloco::allocator_arg, sched.allocator(), sched, uart, text, out))) {
+  if (!sched.spawn(editor_task(sched, uart, text, out))) {
     (void)::tcsetattr(STDIN_FILENO, TCSANOW, &saved);
     return 1;
   }

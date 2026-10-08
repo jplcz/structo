@@ -94,7 +94,7 @@ bool open_tty(linux_uart &u, const char *path, char *slave_out, std::size_t slav
 }
 
 // Echo task: every datagram sent to our port goes straight back to its sender.
-reloco::task<void> echo_task(reloco::allocator_arg_t, reloco::allocator_ref, bootldr::udp_socket &s) noexcept {
+reloco::task<void> echo_task(bootldr::udp_socket &s) noexcept {
   reloco::array<std::uint8_t, 512> buf{};
   for (;;) {
     auto rx = co_await s.receive_from(reloco::span<std::uint8_t>(buf));
@@ -265,7 +265,7 @@ int run(Dev &dev, linux_uart &uart, bool ppp, net::ipv4_config static_ip, std::u
     logger.error("bind failed");
     return 1;
   }
-  if (!sched.spawn(echo_task(reloco::allocator_arg, sched.allocator(), sock)))
+  if (!sched.spawn(echo_task(sock)))
     return 1;
 
   reporter rep{&net};
