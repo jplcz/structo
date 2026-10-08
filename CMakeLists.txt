@@ -419,7 +419,11 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
     gtest_discover_tests(jplcz_structo_tests)
 
     # Coroutine-based devices need C++20; own target so the main suite stays C++17.
-    add_executable(jplcz_structo_coroutine_tests tests/test_polled_net_device.cpp)
+    add_executable(jplcz_structo_coroutine_tests
+        tests/test_polled_net_device.cpp
+        tests/test_slip_device.cpp
+        tests/test_ipv4.cpp
+        tests/test_dhcp.cpp)
     target_link_libraries(jplcz_structo_coroutine_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)
     set_target_properties(jplcz_structo_coroutine_tests PROPERTIES
@@ -466,6 +470,7 @@ if(JPLCZ_STRUCTO_BUILD_HEADER_CHECKS)
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/hypervisor/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/virtio/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/bootldr/*.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/net/*.hpp"
     )
     list(APPEND JPLCZ_STRUCTO_PUBLIC_HEADERS ${JPLCZ_STRUCTO_ARCH_HEADERS})
 
