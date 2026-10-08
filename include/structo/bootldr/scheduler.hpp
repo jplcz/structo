@@ -306,8 +306,40 @@ public:
     void reset() noexcept { set_ = false; }
     /** @brief Awaitable: completes when the event is set (immediately if it already is). */
     [[nodiscard]] auto wait() noexcept { return wait_awaiter{*this}; }
+    /**
+     * @brief Awaitable: like `wait()` but gives up after `ms` milliseconds. Yields `result<void>`:
+     * success if the event is set, `error::timed_out` otherwise, `error::invalid_state` without a clock
+     * (unless the event is already set).
+     */
+    [[nodiscard]] auto wait_for(std::uint64_t ms) noexcept { return timed_wait_awaiter{*this, ms}; }
 
   private:
+    struct timed_wait_awaiter {
+      event &e;
+      std::uint64_t ms;
+      detail::wait_node wait_node_; // in the event's waiters
+      detail::wait_node timer_node_; // in the scheduler's timers; whichever fires first resumes us
+      timed_wait_awaiter(event &ev, std::uint64_t t) noexcept : e(ev), ms(t) {}
+      [[nodiscard]] bool await_ready() const noexcept { return e.set_ || e.s_->clock_ == nullptr; }
+      void await_suspend(std::coroutine_handle<> h) noexcept {
+        const std::uint64_t deadline = e.s_->now() + ms;
+        wait_node_.h = h;
+        timer_node_.h = h;
+        timer_node_.key = deadline;
+        e.waiters_.push_back(&wait_node_);
+        (ms == 0 ? e.s_->ready_ : e.s_->timers_).push_back(&timer_node_);
+      }
+      reloco::result<void> await_resume() noexcept {
+        wait_node_.unlink(); // the one that did not fire must not resume us again
+        timer_node_.unlink();
+        if (e.set_)
+          return {};
+        if (!e.s_->clock_)
+          return reloco::unexpected(reloco::error::invalid_state);
+        return reloco::unexpected(reloco::error::timed_out);
+      }
+    };
+
     struct wait_awaiter {
       event &e;
       detail::wait_node node;

@@ -239,3 +239,23 @@ After `net.ready()` the board answers ping at the address
 `ppp.link().local_address()`; `ppp.link().dns()` holds the DNS server the peer
 offered (unspecified if none). If negotiation fails (`ppp.link().failed()`),
 check that `pppd` runs with `noauth` and the same baud rate.
+
+## TFTP and receive timeouts
+
+```cpp
+// Needs a scheduler clock; timeouts are measured against it.
+sched.set_clock(now_ms, nullptr);
+
+// tftp_client binds an ephemeral UDP socket per transfer on the netstack's demux.
+bootldr::tftp_options opt;
+opt.timeout_ms = 1000; // silence before the last packet is retransmitted
+opt.max_retries = 5;   // retransmits before failing with timed_out
+bootldr::tftp_client tftp{net, opt};
+
+// Download "kernel.bin" from the server into a memory buffer (runs as a scheduler task).
+reloco::array<std::uint8_t, 65536> image{};
+auto r = co_await tftp.get(server_ip, "kernel.bin", reloco::span<std::uint8_t>(image));
+
+// A plain socket receive can also time out: returns error::timed_out after 500 ms.
+auto d = co_await sock.receive_from(buf, 500);
+```

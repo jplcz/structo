@@ -97,6 +97,13 @@ public:
   [[nodiscard]] inline reloco::task<udp_received> receive_from(reloco::span<std::uint8_t> buf) noexcept;
 
   /**
+   * @brief Like `receive_from(buf)` but gives up with `error::timed_out` after `timeout_ms` milliseconds
+   * (scheduler clock; `error::invalid_state` if there is none and nothing is queued). 0 only checks the queue.
+   */
+  [[nodiscard]] inline reloco::task<udp_received> receive_from(reloco::span<std::uint8_t> buf,
+                                                               std::uint64_t timeout_ms) noexcept;
+
+  /**
    * @brief Sends one datagram. Binds an ephemeral port first if needed. Fails with `error::invalid_state` when
    * the stack has no address yet and `error::out_of_range` if it exceeds the IP MTU; waits while the link is busy.
    */
@@ -279,6 +286,29 @@ inline reloco::task<udp_received> udp_socket::receive_from(reloco::span<std::uin
       co_await reloco::unexpected(r.error());
     ready_.reset();
     co_await ready_.wait(); // woken by enqueue() or close(); loop re-checks
+  }
+}
+
+inline reloco::task<udp_received> udp_socket::receive_from(reloco::span<std::uint8_t> buf,
+                                                           std::uint64_t timeout_ms) noexcept {
+  const std::uint64_t deadline = stack_ ? stack_->sched().now_ms() + timeout_ms : 0;
+  for (;;) {
+    if (!bound_)
+      co_await reloco::unexpected(reloco::error::operation_canceled);
+    auto r = try_receive_from(buf);
+    if (r)
+      co_return *r;
+    if (r.error() != reloco::error::try_again)
+      co_await reloco::unexpected(r.error());
+    const std::uint64_t now = stack_->sched().now_ms();
+    if (now >= deadline)
+      co_await reloco::unexpected(reloco::error::timed_out);
+    ready_.reset();
+    auto w = co_await ready_.wait_for(deadline - now);
+    if (!w && w.error() != reloco::error::timed_out)
+      co_await reloco::unexpected(w.error());
+    // set (a datagram or close) or timed out: the loop re-checks the queue first, so a datagram that
+    // arrived at the deadline is not lost
   }
 }
 

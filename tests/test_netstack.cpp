@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 #include <structo/bootldr/netstack.hpp>
+#include <structo/bootldr/tftp.hpp>
 #include <structo/hw/slip_device.hpp>
 
 #include <reloco/vec_deque.hpp>
@@ -372,4 +373,258 @@ TEST_F(Netstack, DestroyingStackWhileRunningIsSafe) {
     step();
   }
   EXPECT_EQ(sched.live(), 0u);
+}
+
+namespace {
+
+bytes tftp_pkt(std::uint16_t op, std::uint16_t arg, const bytes &data = bytes()) {
+  bytes b;
+  push(b, static_cast<std::uint8_t>(op >> 8));
+  push(b, static_cast<std::uint8_t>(op));
+  push(b, static_cast<std::uint8_t>(arg >> 8));
+  push(b, static_cast<std::uint8_t>(arg));
+  append(b, net_test::as_span(data));
+  return b;
+}
+
+struct tftp_out {
+  bool done = false;
+  std::size_t size = 0;
+  reloco::error err = reloco::error::invalid_state;
+  bool ok = false;
+};
+
+reloco::task<void> run_get(bootldr::tftp_client &c, ipv4_address srv, reloco::span<std::uint8_t> dst, tftp_out &out) {
+  auto r = co_await c.get(srv, "boot.bin", dst);
+  out.done = true;
+  if (r) {
+    out.ok = true;
+    out.size = *r;
+  } else {
+    out.err = r.error();
+  }
+}
+
+reloco::task<void> run_put(bootldr::tftp_client &c, ipv4_address srv, reloco::span<const std::uint8_t> src, tftp_out &out) {
+  auto r = co_await c.put(srv, "up.bin", src);
+  out.done = true;
+  if (r) {
+    out.ok = true;
+    out.size = *r;
+  } else {
+    out.err = r.error();
+  }
+}
+
+// The UDP payload and ports of an IPv4 frame the stack transmitted.
+struct sent_udp {
+  bytes frame;
+  std::uint16_t src_port = 0;
+  std::uint16_t dst_port = 0;
+  bytes payload;
+};
+
+sent_udp as_udp(bytes frame) {
+  sent_udp o;
+  o.frame = std::move(frame);
+  auto ip = parse_ipv4(o.frame);
+  EXPECT_TRUE(ip.has_value());
+  if (!ip)
+    return o;
+  auto u = parse_udp(ip->payload, ip->header.src, ip->header.dst);
+  EXPECT_TRUE(u.has_value());
+  if (!u)
+    return o;
+  o.src_port = u->src_port;
+  o.dst_port = u->dst_port;
+  o.payload = make_bytes(u->payload);
+  return o;
+}
+
+} // namespace
+
+TEST_F(Netstack, TftpDownloadsIntoMemory) {
+  bootldr::netstack_config cfg;
+  cfg.static_ip = ipv4_config::make_static(board);
+  bootldr::netstack<mtu> net{sched, nic, cfg};
+  ASSERT_TRUE(net.poll_with(pnd).has_value());
+  ASSERT_TRUE(net.start().has_value());
+  bootldr::tftp_client tftp{net};
+
+  bytes mem = make_bytes(1000, 0);
+  tftp_out out;
+  ASSERT_TRUE(sched.spawn(run_get(tftp, host, reloco::span<std::uint8_t>(mem.data(), mem.size()), out)).has_value());
+  step();
+
+  auto rrq = as_udp(take_tx());
+  EXPECT_EQ(rrq.dst_port, 69);
+  ASSERT_GE(rrq.payload.size(), 2u);
+  EXPECT_EQ(rrq.payload[1], 1); // RRQ
+  const std::uint16_t local = rrq.src_port;
+
+  bytes b1 = make_bytes(512, 0x11);
+  inject(udp_packet(host, 3000, board, local, tftp_pkt(3, 1, b1)));
+  step();
+  auto ack1 = as_udp(take_tx());
+  EXPECT_EQ(ack1.dst_port, 3000); // replies go to the server's transfer port
+  EXPECT_TRUE(net_test::bytes_equal(ack1.payload, tftp_pkt(4, 1)));
+  EXPECT_FALSE(out.done);
+
+  bytes b2 = make_bytes(88, 0x22);
+  inject(udp_packet(host, 3000, board, local, tftp_pkt(3, 2, b2)));
+  step();
+  EXPECT_TRUE(net_test::bytes_equal(as_udp(take_tx()).payload, tftp_pkt(4, 2)));
+  ASSERT_TRUE(out.done);
+  ASSERT_TRUE(out.ok);
+  EXPECT_EQ(out.size, 600u);
+  EXPECT_EQ(mem[0], 0x11);
+  EXPECT_EQ(mem[511], 0x11);
+  EXPECT_EQ(mem[512], 0x22);
+  EXPECT_EQ(mem[599], 0x22);
+  EXPECT_FALSE(tftp.busy());
+}
+
+TEST_F(Netstack, TftpDownloadReportsServerErrorAndSmallBuffer) {
+  bootldr::netstack_config cfg;
+  cfg.static_ip = ipv4_config::make_static(board);
+  bootldr::netstack<mtu> net{sched, nic, cfg};
+  ASSERT_TRUE(net.poll_with(pnd).has_value());
+  ASSERT_TRUE(net.start().has_value());
+  bootldr::tftp_client tftp{net};
+
+  bytes mem = make_bytes(100, 0);
+  tftp_out out;
+  ASSERT_TRUE(sched.spawn(run_get(tftp, host, reloco::span<std::uint8_t>(mem.data(), mem.size()), out)).has_value());
+  step();
+  const auto local = as_udp(take_tx()).src_port;
+  bytes msg = make_bytes({'n', 'o', 0});
+  inject(udp_packet(host, 3000, board, local, tftp_pkt(5, 1, msg)));
+  step();
+  ASSERT_TRUE(out.done);
+  EXPECT_FALSE(out.ok);
+  EXPECT_EQ(out.err, reloco::error::not_found);
+  EXPECT_EQ(tftp.server_error(), 1);
+
+  // A second transfer reuses the client; the 512-byte block does not fit into 100 bytes.
+  tftp_out out2;
+  ASSERT_TRUE(sched.spawn(run_get(tftp, host, reloco::span<std::uint8_t>(mem.data(), mem.size()), out2)).has_value());
+  step();
+  const auto local2 = as_udp(take_tx()).src_port;
+  inject(udp_packet(host, 3001, board, local2, tftp_pkt(3, 1, make_bytes(512, 1))));
+  step();
+  ASSERT_TRUE(out2.done);
+  EXPECT_EQ(out2.err, reloco::error::out_of_range);
+}
+
+TEST_F(Netstack, TftpIgnoresOtherHostsAndTimesOut) {
+  bootldr::netstack_config cfg;
+  cfg.static_ip = ipv4_config::make_static(board);
+  bootldr::netstack<mtu> net{sched, nic, cfg};
+  ASSERT_TRUE(net.poll_with(pnd).has_value());
+  ASSERT_TRUE(net.start().has_value());
+  bootldr::tftp_client tftp{net};
+
+  bytes mem = make_bytes(100, 0);
+  tftp_out out;
+  ASSERT_TRUE(sched.spawn(run_get(tftp, host, reloco::span<std::uint8_t>(mem.data(), mem.size()), out)).has_value());
+  step();
+  const auto local = as_udp(take_tx()).src_port;
+  inject(udp_packet(ipv4_address{192, 168, 7, 99}, 3000, board, local, tftp_pkt(3, 1, make_bytes(4, 7))));
+  for (int i = 0; i < 80 && !out.done; ++i)
+    step();
+  ASSERT_TRUE(out.done);
+  EXPECT_EQ(out.err, reloco::error::timed_out);
+}
+
+TEST_F(Netstack, TftpUploadsFromMemory) {
+  bootldr::netstack_config cfg;
+  cfg.static_ip = ipv4_config::make_static(board);
+  bootldr::netstack<mtu> net{sched, nic, cfg};
+  ASSERT_TRUE(net.poll_with(pnd).has_value());
+  ASSERT_TRUE(net.start().has_value());
+  bootldr::tftp_client tftp{net};
+
+  bytes src = make_bytes(600, 0x5A);
+  tftp_out out;
+  ASSERT_TRUE(sched.spawn(run_put(tftp, host, reloco::span<const std::uint8_t>(src.data(), src.size()), out)).has_value());
+  step();
+  auto wrq = as_udp(take_tx());
+  EXPECT_EQ(wrq.dst_port, 69);
+  EXPECT_EQ(wrq.payload[1], 2); // WRQ
+  const std::uint16_t local = wrq.src_port;
+
+  inject(udp_packet(host, 3000, board, local, tftp_pkt(4, 0)));
+  step();
+  auto d1 = as_udp(take_tx());
+  EXPECT_EQ(d1.dst_port, 3000);
+  ASSERT_EQ(d1.payload.size(), 516u);
+  EXPECT_EQ(d1.payload[1], 3);
+  EXPECT_EQ(d1.payload[3], 1);
+
+  inject(udp_packet(host, 3000, board, local, tftp_pkt(4, 1)));
+  step();
+  auto d2 = as_udp(take_tx());
+  ASSERT_EQ(d2.payload.size(), 4u + 88u);
+  EXPECT_EQ(d2.payload[3], 2);
+  EXPECT_FALSE(out.done);
+
+  inject(udp_packet(host, 3000, board, local, tftp_pkt(4, 2)));
+  step();
+  ASSERT_TRUE(out.done);
+  ASSERT_TRUE(out.ok);
+  EXPECT_EQ(out.size, 600u);
+}
+
+namespace {
+
+reloco::task<void> recv_timed(bootldr::udp_socket &s, std::uint64_t ms, tftp_out &out) {
+  reloco::array<std::uint8_t, 16> buf{};
+  auto r = co_await s.receive_from(buf, ms);
+  out.done = true;
+  if (r) {
+    out.ok = true;
+    out.size = r->size;
+  } else {
+    out.err = r.error();
+  }
+}
+
+} // namespace
+
+TEST_F(Netstack, UdpReceiveTimeout) {
+  bootldr::netstack_config cfg;
+  cfg.static_ip = ipv4_config::make_static(board);
+  bootldr::netstack<mtu> net{sched, nic, cfg};
+  ASSERT_TRUE(net.poll_with(pnd).has_value());
+  ASSERT_TRUE(net.start().has_value());
+  bootldr::udp_socket sock{net};
+  ASSERT_TRUE(sock.bind(5000).has_value());
+
+  tftp_out timed_out;
+  ASSERT_TRUE(sched.spawn(recv_timed(sock, 250, timed_out)).has_value());
+  step(100);
+  EXPECT_FALSE(timed_out.done);
+  step(100);
+  EXPECT_FALSE(timed_out.done);
+  step(100);
+  step(100); // the task started at t=100, so its 250 ms deadline is t=350
+  ASSERT_TRUE(timed_out.done);
+  EXPECT_EQ(timed_out.err, reloco::error::timed_out);
+
+  // A datagram arriving before the deadline is delivered.
+  tftp_out got;
+  ASSERT_TRUE(sched.spawn(recv_timed(sock, 1000, got)).has_value());
+  step(100);
+  inject(udp_packet(host, 4000, board, 5000, make_bytes({1, 2, 3})));
+  step(100);
+  ASSERT_TRUE(got.done);
+  EXPECT_TRUE(got.ok);
+  EXPECT_EQ(got.size, 3u);
+
+  // Timeout 0 only inspects the queue.
+  tftp_out poll0;
+  ASSERT_TRUE(sched.spawn(recv_timed(sock, 0, poll0)).has_value());
+  step(10);
+  ASSERT_TRUE(poll0.done);
+  EXPECT_EQ(poll0.err, reloco::error::timed_out);
 }

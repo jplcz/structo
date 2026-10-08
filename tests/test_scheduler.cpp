@@ -184,3 +184,46 @@ TEST_F(Scheduler, DestroyingSchedulerWithParkedTasksIsSafe) {
   } // parked frame destroyed with the scheduler
   SUCCEED();
 }
+
+namespace {
+
+reloco::task<void> timed_waiter(scheduler::event &e, log &l, int ok_tag, int timeout_tag) {
+  auto r = co_await e.wait_for(100);
+  l.add(r ? ok_tag : (r.error() == reloco::error::timed_out ? timeout_tag : -1));
+}
+
+} // namespace
+
+TEST_F(Scheduler, EventWaitForTimesOut) {
+  scheduler::event ev{sched};
+  log l;
+  ASSERT_TRUE(sched.spawn(timed_waiter(ev, l, 1, 2)).has_value());
+  sched.run_once();
+  now = 50;
+  sched.run_once();
+  EXPECT_EQ(l.n, 0);
+  now = 100;
+  sched.run_once();
+  sched.run_once();
+  ASSERT_EQ(l.n, 1);
+  EXPECT_EQ(l.items[0], 2);
+  // The abandoned wait must not resume the (finished) task when the event is set later.
+  ev.set();
+  sched.run_once();
+  EXPECT_EQ(l.n, 1);
+}
+
+TEST_F(Scheduler, EventWaitForCompletesWhenSetAndIgnoresLateTimer) {
+  scheduler::event ev{sched};
+  log l;
+  ASSERT_TRUE(sched.spawn(timed_waiter(ev, l, 1, 2)).has_value());
+  sched.run_once();
+  ev.set();
+  sched.run_once();
+  ASSERT_EQ(l.n, 1);
+  EXPECT_EQ(l.items[0], 1);
+  now = 500;
+  sched.run_once();
+  sched.run_once();
+  EXPECT_EQ(l.n, 1);
+}
