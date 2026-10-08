@@ -201,3 +201,41 @@ fails with `error::busy`: retry after a `yield()`).
 - For a TFTP client on top of the same link see
   [tftp_over_slip.md](tftp_over_slip.md); it currently drives `ipv4_node`
   directly rather than through `netstack`.
+
+## Using PPP instead of SLIP
+
+PPP negotiates the addresses itself (LCP, then IPCP), so there is no static
+IP or DHCP to configure. Authentication is not supported: run the host side
+with `noauth`.
+
+```
+# Host: hands 192.168.7.2 to the board, takes 192.168.7.1 for itself.
+pppd /dev/ttyUSB0 115200 192.168.7.1:192.168.7.2 noauth local nodetach
+```
+
+```cpp
+std::uint64_t now_ms(void *) noexcept;                  // monotonic ms clock, drives PPP retransmit timers
+
+structo::bootldr::scheduler sched;
+sched.set_clock(now_ms, nullptr);
+
+structo::hw::uart_ref uart{my_uart};                    // the serial line, 115200 8N1
+structo::net::ppp_config pcfg;                          // defaults: ask the peer for our address and DNS
+structo::hw::ppp_device<1500> ppp{uart, now_ms, nullptr, pcfg}; // 1500 = largest IP datagram; starts LCP right away
+structo::hw::polled_net_device<decltype(ppp)> pnd{ppp}; // coroutine send/receive on top of the polled backend
+structo::hw::net_device_ref nic{pnd};                   // what the netstack consumes
+
+structo::bootldr::netstack<1500> net{sched, nic};       // no static_ip/dhcp: the address comes from PPP
+(void)net.poll_with(pnd);                               // pump the device every scheduler round (also drives PPP)
+net.use_ppp(ppp.link());                                // apply the negotiated address/gateway when IPCP opens, clear it when the link drops
+(void)net.start();
+
+for (;;) {
+  sched.run_once();                                     // net.ready() becomes true once IPCP is open
+}
+```
+
+After `net.ready()` the board answers ping at the address
+`ppp.link().local_address()`; `ppp.link().dns()` holds the DNS server the peer
+offered (unspecified if none). If negotiation fails (`ppp.link().failed()`),
+check that `pppd` runs with `noauth` and the same baud rate.

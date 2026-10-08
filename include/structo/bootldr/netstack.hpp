@@ -56,6 +56,7 @@
 #include "../hw/polled_net_device.hpp"
 #include "../net/dhcp_client.hpp"
 #include "../net/ipv4_node.hpp"
+#include "../net/ppp.hpp"
 
 #if RELOCO_HAS_COROUTINES
 
@@ -124,6 +125,13 @@ public:
     (void)sched_->cancel(timer_id_);
   }
 
+  /**
+   * @brief Takes the address (and gateway) from a PPP link: each timer tick the negotiated IPv4
+   * configuration is applied while `link.ip_up()`, and cleared when the link drops. The link must
+   * outlive the netstack (usually `ppp_device::link()`).
+   */
+  void use_ppp(net::ppp_link &link) noexcept { ppp_ = &link; }
+
   [[nodiscard]] bool running() const noexcept { return running_; }
   /** @brief True once the node has an address (static or leased). */
   [[nodiscard]] bool ready() const noexcept { return ip_.configured(); }
@@ -183,12 +191,27 @@ private:
 
   static reloco::task<void> timer_loop(reloco::allocator_arg_t, reloco::allocator_ref, netstack &n) noexcept {
     for (;;) {
+      n.sync_ppp();
       if (n.cfg_.dhcp) {
         auto sent = co_await net::dhcp_send_due(n.ip_, n.dhcp_, n.sched_->now_ms());
         if (!sent)
           ++n.stats_.tx_errors;
       }
       co_await n.pause(n.cfg_.tick_ms);
+    }
+  }
+
+  void sync_ppp() noexcept {
+    if (!ppp_)
+      return;
+    if (ppp_->ip_up()) {
+      const auto want = ppp_->ipv4();
+      if (!ip_.configured() || ip_.config().address != want.address)
+        ip_.configure(want);
+      ppp_applied_ = true;
+    } else if (ppp_applied_) {
+      ip_.configure(net::ipv4_config{});
+      ppp_applied_ = false;
     }
   }
 
@@ -208,6 +231,8 @@ private:
   void *handler_ctx_ = nullptr;
   task_id rx_id_{};
   task_id timer_id_{};
+  net::ppp_link *ppp_ = nullptr;
+  bool ppp_applied_ = false;
   bool running_ = false;
 };
 
