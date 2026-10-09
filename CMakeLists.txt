@@ -325,6 +325,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_mmio_space.cpp
         tests/test_multiboot2.cpp
         tests/test_boot_protocols.cpp
+        tests/test_crypto.cpp
         tests/test_uart_ref.cpp
         tests/test_uart_input.cpp
         tests/test_input_device_ref.cpp
@@ -492,6 +493,18 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
     target_link_libraries(jplcz_structo_ipc_ring_fault_injection_tests PRIVATE
         jplcz_structo jplcz_structo_warnings GTest::gtest_main)
     gtest_discover_tests(jplcz_structo_ipc_ring_fault_injection_tests)
+
+    # Optional: exercises crypto/backends/mbedtls.hpp against a real mbedTLS 3.x. Point the two cache
+    # variables at its include directory and a library containing mbedcrypto (e.g. libmbedcrypto.a).
+    set(JPLCZ_STRUCTO_MBEDTLS_INCLUDE_DIR "" CACHE PATH "mbedTLS include directory (enables crypto backend test)")
+    set(JPLCZ_STRUCTO_MBEDTLS_LIBRARY "" CACHE FILEPATH "mbedTLS library to link (enables crypto backend test)")
+    if(JPLCZ_STRUCTO_MBEDTLS_INCLUDE_DIR AND JPLCZ_STRUCTO_MBEDTLS_LIBRARY)
+        add_executable(jplcz_structo_mbedtls_tests tests/test_crypto_mbedtls.cpp)
+        target_link_libraries(jplcz_structo_mbedtls_tests PRIVATE
+            jplcz_structo GTest::gtest_main "${JPLCZ_STRUCTO_MBEDTLS_LIBRARY}")
+        target_include_directories(jplcz_structo_mbedtls_tests SYSTEM PRIVATE "${JPLCZ_STRUCTO_MBEDTLS_INCLUDE_DIR}")
+        gtest_discover_tests(jplcz_structo_mbedtls_tests TEST_PREFIX "Mbedtls.")
+    endif()
 endif()
 
 if(JPLCZ_STRUCTO_BUILD_EXAMPLES)
@@ -520,6 +533,7 @@ if(JPLCZ_STRUCTO_BUILD_HEADER_CHECKS)
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/hypervisor/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/virtio/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/boot/*.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/crypto/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/bootldr/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/net/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/usb/*.hpp"
