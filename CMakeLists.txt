@@ -325,6 +325,8 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_mmio_space.cpp
         tests/test_multiboot2.cpp
         tests/test_uart_ref.cpp
+        tests/test_uart_input.cpp
+        tests/test_input_device_ref.cpp
         tests/test_xmodem.cpp
         tests/test_boot_prompt.cpp
         tests/test_text_editor.cpp
@@ -333,6 +335,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_irqc_ref.cpp
         tests/test_framebuffer.cpp
         tests/test_console_ref.cpp
+        tests/test_console_uart.cpp
         tests/test_vga_text_console.cpp
         tests/test_framebuffer_console.cpp
         tests/test_vt100.cpp

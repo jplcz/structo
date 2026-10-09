@@ -74,4 +74,16 @@ if(UNIX)
     target_link_libraries(shell_linux_demo PRIVATE jplcz_structo jplcz_structo_warnings)
     target_compile_features(shell_linux_demo PRIVATE cxx_std_20)
     add_dependencies(jplcz_structo_examples shell_linux_demo)
+
+    # Graphical terminal emulator spawning $SHELL on a pty, via input_device_ref + framebuffer_console +
+    # console_uart; needs SDL3 like the other sdl3_* demos.
+    if(SDL3_FOUND)
+        add_executable(sdl3_shell_terminal_demo sdl3_shell_terminal_demo.cpp)
+        target_link_libraries(sdl3_shell_terminal_demo PRIVATE jplcz_structo jplcz_structo_warnings SDL3::SDL3)
+        find_library(JPLCZ_STRUCTO_UTIL_LIB util)
+        if(JPLCZ_STRUCTO_UTIL_LIB)
+            target_link_libraries(sdl3_shell_terminal_demo PRIVATE ${JPLCZ_STRUCTO_UTIL_LIB})
+        endif()
+        add_dependencies(jplcz_structo_examples sdl3_shell_terminal_demo)
+    endif()
 endif()

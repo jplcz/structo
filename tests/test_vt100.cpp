@@ -6,6 +6,10 @@
 #include <reloco/array.hpp>
 #include <structo/hw/vt100.hpp>
 
+#include <string>
+#include <utility>
+#include <vector>
+
 using namespace structo::hw;
 
 namespace {
@@ -50,6 +54,20 @@ struct Vt100Test : ::testing::Test {
 
 TEST_F(Vt100Test, PlainTextAdvancesCursorAndWritesGlyphs) {
   term.feed("AB");
+  EXPECT_EQ(term.console().cursor_x(), 2u);
+  EXPECT_EQ(cell_at(term.console(), 0, 0).ch, 'A');
+  EXPECT_EQ(cell_at(term.console(), 1, 0).ch, 'B');
+}
+
+TEST_F(Vt100Test, NulBelDelAndHighBytesAreIgnored) {
+  term.feed(std::string_view("A\0\a\x7f\xe2\x9e\x9c" "B", 8));
+  EXPECT_EQ(term.console().cursor_x(), 2u);
+  EXPECT_EQ(cell_at(term.console(), 0, 0).ch, 'A');
+  EXPECT_EQ(cell_at(term.console(), 1, 0).ch, 'B');
+}
+
+TEST_F(Vt100Test, PrivateModeAndIntermediateSequencesAreConsumedSilently) {
+  term.feed("A\x1b[?1h\x1b=\x1b[?2004h\x1b[?25l\x1b[1 qB");
   EXPECT_EQ(term.console().cursor_x(), 2u);
   EXPECT_EQ(cell_at(term.console(), 0, 0).ch, 'A');
   EXPECT_EQ(cell_at(term.console(), 1, 0).ch, 'B');
@@ -211,4 +229,217 @@ TEST_F(Vt100Test, FeedStringViewProcessesEveryByte) {
   term.feed("\x1b[2;2HHi");
   EXPECT_EQ(cell_at(term.console(), 1, 1).ch, 'H');
   EXPECT_EQ(cell_at(term.console(), 2, 1).ch, 'i');
+}
+
+namespace {
+
+// reloco::string_view refuses temporary std::strings; bind to a named one first.
+void feed_str(vt100_terminal &t, const std::string &s) { t.feed(reloco::string_view(s)); }
+
+std::string row_text(const console_ref &c, std::size_t y) {
+  std::string s;
+  for (std::size_t x = 0; x < kCols; ++x)
+    s += cell_at(c, x, y).ch;
+  while (!s.empty() && s.back() == ' ')
+    s.pop_back();
+  return s;
+}
+
+// One letter per row: row 0 = 'A', row 1 = 'B', ...
+void fill_rows(vt100_terminal &t) {
+  for (std::size_t y = 0; y < kRows; ++y) {
+    std::string s = "\x1b[" + std::to_string(y + 1) + ";1H";
+    s += static_cast<char>('A' + y);
+    feed_str(t, s);
+  }
+}
+
+struct event_log {
+  int bells = 0;
+  int resets = 0;
+  std::string title;
+  std::vector<std::pair<std::uint32_t, std::string>> oscs;
+  std::vector<std::pair<vt100_mode, bool>> modes;
+  std::vector<std::uint32_t> styles;
+  std::string replies;
+};
+
+vt100_callbacks make_callbacks(event_log &log) {
+  vt100_callbacks cb;
+  cb.ctx = &log;
+  cb.bell = [](void *c) noexcept { ++static_cast<event_log *>(c)->bells; };
+  cb.title = [](void *c, reloco::string_view s) noexcept {
+    static_cast<event_log *>(c)->title.assign(s.data(), s.size());
+  };
+  cb.osc = [](void *c, std::uint32_t code, reloco::string_view s) noexcept {
+    static_cast<event_log *>(c)->oscs.emplace_back(code, std::string(s.data(), s.size()));
+  };
+  cb.mode = [](void *c, vt100_mode m, bool on) noexcept { static_cast<event_log *>(c)->modes.emplace_back(m, on); };
+  cb.cursor_style = [](void *c, std::uint32_t s) noexcept { static_cast<event_log *>(c)->styles.push_back(s); };
+  cb.reply = [](void *c, reloco::string_view s) noexcept { static_cast<event_log *>(c)->replies.append(s.data(), s.size()); };
+  cb.reset = [](void *c) noexcept { ++static_cast<event_log *>(c)->resets; };
+  return cb;
+}
+
+} // namespace
+
+TEST_F(Vt100Test, DeferredWrapDoesNotInsertBlankRowAfterFullLine) {
+  feed_str(term, std::string(kCols, 'x'));
+  EXPECT_EQ(term.console().cursor_x(), kCols - 1);
+  EXPECT_EQ(term.console().cursor_y(), 0u);
+  term.feed("\r\n");
+  EXPECT_EQ(term.console().cursor_y(), 1u);
+  EXPECT_EQ(term.console().cursor_x(), 0u);
+
+  feed_str(term, std::string(kCols, 'y') + "z"); // the 21st character wraps first
+  EXPECT_EQ(cell_at(term.console(), 0, 2).ch, 'z');
+}
+
+TEST_F(Vt100Test, AutowrapCanBeDisabled) {
+  term.feed("\x1b[?7l");
+  feed_str(term, std::string(kCols, 'x') + "!");
+  EXPECT_EQ(term.console().cursor_y(), 0u);
+  EXPECT_EQ(cell_at(term.console(), kCols - 1, 0).ch, '!'); // overwrote the last column
+  term.feed("\x1b[?7h");
+}
+
+TEST_F(Vt100Test, ScrollRegionScrollsOnlyInsideMargins) {
+  fill_rows(term);
+  term.feed("\x1b[2;4r"); // rows 2..4 (1-based), cursor homes
+  term.feed("\x1b[4;1H\n"); // LF on the region's bottom row
+  EXPECT_EQ(row_text(term.console(), 0), "A");
+  EXPECT_EQ(row_text(term.console(), 1), "C");
+  EXPECT_EQ(row_text(term.console(), 2), "D");
+  EXPECT_EQ(row_text(term.console(), 3), "");
+  EXPECT_EQ(row_text(term.console(), 4), "E");
+  EXPECT_EQ(row_text(term.console(), 5), "F");
+}
+
+TEST_F(Vt100Test, ReverseIndexAtRegionTopScrollsDown) {
+  fill_rows(term);
+  term.feed("\x1b[1;1H\x1bM");
+  EXPECT_EQ(row_text(term.console(), 0), "");
+  EXPECT_EQ(row_text(term.console(), 1), "A");
+  EXPECT_EQ(row_text(term.console(), 5), "E");
+}
+
+TEST_F(Vt100Test, InsertAndDeleteLines) {
+  fill_rows(term);
+  term.feed("\x1b[2;1H\x1b[L"); // insert one line at row 2
+  EXPECT_EQ(row_text(term.console(), 1), "");
+  EXPECT_EQ(row_text(term.console(), 2), "B");
+  EXPECT_EQ(row_text(term.console(), 5), "E");
+  term.feed("\x1b[M"); // delete it again
+  EXPECT_EQ(row_text(term.console(), 1), "B");
+  EXPECT_EQ(row_text(term.console(), 5), "");
+}
+
+TEST_F(Vt100Test, InsertDeleteEraseCharacters) {
+  term.feed("abcdef");
+  term.feed("\x1b[1;3H\x1b[2P"); // delete "cd"
+  EXPECT_EQ(row_text(term.console(), 0), "abef");
+  term.feed("\x1b[2@"); // insert two blanks at the cursor
+  EXPECT_EQ(row_text(term.console(), 0), "ab  ef");
+  term.feed("\x1b[3X"); // erase three cells, no shifting
+  EXPECT_EQ(row_text(term.console(), 0), "ab   f");
+}
+
+TEST_F(Vt100Test, CursorSaveRestoreIncludesColors) {
+  term.feed("\x1b[2;5H\x1b[31m\x1b" "7");
+  term.feed("\x1b[1;1H\x1b[0m");
+  term.feed("\x1b" "8");
+  EXPECT_EQ(term.console().cursor_x(), 4u);
+  EXPECT_EQ(term.console().cursor_y(), 1u);
+  EXPECT_EQ(term.console().foreground(), console_color::red);
+  term.feed("\x1b[1;1H\x1b[s\x1b[3;3H\x1b[u"); // CSI s / CSI u form
+  EXPECT_EQ(term.console().cursor_x(), 0u);
+}
+
+TEST_F(Vt100Test, ExtendedColorsMapToNearestOf16) {
+  term.feed("\x1b[38;5;196m"); // 256-colour pure red
+  EXPECT_EQ(term.console().foreground(), console_color::red);
+  term.feed("\x1b[48;2;0;0;170m"); // true-colour blue
+  EXPECT_EQ(term.console().background(), console_color::blue);
+  term.feed("\x1b[1;38;5;2m\x1b[m"); // several params in one sequence, then reset
+  EXPECT_EQ(term.console().foreground(), console_color::light_gray);
+  term.feed("\x1b[31;7m"); // reverse video swaps fg and bg
+  EXPECT_EQ(term.console().foreground(), console_color::black);
+  EXPECT_EQ(term.console().background(), console_color::red);
+}
+
+TEST_F(Vt100Test, RelativeAndAbsoluteCursorForms) {
+  term.feed("\x1b[3;4H\x1b[2E"); // CNL
+  EXPECT_EQ(term.console().cursor_x(), 0u);
+  EXPECT_EQ(term.console().cursor_y(), 4u);
+  term.feed("\x1b[2F\x1b[7G\x1b[6d"); // CPL, CHA, VPA
+  EXPECT_EQ(term.console().cursor_x(), 6u);
+  EXPECT_EQ(term.console().cursor_y(), 5u);
+}
+
+TEST_F(Vt100Test, OscIsConsumedAndReportedWithEitherTerminator) {
+  event_log log;
+  term.set_callbacks(make_callbacks(log));
+  term.feed("A\x1b]0;my title\x07" "B\x1b]2;second\x1b\\" "C\x1b]7;file:///tmp\x07");
+  EXPECT_EQ(row_text(term.console(), 0), "ABC"); // no payload leaked onto the screen
+  EXPECT_EQ(log.title, "second");
+  ASSERT_EQ(log.oscs.size(), 1u);
+  EXPECT_EQ(log.oscs[0].first, 7u);
+  EXPECT_EQ(log.oscs[0].second, "file:///tmp");
+}
+
+TEST_F(Vt100Test, OscSplitAcrossFeedsAndTruncated) {
+  event_log log;
+  term.set_callbacks(make_callbacks(log));
+  term.feed("\x1b]0;ab");
+  term.feed("cd\x07");
+  EXPECT_EQ(log.title, "abcd");
+  feed_str(term, "\x1b]0;" + std::string(400, 'z') + "\x07");
+  EXPECT_EQ(log.title.size(), 255u);
+}
+
+TEST_F(Vt100Test, BellAndResetCallbacks) {
+  event_log log;
+  term.set_callbacks(make_callbacks(log));
+  term.feed("a\x07\x07");
+  EXPECT_EQ(log.bells, 2);
+  EXPECT_EQ(term.console().cursor_x(), 1u); // BEL draws nothing
+  term.feed("\x1b[31m\x1b[3;3H\x1b" "c");
+  EXPECT_EQ(log.resets, 1);
+  EXPECT_EQ(row_text(term.console(), 0), "");
+  EXPECT_EQ(term.console().cursor_x(), 0u);
+  EXPECT_EQ(term.console().foreground(), console_color::light_gray);
+}
+
+TEST_F(Vt100Test, PrivateModeAndStyleCallbacks) {
+  event_log log;
+  term.set_callbacks(make_callbacks(log));
+  term.feed("\x1b[?2004h\x1b[?1;25l\x1b=\x1b>\x1b[5 q");
+  ASSERT_EQ(log.modes.size(), 5u);
+  EXPECT_EQ(log.modes[0], std::make_pair(vt100_mode::bracketed_paste, true));
+  EXPECT_EQ(log.modes[1], std::make_pair(vt100_mode::application_cursor_keys, false));
+  EXPECT_EQ(log.modes[2], std::make_pair(vt100_mode::cursor_visible, false));
+  EXPECT_EQ(log.modes[3], std::make_pair(vt100_mode::application_keypad, true));
+  EXPECT_EQ(log.modes[4], std::make_pair(vt100_mode::application_keypad, false));
+  ASSERT_EQ(log.styles.size(), 1u);
+  EXPECT_EQ(log.styles[0], 5u);
+  EXPECT_EQ(row_text(term.console(), 0), "");
+}
+
+TEST_F(Vt100Test, StatusAndAttributeQueriesProduceReplies) {
+  event_log log;
+  term.set_callbacks(make_callbacks(log));
+  term.feed("\x1b[3;5H\x1b[6n");
+  EXPECT_EQ(log.replies, "\x1b[3;5R");
+  log.replies.clear();
+  term.feed("\x1b[5n\x1b[c");
+  EXPECT_EQ(log.replies, "\x1b[0n\x1b[?1;2c");
+  log.replies.clear();
+  term.feed("\x1b[>c"); // secondary DA is not implemented: no reply, and nothing printed
+  EXPECT_EQ(log.replies, "");
+  EXPECT_EQ(row_text(term.console(), 0), "");
+}
+
+TEST_F(Vt100Test, EventsWithoutCallbacksAreHarmless) {
+  term.feed("\x07\x1b]0;t\x07\x1b[6n\x1b[?2004h\x1b[2 q");
+  EXPECT_EQ(row_text(term.console(), 0), "");
 }
