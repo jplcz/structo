@@ -90,4 +90,27 @@ can be layered on by a caller drawing directly onto `pixels()`).
 - [`framebuffer.md`](framebuffer.md) -- the pixel-level framebuffer this backend rasterizes onto
 - [`vga_text_console.md`](vga_text_console.md) -- the VGA/CGA text-mode alternative backend
 - [`vt100.md`](vt100.md) -- the VT100/ANSI escape-sequence interpreter that can drive this backend
-- [`examples/sdl3_vt100_framebuffer_console_demo.cpp`](../examples/sdl3_vt100_framebuffer_console_demo.cpp) -- renders this backend with a real bitmap font (`examples/fonts/dejavu_sans_mono_8x16_font.hpp`, not `block_font_8x8`) through a real SDL3 window (only built when SDL3 is found)
+- [`examples/sdl3_vt100_framebuffer_console_demo.cpp`](../examples/sdl3_vt100_framebuffer_console_demo.cpp) -- renders this backend with a real bitmap font (`examples/fonts/`, selectable with `--font NAME`; not `block_font_8x8`) through a real SDL3 window (only built when SDL3 is found)
+
+## Bundled fonts
+
+`examples/fonts/` ships bitmap `Font` headers the demos can pick at start-up (`--font NAME`,
+`STRUCTO_FONT=NAME`, `--list-fonts`; see `examples/fonts/all_fonts.hpp`):
+
+| Name | Font | License |
+|---|---|---|
+| `terminus` (default), `terminus-bold`, `terminus-14` | Terminus 16n / 16b / 14n | SIL OFL 1.1 (`LICENSE.terminus-OFL.txt`) |
+| `spleen` | Spleen 8x16 | BSD-2-Clause (`LICENSE.spleen`) |
+| `dejavu` | DejaVu Sans Mono, rasterized | Bitstream Vera (`copyright`) |
+
+The Terminus/Spleen headers are generated from the upstream BDF files, copied pixel-for-pixel:
+
+```sh
+# --bdf takes a bitmap font (no Pillow needed, nothing is resampled); --font takes a TTF/OTF instead.
+./scripts/ttf_to_font_header.py --bdf terminus-font-4.49.1/ter-u16n.bdf \
+    --struct-name terminus_8x16 --namespace structo::examples::fonts \
+    --font-name "Terminus 16 Normal" --font-license "SIL OFL 1.1" \
+    --output examples/fonts/terminus_8x16_font.hpp
+```
+
+Glyphs cover ASCII `0x20-0x7E` only (the `Font` trait indexes by `char`).

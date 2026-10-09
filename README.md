@@ -57,9 +57,10 @@ demonstrated in [examples/](examples):
 - **[`sdl3_vt100_framebuffer_console_demo.cpp`](examples/sdl3_vt100_framebuffer_console_demo.cpp)**
   -- a windowed demo driving `hw::vt100_terminal`/`microfmt::format_to`
   through `hw::console_ref` onto `hw::framebuffer_console` (rendered
-  with the real DejaVu Sans Mono bitmap font in
-  [`examples/fonts/`](examples/fonts), not `block_font_8x8`'s
-  solid-block placeholder), presented via the same SDL3 window
+  with a real bitmap font from
+  [`examples/fonts/`](examples/fonts) -- Terminus, Spleen or DejaVu,
+  chosen with `--font NAME`/`STRUCTO_FONT`, `--list-fonts` lists them --
+  not `block_font_8x8`'s solid-block placeholder), presented via the same SDL3 window
   pipeline; also only built when SDL3 is found.
 - **[`sdl3_virtio_gpu_demo.cpp`](examples/sdl3_virtio_gpu_demo.cpp)** --
   a windowed demo of `virtio::virtio_gpu_function`: a tiny in-process

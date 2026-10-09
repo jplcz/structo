@@ -15,6 +15,7 @@
 // by a reloco::thread blocked in poll(2) and passed over a reloco SPSC ring buffer.
 //
 // SDL scancodes of the keyboard block are USB HID usages, so they pass straight through as HID key events.
+// Font: `--font NAME` or STRUCTO_FONT (terminus, terminus-bold, terminus-14, spleen, dejavu); `--list-fonts`.
 // Layout is US. Window size is fixed; the pty is told its size (columns x rows) via TIOCSWINSZ.
 //
 // The terminal speaks an xterm-style VT100/ANSI subset (see docs/vt100.md); TERM defaults to "xterm" (so
@@ -27,7 +28,7 @@
 #include <structo/hw/input_device_ref.hpp>
 #include <structo/hypervisor/mmio_framebuffer_device.hpp>
 
-#include "fonts/dejavu_sans_mono_8x16_font.hpp"
+#include "fonts/all_fonts.hpp"
 
 #include <SDL3/SDL.h>
 
@@ -56,7 +57,6 @@
 RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
 
 using namespace structo;
-using structo::examples::fonts::dejavu_sans_mono_8x16;
 using structo::hw::console_cell;
 using structo::hw::rgba8888;
 
@@ -69,6 +69,8 @@ constexpr std::size_t window_height = 768;
 struct sdl_keyboard {
   std::deque<hw::input_event> queue;
   bool quit = false;
+  float cell_width = 8;   // glyph size in pixels, set by main() from the selected font
+  float cell_height = 16;
 
   // Translates one SDL event; keyboard, mouse and window-close are handled, everything else is ignored.
   void feed(const SDL_Event &ev) {
@@ -107,8 +109,8 @@ struct sdl_keyboard {
 
   // Pointer positions go to the input framework in character cells (what `console_uart` reports to programs).
   void point_at(float px, float py) {
-    const auto cx = static_cast<std::int32_t>(px / static_cast<float>(dejavu_sans_mono_8x16::glyph_width));
-    const auto cy = static_cast<std::int32_t>(py / static_cast<float>(dejavu_sans_mono_8x16::glyph_height));
+    const auto cx = static_cast<std::int32_t>(px / cell_width);
+    const auto cy = static_cast<std::int32_t>(py / cell_height);
     queue.push_back(hw::make_abs_event(hw::input_axis::x, cx));
     queue.push_back(hw::make_abs_event(hw::input_axis::y, cy));
   }
@@ -130,9 +132,9 @@ template <> struct structo::hw::input_traits<sdl_keyboard> {
   }
 };
 
-int main() {
-  const std::size_t cols = window_width / dejavu_sans_mono_8x16::glyph_width;
-  const std::size_t rows = window_height / dejavu_sans_mono_8x16::glyph_height;
+template <typename Font> int run() {
+  const std::size_t cols = window_width / Font::glyph_width;
+  const std::size_t rows = window_height / Font::glyph_height;
 
   // Spawn $SHELL on a pty sized to the text grid.
   winsize ws{};
@@ -183,7 +185,7 @@ int main() {
   }
   auto fb = std::move(fb_maker.value());
   std::vector<console_cell> cells(cols * rows);
-  auto console_maker = hw::framebuffer_console<rgba8888, dejavu_sans_mono_8x16>::try_create(
+  auto console_maker = hw::framebuffer_console<rgba8888, Font>::try_create(
       fb.pixels(), reloco::span<console_cell>(cells.data(), cells.size()));
   if (!console_maker.has_value()) {
     std::fprintf(stderr, "framebuffer_console creation failed\n");
@@ -193,6 +195,8 @@ int main() {
 
   // The adapters: keyboard -> input_device_ref, screen -> console_ref, both bridged into one uart_ref.
   sdl_keyboard keyboard;
+  keyboard.cell_width = static_cast<float>(Font::glyph_width);
+  keyboard.cell_height = static_cast<float>(Font::glyph_height);
   hw::input_device_ref input(keyboard);
   hw::console_ref screen(console);
   hw::console_uart bridge(input, screen);
@@ -329,6 +333,13 @@ int main() {
   int status = 0;
   (void)::waitpid(child, &status, 0);
   return 0;
+}
+
+int main(int argc, char **argv) {
+  // Fonts are compile-time types, so the demo is instantiated once per font and `--font NAME`/`STRUCTO_FONT`
+  // (default: terminus) picks one at start-up; `--list-fonts` shows them.
+  return structo::examples::fonts::select_font(
+      argc, argv, [](auto tag) { return run<typename decltype(tag)::type>(); });
 }
 
 RELOCO_END_UNSAFE_BUFFER_USAGE

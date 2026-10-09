@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 Jarosław Pelczar <jarek@jpelczar.com>
 #
 # SPDX-License-Identifier: BSD-2-Clause
-"""Converts a TTF/OTF font into a bitmap `Font` header compatible with
+"""Converts a TTF/OTF font (rasterized) or a BDF bitmap font (copied as-is, no resampling) into a bitmap `Font` header compatible with
 structo::hw::framebuffer_console's `Font` trait
 (include/structo/hw/framebuffer_console.hpp).
 
@@ -14,8 +14,10 @@ font file you have the rights to use this way and it will produce a
 ready-to-include header -- it is not specific to any one font shipped
 with structo.
 
-Requires Pillow (`pip install Pillow`); Pillow's FreeType-backed text
-rendering is used to rasterize each glyph.
+Requires Pillow (`pip install Pillow`) for TTF/OTF input; Pillow's FreeType-backed
+text rendering is used to rasterize each glyph. BDF input (`--bdf`, e.g. Terminus or
+Spleen) needs no extra packages and is the better choice when a hand-drawn bitmap
+font exists, since nothing is resampled.
 
 Example:
     ./scripts/ttf_to_font_header.py \\
@@ -27,6 +29,13 @@ Example:
         --font-license "Bitstream Vera License (permissive; see DejaVu Fonts License)" \\
         --font-source "https://dejavu-fonts.github.io/" \\
         --output examples/fonts/dejavu_sans_mono_8x16_font.hpp
+
+    ./scripts/ttf_to_font_header.py \\
+        --bdf terminus-font-4.49.1/ter-u16n.bdf \\
+        --struct-name terminus_8x16 \\
+        --namespace structo::examples::fonts \\
+        --font-name "Terminus 16 Normal" --font-license "SIL OFL 1.1" \\
+        --output examples/fonts/terminus_8x16_font.hpp
 """
 
 from __future__ import annotations
@@ -39,7 +48,7 @@ from pathlib import Path
 try:
     from PIL import Image, ImageDraw, ImageFont
 except ImportError:  # pragma: no cover - environment-dependent
-    sys.exit("error: Pillow is required (pip install Pillow)")
+    Image = ImageDraw = ImageFont = None  # only needed for TTF/OTF input
 
 
 def parse_codepoint(value: str) -> int:
@@ -80,6 +89,52 @@ def render_glyph_rows(
     return rows
 
 
+def load_bdf(path: str, first: int, last: int) -> tuple[int, int, list[list[int]]]:
+    """Reads a BDF bitmap font; returns (width, height, glyph rows for first..last).
+    Glyphs are placed in the font's bounding-box cell using their BBX offsets; characters the
+    font lacks stay blank."""
+    cell_w = cell_h = cell_xoff = cell_yoff = 0
+    glyphs: dict[int, list[int]] = {}
+    enc = -1
+    bbx = (0, 0, 0, 0)
+    reading = False
+    rows: list[int] = []
+    for line in Path(path).read_text(encoding="latin-1").splitlines():
+        parts = line.split()
+        if not parts:
+            continue
+        key = parts[0]
+        if reading:
+            if key == "ENDCHAR":
+                reading = False
+                if 0 <= enc <= 0xFF and len(rows) >= 0:
+                    w, h, xoff, yoff = bbx
+                    shift = xoff - cell_xoff
+                    top = cell_yoff + cell_h - (yoff + h)
+                    out = [0] * cell_h
+                    for r, bits in enumerate(rows):
+                        y = top + r
+                        if 0 <= y < cell_h:
+                            out[y] = (bits >> shift if shift >= 0 else bits << -shift) & 0xFF
+                    glyphs[enc] = out
+            else:
+                # Rows are hex, left-aligned; fonts up to 8 wide use exactly one byte per row.
+                rows.append(int(key[:2], 16))
+        elif key == "FONTBOUNDINGBOX":
+            cell_w, cell_h, cell_xoff, cell_yoff = (int(v) for v in parts[1:5])
+        elif key == "ENCODING":
+            enc = int(parts[1])
+        elif key == "BBX":
+            bbx = tuple(int(v) for v in parts[1:5])  # type: ignore[assignment]
+        elif key == "BITMAP":
+            reading = True
+            rows = []
+    if not 1 <= cell_w <= 8:
+        sys.exit(f"error: {path}: cell width {cell_w} is not 1-8 (one row = one uint8_t)")
+    blank = [0] * cell_h
+    return cell_w, cell_h, [glyphs.get(c, blank) for c in range(first, last + 1)]
+
+
 def glyph_art(rows: list[int], width: int) -> list[str]:
     """Renders a glyph's bytes as a '#'/'.' ASCII-art comment block."""
     art = []
@@ -111,19 +166,24 @@ def format_header(args: argparse.Namespace, first: int, last: int, glyphs: list[
     lines: list[str] = []
     lines.append("// clang-format off")
     lines.append("//")
+    source_file = args.bdf or args.font
     lines.append(f"// GENERATED FILE -- produced by scripts/ttf_to_font_header.py on {now}.")
     lines.append("// Do not hand-edit; re-run the generator against the source font instead.")
     lines.append("//")
     if args.font_name:
         lines.append(f"//   Source font:  {args.font_name}")
-    lines.append(f"//   Source file:  {Path(args.font).name}")
+    lines.append(f"//   Source file:  {Path(source_file).name}")
     if args.font_source:
         lines.append(f"//   Upstream:     {args.font_source}")
     if args.font_license:
         lines.append(f"//   License:      {args.font_license}")
-        lines.append("//   The embedded glyph bitmaps below are a mechanically-rasterized,")
-        lines.append("//   low-resolution derivative of that font's outlines; confirm this")
-        lines.append("//   license permits this kind of redistribution/embedding before use.")
+        if args.bdf:
+            lines.append("//   The embedded glyph bitmaps below are copied from that bitmap font;")
+            lines.append("//   keep the upstream copyright/license notice with any redistribution.")
+        else:
+            lines.append("//   The embedded glyph bitmaps below are a mechanically-rasterized,")
+            lines.append("//   low-resolution derivative of that font's outlines; confirm this")
+            lines.append("//   license permits this kind of redistribution/embedding before use.")
     lines.append(f"//   Glyph size:   {width}x{height} pixels, bit 7 (MSB) = leftmost pixel")
     lines.append(f"//   Char range:   0x{first:02X}-0x{last:02X}")
     lines.append("// clang-format on")
@@ -140,6 +200,7 @@ def format_header(args: argparse.Namespace, first: int, last: int, glyphs: list[
     lines.append("")
     lines.append("#include <cstddef>")
     lines.append("#include <cstdint>")
+    lines.append("#include <reloco/lifetime.hpp>")
     lines.append("")
 
     namespaces = [n for n in args.namespace.split("::") if n]
@@ -149,7 +210,7 @@ def format_header(args: argparse.Namespace, first: int, last: int, glyphs: list[
         lines.append("")
 
     lines.append(f"/** @brief {width}x{height} bitmap font generated from "
-                  f"{args.font_name or Path(args.font).name}. */")
+                  f"{args.font_name or Path(source_file).name}. */")
     lines.append(f"struct {args.struct_name} {{")
     lines.append(f"  static constexpr std::size_t glyph_width = {width};")
     lines.append(f"  static constexpr std::size_t glyph_height = {height};")
@@ -171,7 +232,10 @@ def format_header(args: argparse.Namespace, first: int, last: int, glyphs: list[
     lines.append(f"    if (code < 0x{first:02X} || code > 0x{last:02X}) {{")
     lines.append("      return blank;")
     lines.append("    }")
+    lines.append(f"    // code is range-checked to [0x{first:02X}, 0x{last:02X}] above.")
+    lines.append("    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE")
     lines.append(f"    return glyphs[code - 0x{first:02X}];")
+    lines.append("    RELOCO_END_UNSAFE_BUFFER_USAGE")
     lines.append("  }")
     lines.append("};")
 
@@ -190,7 +254,9 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    parser.add_argument("--font", required=True, help="Path to the source .ttf/.otf file")
+    parser.add_argument("--font", help="Path to the source .ttf/.otf file (rasterized)")
+    parser.add_argument("--bdf", help="Path to a source .bdf bitmap font (copied as-is; width/height "
+                                      "come from the font, --width/--height are ignored)")
     parser.add_argument("--output", required=True, help="Path to write the generated header to")
     parser.add_argument("--width", type=int, default=8,
                          help="Glyph width in pixels, 1-8 (the Font trait packs one row per "
@@ -222,6 +288,8 @@ def main() -> int:
                          "attribution in the generated file's doc comment")
     args = parser.parse_args()
 
+    if bool(args.font) == bool(args.bdf):
+        parser.error("give exactly one of --font and --bdf")
     if not (1 <= args.width <= 8):
         parser.error("--width must be between 1 and 8 (one row = one uint8_t, MSB = leftmost "
                       "pixel)")
@@ -237,17 +305,20 @@ def main() -> int:
     if first < 0 or last > 0xFF:
         parser.error("--first/--last must be within 0x00-0xFF (char is one byte)")
 
-    pil_font = ImageFont.truetype(args.font, args.height)
-    # Use the font's own (monospace) advance width as the natural glyph
-    # cell, so every character is condensed/expanded to the requested
-    # --width by the same ratio instead of being clipped on one side.
-    advance_width = max(1, round(pil_font.getlength("M")))
-
     glyphs = []
-    for code in range(first, last + 1):
-        rows = render_glyph_rows(pil_font, chr(code), args.width, args.height, args.threshold,
-                                  args.x_offset, args.y_offset, advance_width)
-        glyphs.append(rows)
+    if args.bdf:
+        args.width, args.height, glyphs = load_bdf(args.bdf, first, last)
+    else:
+        if ImageFont is None:
+            sys.exit("error: Pillow is required for TTF/OTF input (pip install Pillow)")
+        pil_font = ImageFont.truetype(args.font, args.height)
+        # Use the font's own (monospace) advance width as the natural glyph
+        # cell, so every character is condensed/expanded to the requested
+        # --width by the same ratio instead of being clipped on one side.
+        advance_width = max(1, round(pil_font.getlength("M")))
+        for code in range(first, last + 1):
+            glyphs.append(render_glyph_rows(pil_font, chr(code), args.width, args.height, args.threshold,
+                                            args.x_offset, args.y_offset, advance_width))
 
     header = format_header(args, first, last, glyphs)
 

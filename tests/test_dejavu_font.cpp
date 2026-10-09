@@ -9,8 +9,10 @@
 // genuine drop-in replacement for `block_font_8x8`.
 
 #include <gtest/gtest.h>
+#include <cstring>
 #include <structo/hw/framebuffer_console.hpp>
 
+#include "fonts/all_fonts.hpp"
 #include "fonts/dejavu_sans_mono_8x16_font.hpp"
 #include "fonts/dejavu_sans_mono_8x8_font.hpp"
 
@@ -71,3 +73,45 @@ template <typename Font> void exercise_font() {
 TEST(DejavuFontTest, Glyph8x16RendersRealShapeNotABlock) { exercise_font<dejavu_sans_mono_8x16>(); }
 
 TEST(DejavuFontTest, Glyph8x8RendersRealShapeNotABlock) { exercise_font<dejavu_sans_mono_8x8>(); }
+
+namespace {
+
+template <typename Font> void expect_sane_bitmap_font() {
+  auto ink = [](const std::uint8_t *g) {
+    unsigned bits = 0;
+    for (std::size_t y = 0; y < Font::glyph_height; ++y)
+      bits |= g[y];
+    return bits;
+  };
+  EXPECT_EQ(ink(Font::glyph_bitmap(' ')), 0u);        // space has no ink
+  EXPECT_EQ(ink(Font::glyph_bitmap('\x01')), 0u);     // outside 0x20..0x7E is blank
+  EXPECT_NE(ink(Font::glyph_bitmap('A')), 0u);
+  EXPECT_NE(ink(Font::glyph_bitmap('~')), 0u);
+  EXPECT_NE(Font::glyph_bitmap('A')[0] | Font::glyph_bitmap('A')[Font::glyph_height / 2], 0u);
+  EXPECT_NE(std::memcmp(Font::glyph_bitmap('l'), Font::glyph_bitmap('I'), Font::glyph_height), 0);
+}
+
+} // namespace
+
+TEST(BundledFonts, EveryRegisteredFontIsAUsableBitmapFont) {
+  using namespace structo::examples::fonts;
+  expect_sane_bitmap_font<terminus_8x16>();
+  expect_sane_bitmap_font<terminus_bold_8x16>();
+  expect_sane_bitmap_font<terminus_8x14>();
+  expect_sane_bitmap_font<spleen_8x16>();
+  expect_sane_bitmap_font<dejavu_sans_mono_8x16>();
+  static_assert(terminus_8x14::glyph_height == 14 && spleen_8x16::glyph_height == 16);
+}
+
+TEST(BundledFonts, SelectFontDispatchesByNameAndRejectsUnknown) {
+  using namespace structo::examples::fonts;
+  auto height_of = [](auto tag) { return static_cast<int>(decltype(tag)::type::glyph_height); };
+  int out = 0;
+  EXPECT_TRUE(visit_font("terminus-14", height_of, out));
+  EXPECT_EQ(out, 14);
+  EXPECT_TRUE(visit_font("spleen", height_of, out));
+  EXPECT_EQ(out, 16);
+  EXPECT_FALSE(visit_font("comic-sans", height_of, out));
+  for (const font_entry &e : font_list)
+    EXPECT_TRUE(visit_font(e.name, height_of, out)) << e.name;
+}

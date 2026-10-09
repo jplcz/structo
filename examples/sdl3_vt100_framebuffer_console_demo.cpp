@@ -11,10 +11,11 @@
 // difference is *what* draws into the framebuffer (a text console
 // instead of a gpu command buffer).
 //
-// Uses the real, non-placeholder `examples/fonts/dejavu_sans_mono_8x16_font.hpp`
-// glyph bitmap (see that header + `examples/fonts/copyright` for its
-// license) instead of `framebuffer_console.hpp`'s own `block_font_8x8`
-// solid-block stand-in, so the rendered text is actually legible.
+// Uses real bitmap fonts from `examples/fonts/` (Terminus by default; pick another with
+// `--font NAME`, `STRUCTO_FONT=NAME` or list them with `--list-fonts`; licenses are in the
+// generated headers and `examples/fonts/LICENSE.*`/`copyright`) instead of
+// `framebuffer_console.hpp`'s own `block_font_8x8` solid-block stand-in, so the rendered
+// text is actually legible.
 //
 // Only built when SDL3 development files are found (see
 // `examples/CMakeLists.txt`); skipped entirely otherwise.
@@ -23,7 +24,7 @@
 #include <structo/hw/vt100.hpp>
 #include <structo/hypervisor/mmio_framebuffer_device.hpp>
 
-#include "fonts/dejavu_sans_mono_8x16_font.hpp"
+#include "fonts/all_fonts.hpp"
 
 #include <microfmt/microfmt.hpp>
 
@@ -46,14 +47,11 @@ using structo::hw::framebuffer_console;
 using structo::hw::rgba8888;
 using structo::hw::vt100_terminal;
 using structo::hypervisor::mmio_framebuffer_device;
-using structo::examples::fonts::dejavu_sans_mono_8x16;
 
 constexpr std::size_t window_width = 1024;
 constexpr std::size_t window_height = 768;
 
-} // namespace
-
-int main() {
+template <typename Font> int run() {
   if (!SDL_Init(SDL_INIT_VIDEO)) {
     std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
     return 1;
@@ -92,8 +90,8 @@ int main() {
   // write-only, see that header's own docs); sized only once `columns()`/`rows()` -- a function of the
   // framebuffer's pixel geometry divided by the font's glyph size -- are known, so this goes through
   // `reloco::vector<console_cell>::try_create()` + `try_resize()` rather than a compile-time-sized array.
-  const std::size_t cols = window_width / dejavu_sans_mono_8x16::glyph_width;
-  const std::size_t rows = window_height / dejavu_sans_mono_8x16::glyph_height;
+  const std::size_t cols = window_width / Font::glyph_width;
+  const std::size_t rows = window_height / Font::glyph_height;
   auto cells_maker = reloco::vector<console_cell>::try_create(cols * rows);
   if (!cells_maker.has_value()) {
     std::fprintf(stderr, "reloco::vector<console_cell>::try_create failed\n");
@@ -105,7 +103,7 @@ int main() {
     return 1;
   }
 
-  auto console_maker = framebuffer_console<rgba8888, dejavu_sans_mono_8x16>::try_create(
+  auto console_maker = framebuffer_console<rgba8888, Font>::try_create(
       fb.pixels(), reloco::span<console_cell>(cells.data(), cells.size()));
   if (!console_maker.has_value()) {
     std::fprintf(stderr, "framebuffer_console::try_create failed\n");
@@ -122,9 +120,9 @@ int main() {
                             "\x1b[1;37m structo::hw::vt100_terminal demo \x1b[0m\r\n"
                             "\x1b[32mgreen\x1b[0m \x1b[31mred\x1b[0m \x1b[34mblue\x1b[0m \x1b[33myellow\x1b[0m "
                             "\x1b[36mcyan\x1b[0m \x1b[1;35mbright magenta\x1b[0m\r\n"
-                            "{} columns x {} rows, glyph {}x{} (DejaVu Sans Mono, see examples/fonts/copyright)\r\n"
+                            "{} columns x {} rows, glyph {}x{} (see --list-fonts)\r\n"
                             "\x1b[2m--------------------------------------------------------------\x1b[0m\r\n",
-                            cols, rows, dejavu_sans_mono_8x16::glyph_width, dejavu_sans_mono_8x16::glyph_height);
+                            cols, rows, Font::glyph_width, Font::glyph_height);
 
   bool running = true;
   std::uint64_t tick = 0;
@@ -165,6 +163,13 @@ int main() {
   SDL_DestroyWindow(window);
   SDL_Quit();
   return 0;
+}
+
+} // namespace
+
+int main(int argc, char **argv) {
+  return structo::examples::fonts::select_font(
+      argc, argv, [](auto tag) { return run<typename decltype(tag)::type>(); });
 }
 
 RELOCO_END_UNSAFE_BUFFER_USAGE
