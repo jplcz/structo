@@ -222,6 +222,12 @@ if(NOT TARGET jplcz_microfmt::microfmt)
     FetchContent_MakeAvailable(jplcz_microfmt)
 endif()
 
+set(JPLCZ_STRUCTO_PORTING_HEADERS "" CACHE PATH
+    "Directory containing structo_user_config.hpp, copied into \
+include/structo/detail/porting/ (build-tree staging, and installed alongside \
+structo's own headers) so every consumer picks it up via structo_config.hpp. \
+Mirrors reloco's JPLCZ_RELOCO_PORTING_HEADERS.")
+
 # Header-only interface target
 add_library(jplcz_structo INTERFACE)
 target_compile_features(jplcz_structo INTERFACE cxx_std_17)
@@ -234,6 +240,27 @@ target_include_directories(jplcz_structo INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:${JPLCZ_STRUCTO_INSTALL_INCLUDEDIR}>
 )
+
+# Stage the user configuration into the build tree (never into the source
+# include/ tree) under structo/detail/porting/, the path structo_config.hpp
+# looks for; an extra -I directory makes it visible to every consumer.
+if(JPLCZ_STRUCTO_PORTING_HEADERS)
+    set(JPLCZ_STRUCTO_PORTING_STAGING_DIR "${CMAKE_CURRENT_BINARY_DIR}/porting_include")
+    set(JPLCZ_STRUCTO_PORTING_DEST_DIR "${JPLCZ_STRUCTO_PORTING_STAGING_DIR}/structo/detail/porting")
+    set(JPLCZ_STRUCTO_USER_CONFIG_SRC "${JPLCZ_STRUCTO_PORTING_HEADERS}/structo_user_config.hpp")
+    if(EXISTS "${JPLCZ_STRUCTO_USER_CONFIG_SRC}")
+        file(MAKE_DIRECTORY "${JPLCZ_STRUCTO_PORTING_DEST_DIR}")
+        # configure_file(COPYONLY) re-runs CMake when the source changes.
+        configure_file("${JPLCZ_STRUCTO_USER_CONFIG_SRC}"
+            "${JPLCZ_STRUCTO_PORTING_DEST_DIR}/structo_user_config.hpp" COPYONLY)
+        message(STATUS "jplcz_structo: using user configuration from ${JPLCZ_STRUCTO_USER_CONFIG_SRC}")
+        target_include_directories(jplcz_structo INTERFACE
+            $<BUILD_INTERFACE:${JPLCZ_STRUCTO_PORTING_STAGING_DIR}>)
+    else()
+        message(WARNING "jplcz_structo: JPLCZ_STRUCTO_PORTING_HEADERS is set but "
+            "${JPLCZ_STRUCTO_USER_CONFIG_SRC} does not exist")
+    endif()
+endif()
 
 target_link_libraries(jplcz_structo INTERFACE jplcz_reloco::reloco jplcz_microfmt::microfmt)
 
@@ -573,6 +600,14 @@ if(JPLCZ_STRUCTO_INSTALL)
         DESTINATION "${JPLCZ_STRUCTO_INSTALL_INCLUDEDIR}"
         COMPONENT Development
     )
+
+    if(JPLCZ_STRUCTO_PORTING_HEADERS AND EXISTS "${JPLCZ_STRUCTO_PORTING_DEST_DIR}/structo_user_config.hpp")
+        install(
+            FILES "${JPLCZ_STRUCTO_PORTING_DEST_DIR}/structo_user_config.hpp"
+            DESTINATION "${JPLCZ_STRUCTO_INSTALL_INCLUDEDIR}/structo/detail/porting"
+            COMPONENT Development
+        )
+    endif()
 
     if(NOT JPLCZ_STRUCTO_INSTALL_HEADERS_ONLY)
         install(

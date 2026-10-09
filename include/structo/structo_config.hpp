@@ -15,10 +15,12 @@
  * regardless of which structo header an application includes first.
  *
  * User overrides must not be made by editing this file. Instead, supply
- * `detail/porting/structo_user_config.hpp` at the same fixed path in your
- * own include tree (there is no CMake-driven copy step for it yet, unlike
- * reloco's `JPLCZ_RELOCO_PORTING_HEADERS` -- add the directory containing
- * it to your own include path). When that header is present, it is
+ * `structo/detail/porting/structo_user_config.hpp` (also still found at
+ * `detail/porting/structo_user_config.hpp` relative to this directory). Either
+ * place the file there by hand, or set the `JPLCZ_STRUCTO_PORTING_HEADERS`
+ * CMake variable to a directory containing it -- the build then stages (and
+ * installs) it for you, like reloco's `JPLCZ_RELOCO_PORTING_HEADERS`. When
+ * that header is present, it is
  * included here, before any of the `#ifndef`-guarded defaults below are
  * applied, so every `#define` it contains takes precedence.
  *
@@ -37,7 +39,10 @@
  */
 
 #if defined(__has_include)
-#if __has_include("detail/porting/structo_user_config.hpp")
+// Staged/installed by CMake from JPLCZ_STRUCTO_PORTING_HEADERS (or placed by hand) under structo/detail/porting/.
+#if __has_include("structo/detail/porting/structo_user_config.hpp")
+#include "structo/detail/porting/structo_user_config.hpp"
+#elif __has_include("detail/porting/structo_user_config.hpp")
 #include "detail/porting/structo_user_config.hpp"
 #endif
 #endif
