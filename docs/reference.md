@@ -77,6 +77,11 @@ have a linked, standalone page going into more depth.
 | Header | Type(s) | One-line summary |
 |---|---|---|
 | [`hw/block_device_ref.hpp`](block_device_ref.md) | `block_device_ref`, `block_device_traits<Backend>` | Type-erased block-device reference |
+| [`hw/block_cache_ref.hpp`](block_cache_ref.md) | `block_cache_ref` | Small write-back LRU block cache over a `block_device_ref`, using caller-provided storage; itself bindable as a block device |
+| [`hw/partition_table.hpp`](partition_table.md) | `partition_table`, `partition_iterator`, `partition_info`, `partition_device`, `gpt_types`, `mbr_types` | MBR (incl. extended/logical) and GPT decoder with on-demand enumeration; partitions decode to `block_device_ref`s |
+| [`fs/filesystem_ref.hpp`](filesystem_ref.md) | `filesystem_ref`, `filesystem_traits`, `file`, `directory`, `open_flags` | Type-erased read/write filesystem accessor with owning file/directory objects; no concrete filesystem |
+| [`fs/fat.hpp`](fat_filesystem.md) | `fat_filesystem`, `fat_type` | Read-only FAT12/16/32 reader with long file names; implements `filesystem_traits` over a `block_device_ref` |
+| [`fs/ext4.hpp`](ext4_filesystem.md) | `ext4_filesystem` | Read-only ext2/3/4 reader (extents, block maps, symlinks); implements `filesystem_traits` over a `block_device_ref` |
 | [`hw/ram_disk.hpp`](ram_disk.md) | `ram_disk` | RAM-backed block device |
 | [`mmio_space.hpp`](mmio_space.md) | MMIO `io_space_traits` backend | Portable memory-mapped I/O window bindable through `io_space_ref` |
 | [`io_space_ref.hpp`](io_space_ref.md) | `io_space_ref<SpaceTag>`, `io_space_traits<Backend>` | Type-erased, non-owning handle performing fixed-width loads/stores and `rep insb`/`outsb`-style string I/O over an `io_address`, via a customizable backend |
