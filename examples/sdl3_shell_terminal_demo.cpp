@@ -11,13 +11,14 @@
 //
 // `console_uart` is the bridge exposed as a `uart_ref`: bytes written to it are interpreted as VT100 onto the
 // framebuffer console, bytes read from it are the translated keystrokes (Ctrl+letters, arrows, F-keys as ANSI
-// sequences). The main loop only shuttles bytes between that uart_ref and the pty master.
+// sequences). The UI loop only shuttles bytes between that uart_ref and the pty master; shell output is read
+// by a reloco::thread blocked in poll(2) and passed over a reloco SPSC ring buffer.
 //
 // SDL scancodes of the keyboard block are USB HID usages, so they pass straight through as HID key events.
 // Layout is US. Window size is fixed; the pty is told its size (columns x rows) via TIOCSWINSZ.
 //
-// The terminal speaks an xterm-style VT100/ANSI subset (see docs/vt100.md); TERM defaults to "vt100" so
-// programs stay within it, override with STRUCTO_TERM (e.g. STRUCTO_TERM=xterm for colors from `ls`).
+// The terminal speaks an xterm-style VT100/ANSI subset (see docs/vt100.md); TERM defaults to "xterm" (so
+// cursor/function keys, colors and the alternate screen work in mc, vim, htop...); override with STRUCTO_TERM.
 // Window title (OSC), bell and terminal queries (cursor position, device attributes) are wired through
 // `vt100_callbacks`.
 
@@ -33,17 +34,23 @@
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
+#include <atomic>
 #include <deque>
 #include <string>
 #include <vector>
 
 #include <fcntl.h>
+#include <poll.h>
 #include <pty.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <reloco/atomic_ring_buffer.hpp>
+#include <reloco/function.hpp>
 #include <reloco/lifetime.hpp>
+#include <reloco/span.hpp>
+#include <reloco/thread.hpp>
 
 // Example code indexes raw buffers freely; bounds are checked by the surrounding logic.
 RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
@@ -115,7 +122,7 @@ int main() {
     if (shell == nullptr || *shell == '\0')
       shell = "/bin/sh";
     const char *term = std::getenv("STRUCTO_TERM");
-    ::setenv("TERM", term != nullptr ? term : "vt100", 1);
+    ::setenv("TERM", term != nullptr ? term : "xterm", 1);
     ::setenv("COLUMNS", std::to_string(cols).c_str(), 1);
     ::setenv("LINES", std::to_string(rows).c_str(), 1);
     ::execlp(shell, shell, static_cast<char *>(nullptr));
@@ -182,11 +189,73 @@ int main() {
   };
   bridge.terminal().set_callbacks(events);
 
-  bool child_alive = true;
-  while (!keyboard.quit && child_alive) {
+  // Storage that lets full-screen programs use the alternate screen (CSI ? 1049 h/l).
+  std::vector<hw::console_cell> alt_screen(cols * rows);
+  bridge.terminal().set_alternate_screen_storage(reloco::span<hw::console_cell>(alt_screen.data(), alt_screen.size()));
+
+  // Shell output pump: a reloco::thread blocks in poll(2) on the pty master (reloco has no poll wrapper, so
+  // this is plain libc) and hands bytes to the UI thread through a lock-free SPSC ring. It posts an SDL user
+  // event after each batch so the UI loop wakes immediately instead of sleeping a fixed interval.
+  reloco::heap_spsc_ring_buffer<std::uint8_t> pty_ring;
+  if (!pty_ring.try_initialize(64 * 1024)) {
+    std::fprintf(stderr, "ring allocation failed\n");
+    return 1;
+  }
+  std::atomic<bool> stop_reader{false};
+  std::atomic<bool> pty_eof{false};
+  std::atomic<bool> wake_pending{false};
+  const Uint32 wake_event = SDL_RegisterEvents(1);
+
+  auto reader_fn = reloco::function<void()>::try_create([&] {
+    while (!stop_reader.load(std::memory_order_relaxed)) {
+      auto [chunk, chunk2] = pty_ring.write_slices(1);
+      (void)chunk2;
+      if (chunk.empty()) { // ring full: let the UI drain it (backpressure to the shell)
+        ::poll(nullptr, 0, 2);
+        continue;
+      }
+      pollfd pfd{master, POLLIN, 0};
+      const int pr = ::poll(&pfd, 1, 50); // timeout only so we notice stop_reader
+      if (pr < 0 && errno != EINTR)
+        break;
+      if (pr <= 0)
+        continue;
+      const ssize_t n = ::read(master, chunk.data(), chunk.size());
+      if (n > 0) {
+        pty_ring.commit(static_cast<std::size_t>(n));
+        if (!wake_pending.exchange(true)) {
+          SDL_Event wake{};
+          wake.type = wake_event;
+          SDL_PushEvent(&wake);
+        }
+      } else if (n == 0 || (errno != EAGAIN && errno != EINTR)) {
+        break; // 0 or EIO: the shell side closed
+      }
+    }
+    pty_eof.store(true);
+    SDL_Event wake{};
+    wake.type = wake_event;
+    SDL_PushEvent(&wake);
+  });
+  if (!reader_fn) {
+    std::fprintf(stderr, "failed to allocate the pty reader\n");
+    return 1;
+  }
+  auto reader = reloco::thread::try_spawn(std::move(reader_fn.value()));
+  if (!reader) {
+    std::fprintf(stderr, "failed to start the pty reader thread\n");
+    return 1;
+  }
+
+  while (!keyboard.quit) {
+    // Sleep until input, shell output (wake event) or ~8 ms; then handle everything pending.
     SDL_Event ev;
-    while (SDL_PollEvent(&ev))
-      keyboard.feed(ev);
+    if (SDL_WaitEventTimeout(&ev, 8)) {
+      do {
+        keyboard.feed(ev);
+      } while (SDL_PollEvent(&ev));
+    }
+    wake_pending.store(false);
 
     // Keystrokes (translated by the bridge) -> shell.
     while (true) {
@@ -197,28 +266,33 @@ int main() {
       (void)!::write(master, &byte, 1);
     }
 
-    // Shell output -> VT100 -> framebuffer. Bounded per frame so a flood cannot starve rendering.
-    std::uint8_t buf[4096];
-    for (int i = 0; i < 16; ++i) {
-      const ssize_t n = ::read(master, buf, sizeof buf);
-      if (n > 0) {
-        for (ssize_t k = 0; k < n; ++k)
-          (void)uart.put_byte(buf[k]);
-      } else {
-        // 0 or EIO means the shell side closed; EAGAIN just means "nothing right now".
-        if (n == 0 || (errno != EAGAIN && errno != EINTR))
-          child_alive = false;
+    // Shell output (from the reader thread's ring) -> VT100 -> framebuffer. Bounded by a time budget per
+    // frame so a flood cannot starve input and rendering.
+    const std::uint64_t deadline = SDL_GetTicksNS() + 10'000'000;
+    bool drained = false;
+    while (SDL_GetTicksNS() < deadline) {
+      auto [s1, s2] = pty_ring.read_slices(1);
+      (void)s2;
+      if (s1.empty()) {
+        drained = true;
         break;
       }
+      for (const std::uint8_t byte : s1)
+        (void)uart.put_byte(byte);
+      pty_ring.consume(s1.size());
     }
+    if (drained && pty_eof.load())
+      break; // shell exited and everything it printed has been shown
 
     auto pixels = fb.pixels().raw();
     (void)SDL_UpdateTexture(texture, nullptr, pixels.data(), static_cast<int>(fb.pixels().stride_bytes()));
     SDL_RenderClear(renderer);
     SDL_RenderTexture(renderer, texture, nullptr, nullptr);
     SDL_RenderPresent(renderer);
-    SDL_Delay(8);
   }
+
+  stop_reader.store(true);
+  reader.value().join();
 
   SDL_DestroyTexture(texture);
   SDL_DestroyRenderer(renderer);

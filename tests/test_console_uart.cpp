@@ -195,3 +195,15 @@ TEST_F(ConsoleUartTest, GetByteBlocksOnKeyboardThenTimesOut) {
   tap(L('q'));
   EXPECT_EQ(uart.get_byte(10).value(), 'q');
 }
+
+TEST_F(ConsoleUartTest, ApplicationCursorKeysSendSs3) {
+  tap(K(hid_key::up));
+  EXPECT_EQ(drain(), "\x1b[A");
+  ASSERT_TRUE(uart.write_string("\x1b[?1h")); // program (e.g. mc via smkx) asks for application mode
+  tap(K(hid_key::up));
+  tap(K(hid_key::home));
+  EXPECT_EQ(drain(), "\x1bOA\x1bOH");
+  ASSERT_TRUE(uart.write_string("\x1b[?1l"));
+  tap(K(hid_key::up));
+  EXPECT_EQ(drain(), "\x1b[A");
+}

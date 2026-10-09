@@ -54,7 +54,7 @@ the keyboard LED when supported).
 | Enter                    | `'\r'`                                         |
 | Backspace                | `0x7F`                                         |
 | Tab / Escape             | `'\t'` / `0x1B`                                |
-| arrows, Home, End        | `ESC [ A/B/C/D`, `ESC [ H`, `ESC [ F`          |
+| arrows, Home, End        | `ESC [ A/B/C/D`, `ESC [ H`, `ESC [ F`; `ESC O x` once the program enabled application cursor keys (`CSI ? 1 h`) |
 | Insert/Delete/PgUp/PgDn  | `ESC [ 2~`, `ESC [ 3~`, `ESC [ 5~`, `ESC [ 6~` |
 | F1..F4                   | `ESC O P`, `ESC O Q`, `ESC O R`, `ESC O S`     |
 | F5..F12                  | `ESC [ 15~`, `17~`, `18~`, `19~`, `20~`, `21~`, `23~`, `24~` (xterm/VT220) |
@@ -68,5 +68,7 @@ rate); `tx_ready` is always true.
 
 `examples/sdl3_shell_terminal_demo.cpp` wires an SDL3 keyboard (`input_traits`), a
 `framebuffer_console` and this bridge into a graphical terminal emulator that spawns
-`$SHELL` on a pty (`TERM=vt100` unless `STRUCTO_TERM` is set). Built when SDL3 is
-found (`ninja sdl3_shell_terminal_demo`).
+`$SHELL` on a pty (`TERM=xterm` unless `STRUCTO_TERM` is set). Built when SDL3 is
+found (`ninja sdl3_shell_terminal_demo`). Shell output is read by a `reloco::thread` blocked in
+`poll(2)` (reloco has no poll wrapper) and handed to the UI thread through a
+`reloco::heap_spsc_ring_buffer`; the thread wakes the SDL event loop with a user event.

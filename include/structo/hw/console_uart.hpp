@@ -48,7 +48,7 @@
  * | Enter                       | `'\r'` (as a serial terminal sends it)        |
  * | Backspace                   | `0x7F`                                         |
  * | Tab / Escape                | `'\t'` / `0x1B`                                |
- * | arrows, Home, End           | `ESC [ A/B/C/D`, `ESC [ H`, `ESC [ F`          |
+ * | arrows, Home, End           | `ESC [ A/B/C/D`, `ESC [ H`, `ESC [ F`; `ESC O A/B/C/D/H/F` while the program enabled application cursor keys (`CSI ? 1 h`) |
  * | Insert/Delete/PgUp/PgDn     | `ESC [ 2~`, `ESC [ 3~`, `ESC [ 5~`, `ESC [ 6~` |
  * | F1..F4                      | `ESC O P`, `ESC O Q`, `ESC O R`, `ESC O S`     |
  * | F5..F12                     | `ESC [ 15~`, `17~`, `18~`, `19~`, `20~`, `21~`, `23~`, `24~` |
@@ -142,6 +142,18 @@ private:
     }
   }
 
+  // Arrows/Home/End: `ESC O x` while the program enabled application cursor keys (`CSI ? 1 h`, what
+  // terminfo's smkx does and what ncurses/slang programs such as mc expect), `ESC [ x` otherwise.
+  void push_cursor_key(char final_byte) noexcept {
+    if (term_.application_cursor_keys()) {
+      push(0x1B);
+      push('O');
+      push(static_cast<std::uint8_t>(final_byte));
+    } else {
+      push_csi(final_byte);
+    }
+  }
+
   // F1-F4: SS3 P..S; F5-F12: CSI n ~ with the xterm/VT220 numbering (gaps at 16, 22).
   void push_function_key(unsigned n) noexcept {
     static constexpr std::uint8_t csi_numbers[] = {15, 17, 18, 19, 20, 21, 23, 24};
@@ -206,12 +218,12 @@ private:
     switch (static_cast<hid_key>(code)) {
     case hid_key::enter: push('\r'); return;
     case hid_key::backspace: push(0x7F); return;
-    case hid_key::up: push_csi('A'); return;
-    case hid_key::down: push_csi('B'); return;
-    case hid_key::right: push_csi('C'); return;
-    case hid_key::left: push_csi('D'); return;
-    case hid_key::home: push_csi('H'); return;
-    case hid_key::end: push_csi('F'); return;
+    case hid_key::up: push_cursor_key('A'); return;
+    case hid_key::down: push_cursor_key('B'); return;
+    case hid_key::right: push_cursor_key('C'); return;
+    case hid_key::left: push_cursor_key('D'); return;
+    case hid_key::home: push_cursor_key('H'); return;
+    case hid_key::end: push_cursor_key('F'); return;
     case hid_key::insert: push_csi('~', '2'); return;
     case hid_key::delete_key: push_csi('~', '3'); return;
     case hid_key::page_up: push_csi('~', '5'); return;

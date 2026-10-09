@@ -443,3 +443,50 @@ TEST_F(Vt100Test, EventsWithoutCallbacksAreHarmless) {
   term.feed("\x07\x1b]0;t\x07\x1b[6n\x1b[?2004h\x1b[2 q");
   EXPECT_EQ(row_text(term.console(), 0), "");
 }
+
+TEST_F(Vt100Test, DecSpecialGraphicsDrawsAsciiLookalikesViaG0AndShift) {
+  term.feed("\x1b(0lqqk\x1b(B|"); // G0 = graphics: box corner/line/corner, then back to ASCII
+  EXPECT_EQ(row_text(term.console(), 0), "+--+|");
+  term.feed("\r\n\x1b)0\x0e" "x\x0f" "x"); // G1 = graphics, SO selects it, SI returns to G0 (ASCII)
+  EXPECT_EQ(row_text(term.console(), 1), "|x");
+}
+
+TEST_F(Vt100Test, ModeGettersTrackProgramRequests) {
+  EXPECT_FALSE(term.application_cursor_keys());
+  term.feed("\x1b[?1h\x1b=\x1b[?2004h");
+  EXPECT_TRUE(term.application_cursor_keys());
+  EXPECT_TRUE(term.application_keypad());
+  EXPECT_TRUE(term.bracketed_paste());
+  term.feed("\x1b[?1l\x1b>\x1b[?2004l");
+  EXPECT_FALSE(term.application_cursor_keys());
+  EXPECT_FALSE(term.application_keypad());
+  EXPECT_FALSE(term.bracketed_paste());
+  term.feed("\x1b[?1h\x1b" "c"); // RIS clears them
+  EXPECT_FALSE(term.application_cursor_keys());
+}
+
+TEST_F(Vt100Test, AlternateScreenSavesAndRestoresMainScreen) {
+  reloco::array<console_cell, kCols * kRows> storage{};
+  term.set_alternate_screen_storage(reloco::span<console_cell>(storage.data(), storage.size()));
+  term.feed("main\x1b[3;3H");
+  term.feed("\x1b[?1049h");
+  EXPECT_TRUE(term.alternate_screen());
+  EXPECT_EQ(row_text(term.console(), 0), ""); // blank alternate screen
+  term.feed("ALT");
+  EXPECT_EQ(row_text(term.console(), 0), "ALT");
+  term.feed("\x1b[?1049l");
+  EXPECT_FALSE(term.alternate_screen());
+  EXPECT_EQ(row_text(term.console(), 0), "main");
+  EXPECT_EQ(term.console().cursor_x(), 2u);
+  EXPECT_EQ(term.console().cursor_y(), 2u);
+}
+
+TEST_F(Vt100Test, AlternateScreenWithoutStorageIsOnlyReported) {
+  event_log log;
+  term.set_callbacks(make_callbacks(log));
+  term.feed("keep\x1b[?1049h");
+  EXPECT_FALSE(term.alternate_screen());
+  EXPECT_EQ(row_text(term.console(), 0), "keep");
+  ASSERT_EQ(log.modes.size(), 1u);
+  EXPECT_EQ(log.modes[0], std::make_pair(vt100_mode::alt_screen_save, true));
+}

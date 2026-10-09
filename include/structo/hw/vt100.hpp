@@ -16,7 +16,7 @@
  * A VT100 core plus the commonly used xterm extensions -- enough for
  * shells (bash, zsh with line editing), `less`, `top`-style tools -- but
  * not a complete xterm. Everything is 16-colour text-cell based; there is
- * no scrollback, alternate screen buffer, mouse generation or Unicode.
+ * no scrollback, mouse generation or Unicode.
  * - Cursor movement: `CUU`/`CUD`/`CUF`/`CUB` (`A`/`B`/`C`/`D`), `CNL`/`CPL`
  *   (`E`/`F`), `CHA` (`G`), `VPA` (`d`), `CUP`/`HVP` (`H`/`f`), `HPA`/`VPR`
  *   aliases (`` ` ``, `a`, `e`), save/restore (`ESC 7`/`ESC 8`, `CSI s`/`CSI u`).
@@ -38,6 +38,13 @@
  *   one row without returning the carriage**, scrolling at the bottom of
  *   the scroll region -- pair with `\r`, as a pty's `onlcr` does), `\b`,
  *   `\t`, BEL (callback). NUL, DEL and bytes >= 0x80 are ignored.
+ * - Character sets: `ESC ( 0` / `ESC ) 0` select the DEC special graphics set for G0/G1
+ *   (`ESC ( B` / `ESC ) B` back to ASCII), `SO`/`SI` (`0x0E`/`0x0F`) switch between them. Line-drawing
+ *   characters (used by `mc`, `dialog`, ncurses boxes) are drawn with ASCII look-alikes (`-`, `|`, `+`)
+ *   since the cell font is ASCII.
+ * - Alternate screen (`CSI ? 1049 h/l`, also 47/1047): supported when the caller provides cell storage
+ *   with @ref vt100_terminal::set_alternate_screen_storage; the main screen is saved on entry and restored
+ *   on exit. Without storage the modes are only reported to the callbacks.
  * - Anything else (unknown CSI/ESC/private modes) is consumed and ignored
  *   rather than leaking onto the screen.
  *
@@ -63,6 +70,7 @@
 #include "console_ref.hpp"
 
 #include <reloco/array.hpp>
+#include <reloco/span.hpp>
 #include <reloco/string_view.hpp>
 
 #include <cstddef>
@@ -131,6 +139,22 @@ public:
 
   /** @brief Installs event callbacks (copied; `callbacks.ctx` must outlive the terminal's use of it). */
   constexpr void set_callbacks(const vt100_callbacks &callbacks) noexcept { cb_ = callbacks; }
+
+  /**
+   * @brief Gives the terminal caller-owned storage for the alternate screen (at least `columns() * rows()`
+   * cells), enabling `CSI ? 1049 h/l` (and 47/1047). Must outlive the terminal's use of it.
+   */
+  void set_alternate_screen_storage(reloco::span<console_cell> storage) noexcept { alt_storage_ = storage; }
+
+  /** @brief True while the program has enabled application cursor keys (`CSI ? 1 h`): the keyboard side
+   * should then send arrows/Home/End as `ESC O x` instead of `ESC [ x`. */
+  [[nodiscard]] constexpr bool application_cursor_keys() const noexcept { return application_cursor_keys_; }
+  /** @brief True while application keypad mode (`ESC =`) is on. */
+  [[nodiscard]] constexpr bool application_keypad() const noexcept { return application_keypad_; }
+  /** @brief True while bracketed paste (`CSI ? 2004 h`) is on: wrap pasted text in `ESC [ 200 ~` / `ESC [ 201 ~`. */
+  [[nodiscard]] constexpr bool bracketed_paste() const noexcept { return bracketed_paste_; }
+  /** @brief True while the alternate screen is active. */
+  [[nodiscard]] constexpr bool alternate_screen() const noexcept { return alt_active_; }
 
   /** @brief Feeds one byte of input, advancing the escape-sequence
    * state machine and/or performing the resulting console operation. */
@@ -229,6 +253,7 @@ private:
     switch (c) {
     case '\x1B':
       state_ = state::escape;
+      esc_intermediate_ = 0;
       break;
     case '\r':
       goto_xy(0, console_.cursor_y());
@@ -243,6 +268,12 @@ private:
       break;
     case '\t':
       goto_xy((console_.cursor_x() / 8 + 1) * 8, console_.cursor_y());
+      break;
+    case '\x0E': // SO: shift to G1
+      shifted_ = true;
+      break;
+    case '\x0F': // SI: shift to G0
+      shifted_ = false;
       break;
     case '\a':
       if (cb_.bell) {
@@ -262,6 +293,7 @@ private:
 
   void feed_escape(char c) noexcept {
     if (c == '[') {
+      esc_intermediate_ = 0;
       state_ = state::csi;
       param_count_ = 0;
       current_param_ = 0;
@@ -272,6 +304,7 @@ private:
       return;
     }
     if (c == ']') {
+      esc_intermediate_ = 0;
       state_ = state::osc;
       osc_len_ = 0;
       osc_code_ = 0;
@@ -285,10 +318,26 @@ private:
     // Per ECMA-48, an escape sequence is `ESC`, zero or more "intermediate" bytes (0x20-0x2F), then one
     // "final" byte. Unsupported ones (e.g. charset select `ESC ( B`) are consumed so the final byte does not
     // leak onto the screen as text.
-    if (uc < 0x20 || (uc >= 0x20 && uc <= 0x2F)) {
+    if (uc >= 0x20 && uc <= 0x2F) {
+      if (esc_intermediate_ == 0) {
+        esc_intermediate_ = c;
+      }
+      return;
+    }
+    if (uc < 0x20) {
       return;
     }
     state_ = state::ground;
+    if (esc_intermediate_ != 0) {
+      // Charset designation: `ESC ( x` -> G0, `ESC ) x` -> G1; `0` is DEC special graphics, anything else ASCII.
+      if (esc_intermediate_ == '(') {
+        g0_graphics_ = c == '0';
+      } else if (esc_intermediate_ == ')') {
+        g1_graphics_ = c == '0';
+      }
+      esc_intermediate_ = 0;
+      return;
+    }
     switch (c) {
     case '7':
       save_cursor();
@@ -310,9 +359,11 @@ private:
       full_reset();
       break;
     case '=':
+      application_keypad_ = true;
       report_mode(vt100_mode::application_keypad, true);
       break;
     case '>':
+      application_keypad_ = false;
       report_mode(vt100_mode::application_keypad, false);
       break;
     default:
@@ -561,6 +612,14 @@ private:
       }
     } else if (mode == static_cast<std::uint32_t>(vt100_mode::cursor_visible)) {
       console_.set_cursor_visible(on);
+    } else if (mode == static_cast<std::uint32_t>(vt100_mode::application_cursor_keys)) {
+      application_cursor_keys_ = on;
+    } else if (mode == static_cast<std::uint32_t>(vt100_mode::bracketed_paste)) {
+      bracketed_paste_ = on;
+    } else if (mode == static_cast<std::uint32_t>(vt100_mode::alt_screen_47) ||
+               mode == static_cast<std::uint32_t>(vt100_mode::alt_screen) ||
+               mode == static_cast<std::uint32_t>(vt100_mode::alt_screen_save)) {
+      set_alternate_screen(on);
     }
     report_mode(static_cast<vt100_mode>(mode), on);
   }
@@ -623,6 +682,12 @@ private:
 
   // Writes one glyph with xterm's deferred wrap: the cursor stays on the last column until the *next*
   // printable character, which first wraps to the next line.
+  // ASCII look-alikes for the DEC special graphics set, 0x5F..0x7E.
+  static constexpr char graphics_to_ascii(char c) noexcept {
+    constexpr char table[] = " +#####'+##+++++----_++++|<>p!f.";
+    return table[static_cast<std::size_t>(c - '\x5F')];
+  }
+
   void print(char c) noexcept {
     const std::size_t cols = console_.columns();
     if (cols == 0 || console_.rows() == 0) {
@@ -637,6 +702,9 @@ private:
     }
     const std::size_t x = console_.cursor_x();
     const std::size_t y = console_.cursor_y();
+    if ((shifted_ ? g1_graphics_ : g0_graphics_) && c >= '\x5F' && c <= '\x7E') {
+      c = graphics_to_ascii(c);
+    }
     (void)console_.put_char(x, y, c, console_.foreground(), console_.background());
     if (x + 1 >= cols) {
       wrap_pending_ = autowrap_;
@@ -767,6 +835,37 @@ private:
 
   // ------------------------------------------------------------------ cursor save / reset
 
+  // Switches to/from the alternate screen: the main screen's cells and cursor are parked in the caller's
+  // storage; the alternate screen starts blank.
+  void set_alternate_screen(bool on) noexcept {
+    const std::size_t cols = console_.columns();
+    const std::size_t rows = console_.rows();
+    if (on == alt_active_ || alt_storage_.size() < cols * rows || cols * rows == 0) {
+      return;
+    }
+    if (on) {
+      for (std::size_t y = 0; y < rows; ++y) {
+        for (std::size_t x = 0; x < cols; ++x) {
+          auto cell = console_.get_char(x, y);
+          alt_storage_[y * cols + x] = cell ? *cell : console_cell{};
+        }
+      }
+      alt_saved_x_ = console_.cursor_x();
+      alt_saved_y_ = console_.cursor_y();
+      console_.clear(console_.foreground(), console_.background());
+      goto_xy(0, 0);
+    } else {
+      for (std::size_t y = 0; y < rows; ++y) {
+        for (std::size_t x = 0; x < cols; ++x) {
+          const console_cell &cell = alt_storage_[y * cols + x];
+          (void)console_.put_char(x, y, cell.ch, cell.fg, cell.bg);
+        }
+      }
+      goto_xy(alt_saved_x_, alt_saved_y_);
+    }
+    alt_active_ = on;
+  }
+
   void save_cursor() noexcept {
     saved_x_ = console_.cursor_x();
     saved_y_ = console_.cursor_y();
@@ -786,6 +885,10 @@ private:
     top_ = 0;
     bottom_ = no_bottom;
     autowrap_ = true;
+    application_cursor_keys_ = false;
+    application_keypad_ = false;
+    bracketed_paste_ = false;
+    g0_graphics_ = g1_graphics_ = shifted_ = false;
     update_colors();
     console_.set_cursor_visible(true);
     console_.clear(console_.foreground(), console_.background());
@@ -942,6 +1045,20 @@ private:
   std::size_t bottom_ = no_bottom;
   bool autowrap_ = true;
   bool wrap_pending_ = false;
+
+  char esc_intermediate_ = 0;
+  bool g0_graphics_ = false;
+  bool g1_graphics_ = false;
+  bool shifted_ = false;
+
+  bool application_cursor_keys_ = false;
+  bool application_keypad_ = false;
+  bool bracketed_paste_ = false;
+
+  reloco::span<console_cell> alt_storage_{};
+  bool alt_active_ = false;
+  std::size_t alt_saved_x_ = 0;
+  std::size_t alt_saved_y_ = 0;
 };
 
 } // namespace hw
