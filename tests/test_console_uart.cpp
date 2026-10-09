@@ -79,12 +79,12 @@ struct ConsoleUartTest : ::testing::Test {
   // Drains every translated byte currently available.
   std::string drain() {
     std::string s;
-    std::uint8_t buf[16];
+    reloco::array<std::uint8_t, 16> buf{};
     for (;;) {
-      auto n = uart.read_available(buf);
+      auto n = uart.read_available(reloco::span<std::uint8_t>(buf.data(), buf.size()));
       if (!n || n.value() == 0)
         break;
-      s.append(reinterpret_cast<const char *>(buf), n.value());
+      s.append(reinterpret_cast<const char *>(buf.data()), n.value());
     }
     return s;
   }
@@ -102,14 +102,14 @@ TEST_F(ConsoleUartTest, TxDrawsOnConsoleAndLoneNewlineReturnsCarriage) {
 }
 
 TEST_F(ConsoleUartTest, RawLfIsExpandedToCrLf) {
-  const std::uint8_t data[] = {'A', '\n', 'B'};
+  const reloco::array<std::uint8_t, 3> data{{'A', '\n', 'B'}};
   ASSERT_TRUE(uart.write(data)); // raw write(): bridge supplies the CR
   EXPECT_EQ(cell(0, 0), 'A');
   EXPECT_EQ(cell(0, 1), 'B');
 }
 
 TEST_F(ConsoleUartTest, CrLfIsNotDoubled) {
-  const std::uint8_t data[] = {'A', '\r', '\n', 'B'};
+  const reloco::array<std::uint8_t, 4> data{{'A', '\r', '\n', 'B'}};
   ASSERT_TRUE(uart.write(data));
   EXPECT_EQ(cell(0, 0), 'A');
   EXPECT_EQ(cell(0, 1), 'B');
@@ -156,8 +156,8 @@ TEST_F(ConsoleUartTest, CtrlLettersAndNonKeyEventsIgnored) {
 }
 
 TEST_F(ConsoleUartTest, FunctionKeysUseXtermSequences) {
-  const std::string expected[] = {"\x1bOP",   "\x1bOQ",   "\x1bOR",   "\x1bOS",   "\x1b[15~", "\x1b[17~",
-                                  "\x1b[18~", "\x1b[19~", "\x1b[20~", "\x1b[21~", "\x1b[23~", "\x1b[24~"};
+  const reloco::array<std::string, 12> expected{{"\x1bOP",   "\x1bOQ",   "\x1bOR",   "\x1bOS",   "\x1b[15~", "\x1b[17~",
+                                                 "\x1b[18~", "\x1b[19~", "\x1b[20~", "\x1b[21~", "\x1b[23~", "\x1b[24~"}};
   for (std::uint16_t i = 0; i < 12; ++i) {
     tap(static_cast<std::uint16_t>(K(hid_key::f1) + i));
     EXPECT_EQ(drain(), expected[i]) << "F" << (i + 1);

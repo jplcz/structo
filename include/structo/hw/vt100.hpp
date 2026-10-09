@@ -37,7 +37,7 @@
  * - Control characters: `\r`, `\n`/`\v`/`\f` (**strict line feed: moves down
  *   one row without returning the carriage**, scrolling at the bottom of
  *   the scroll region -- pair with `\r`, as a pty's `onlcr` does), `\b`,
- *   `\t`, BEL (callback). NUL, DEL and bytes >= 0x80 are ignored.
+ *   `\t`, BEL (callback). NUL and DEL are ignored; UTF-8 is decoded to one cell per character (ASCII look-alikes, see `unicode_to_ascii`).
  * - Character sets: `ESC ( 0` / `ESC ) 0` select the DEC special graphics set for G0/G1
  *   (`ESC ( B` / `ESC ) B` back to ASCII), `SO`/`SI` (`0x0E`/`0x0F`) switch between them. Line-drawing
  *   characters (used by `mc`, `dialog`, ncurses boxes) are drawn with ASCII look-alikes (`-`, `|`, `+`)
@@ -267,6 +267,7 @@ private:
     case '\x1B':
       state_ = state::escape;
       esc_intermediate_ = 0;
+      utf8_left_ = 0;
       break;
     case '\r':
       goto_xy(0, console_.cursor_y());
@@ -294,10 +295,22 @@ private:
       }
       break;
     default: {
-      // NUL (terminfo padding), DEL, other C0 controls and non-ASCII bytes have no glyph: drop them.
+      // NUL (terminfo padding), DEL and other C0 controls have no glyph: drop them. UTF-8 sequences (what
+      // ncurses/slang programs emit for borders in a UTF-8 locale) are decoded and drawn as ONE cell each.
       auto uc = static_cast<unsigned char>(c);
       if (uc >= 0x20 && uc < 0x7F) {
+        utf8_left_ = 0;
         print(c);
+      } else if (uc >= 0xC2 && uc <= 0xF4) {
+        utf8_left_ = uc >= 0xF0 ? 3u : uc >= 0xE0 ? 2u : 1u;
+        utf8_cp_ = uc & (uc >= 0xF0 ? 0x07u : uc >= 0xE0 ? 0x0Fu : 0x1Fu);
+      } else if (uc >= 0x80 && uc <= 0xBF && utf8_left_ > 0) {
+        utf8_cp_ = (utf8_cp_ << 6) | (uc & 0x3Fu);
+        if (--utf8_left_ == 0) {
+          print(unicode_to_ascii(utf8_cp_));
+        }
+      } else {
+        utf8_left_ = 0;
       }
       break;
     }
@@ -571,7 +584,7 @@ private:
       if (params_[0] == 5) {
         reply("\x1b[0n");
       } else if (params_[0] == 6) {
-        char buf[24];
+        reloco::array<char, 24> buf{};
         std::size_t len = 0;
         buf[len++] = '\x1b';
         buf[len++] = '[';
@@ -579,7 +592,7 @@ private:
         buf[len++] = ';';
         len = append_number(buf, len, x + 1);
         buf[len++] = 'R';
-        reply(reloco::string_view(buf, len));
+        reply(reloco::string_view(buf.data(), len));
       }
       break;
     case 'c': // DA: identify as a VT100 with advanced video option
@@ -592,13 +605,13 @@ private:
     }
   }
 
-  static std::size_t append_number(char *buf, std::size_t len, std::size_t v) noexcept {
-    char tmp[8];
+  static std::size_t append_number(reloco::array<char, 24> &buf, std::size_t len, std::size_t v) noexcept {
+    reloco::array<char, 8> tmp{};
     std::size_t t = 0;
     do {
       tmp[t++] = static_cast<char>('0' + v % 10);
       v /= 10;
-    } while (v != 0 && t < sizeof tmp);
+    } while (v != 0 && t < tmp.size());
     while (t != 0) {
       buf[len++] = tmp[--t];
     }
@@ -708,14 +721,72 @@ private:
     console_.set_cursor(x, y);
   }
 
-  // Writes one glyph with xterm's deferred wrap: the cursor stays on the last column until the *next*
-  // printable character, which first wraps to the next line.
   // ASCII look-alikes for the DEC special graphics set, 0x5F..0x7E.
   static constexpr char graphics_to_ascii(char c) noexcept {
-    constexpr char table[] = " +#####'+##+++++----_++++|<>p!f.";
+    constexpr reloco::string_view table(" +#####'+##+++++----_++++|<>p!f.");
     return table[static_cast<std::size_t>(c - '\x5F')];
   }
 
+  // ASCII look-alike for a Unicode code point (the cell font is ASCII): box drawing becomes `-`/`|`/`+`,
+  // accented Latin letters lose their accent, common punctuation maps to its ASCII form, the rest is `?`.
+  static constexpr char unicode_to_ascii(std::uint32_t cp) noexcept {
+    if (cp >= 0x2500 && cp <= 0x257F) {
+      switch (cp) {
+      case 0x2500: case 0x2501: case 0x2504: case 0x2505: case 0x2508: case 0x2509: case 0x254C: case 0x254D:
+      case 0x2550: case 0x2574: case 0x2576: case 0x2578: case 0x257A: case 0x257C: case 0x257E:
+        return '-';
+      case 0x2502: case 0x2503: case 0x2506: case 0x2507: case 0x250A: case 0x250B: case 0x254E: case 0x254F:
+      case 0x2551: case 0x2575: case 0x2577: case 0x2579: case 0x257B: case 0x257D: case 0x257F:
+        return '|';
+      case 0x2571: return '/';
+      case 0x2572: return '\\';
+      case 0x2573: return 'X';
+      default: return '+';
+      }
+    }
+    if (cp >= 0x2580 && cp <= 0x259F) {
+      return (cp == 0x2591 || cp == 0x2592) ? ':' : '#';
+    }
+    if (cp >= 0xC0 && cp <= 0xFF) {
+      constexpr reloco::string_view latin1("AAAAAAACEEEEIIIIDNOOOOO*OUUUUYTsaaaaaaaceeeeiiiidnooooo/ouuuuyty");
+      return latin1[cp - 0xC0];
+    }
+    switch (cp) {
+    case 0xA0: return ' ';
+    case 0xA9: return 'c';
+    case 0xB0: return 'o';
+    case 0xB7: return '.';
+    case 0x104: return 'A';
+    case 0x105: return 'a';
+    case 0x106: return 'C';
+    case 0x107: return 'c';
+    case 0x118: return 'E';
+    case 0x119: return 'e';
+    case 0x141: return 'L';
+    case 0x142: return 'l';
+    case 0x143: return 'N';
+    case 0x144: return 'n';
+    case 0x15A: return 'S';
+    case 0x15B: return 's';
+    case 0x179: case 0x17B: return 'Z';
+    case 0x17A: case 0x17C: return 'z';
+    case 0x2013: case 0x2014: case 0x2212: return '-';
+    case 0x2018: case 0x2019: return '\'';
+    case 0x201C: case 0x201D: return '"';
+    case 0x2022: case 0x25CF: return '*';
+    case 0x2026: return '.';
+    case 0x2190: case 0x25C0: case 0x25C4: return '<';
+    case 0x2191: case 0x25B2: return '^';
+    case 0x2192: case 0x25B6: case 0x25BA: return '>';
+    case 0x279C: return '>'; // zsh/oh-my-zsh prompt arrow
+    case 0x2193: case 0x25BC: return 'v';
+    case 0x20AC: return 'E';
+    default: return '?';
+    }
+  }
+
+  // Writes one glyph with xterm's deferred wrap: the cursor stays on the last column until the *next*
+  // printable character, which first wraps to the next line.
   void print(char c) noexcept {
     const std::size_t cols = console_.columns();
     if (cols == 0 || console_.rows() == 0) {
@@ -1077,6 +1148,8 @@ private:
   bool wrap_pending_ = false;
 
   char esc_intermediate_ = 0;
+  std::uint32_t utf8_left_ = 0; // continuation bytes still expected
+  std::uint32_t utf8_cp_ = 0;   // code point being decoded
   bool g0_graphics_ = false;
   bool g1_graphics_ = false;
   bool shifted_ = false;

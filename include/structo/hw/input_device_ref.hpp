@@ -90,6 +90,7 @@
 #include <reloco/function_ref.hpp>
 #include <reloco/lifetime.hpp>
 #include <reloco/span.hpp>
+#include <reloco/string_view.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -267,7 +268,7 @@ enum class hid_key : std::uint16_t {
  * `'\\n'`, Tab `'\\t'`, Backspace `'\\b'`, Escape `0x1B`.
  */
 [[nodiscard]] constexpr char hid_key_to_ascii(std::uint16_t usage, bool shift = false) noexcept {
-  constexpr char digits_shifted[] = {'!', '@', '#', '$', '%', '^', '&', '*', '('};
+  constexpr reloco::string_view digits_shifted("!@#$%^&*(");
   if (usage >= 0x04 && usage <= 0x1D) {
     const char base = static_cast<char>('a' + (usage - 0x04));
     return shift ? static_cast<char>(base - 'a' + 'A') : base;

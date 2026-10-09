@@ -200,7 +200,7 @@ def format_header(args: argparse.Namespace, first: int, last: int, glyphs: list[
     lines.append("")
     lines.append("#include <cstddef>")
     lines.append("#include <cstdint>")
-    lines.append("#include <reloco/lifetime.hpp>")
+    lines.append("#include <reloco/array.hpp>")
     lines.append("")
 
     namespaces = [n for n in args.namespace.split("::") if n]
@@ -217,8 +217,8 @@ def format_header(args: argparse.Namespace, first: int, last: int, glyphs: list[
     lines.append("")
     lines.append("  [[nodiscard]] static const std::uint8_t *glyph_bitmap(char ch) noexcept {")
     blank_row = ", ".join("0" for _ in range(height))
-    lines.append(f"    static constexpr std::uint8_t blank[{height}] = {{{blank_row}}};")
-    lines.append(f"    static constexpr std::uint8_t glyphs[{count}][{height}] = {{")
+    lines.append(f"    static constexpr reloco::array<std::uint8_t, {height}> blank{{{{{blank_row}}}}};")
+    lines.append(f"    static constexpr reloco::array<reloco::array<std::uint8_t, {height}>, {count}> glyphs{{{{")
     for code in range(first, last + 1):
         rows = glyphs[code - first]
         art = glyph_art(rows, width)
@@ -226,16 +226,13 @@ def format_header(args: argparse.Namespace, first: int, last: int, glyphs: list[
         lines.append(f"        // {char_label(code)}")
         for art_line in art:
             lines.append(f"        //   |{art_line}|")
-        lines.append(f"        {{{row_values}}},")
-    lines.append("    };")
+        lines.append(f"        {{{{{row_values}}}}},")
+    lines.append("    }};")
     lines.append(f"    auto code = static_cast<unsigned char>(ch);")
     lines.append(f"    if (code < 0x{first:02X} || code > 0x{last:02X}) {{")
-    lines.append("      return blank;")
+    lines.append("      return blank.data();")
     lines.append("    }")
-    lines.append(f"    // code is range-checked to [0x{first:02X}, 0x{last:02X}] above.")
-    lines.append("    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE")
-    lines.append(f"    return glyphs[code - 0x{first:02X}];")
-    lines.append("    RELOCO_END_UNSAFE_BUFFER_USAGE")
+    lines.append(f"    return glyphs[code - 0x{first:02X}].data();")
     lines.append("  }")
     lines.append("};")
 

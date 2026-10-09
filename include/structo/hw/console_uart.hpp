@@ -74,6 +74,7 @@
 #include <structo/hw/uart_ref.hpp>
 #include <structo/hw/vt100.hpp>
 
+#include <reloco/array.hpp>
 #include <reloco/error.hpp>
 
 #include <cstddef>
@@ -161,7 +162,7 @@ private:
 
   // F1-F4: SS3 P..S; F5-F12: CSI n ~ with the xterm/VT220 numbering (gaps at 16, 22).
   void push_function_key(unsigned n) noexcept {
-    static constexpr std::uint8_t csi_numbers[] = {15, 17, 18, 19, 20, 21, 23, 24};
+    static constexpr reloco::array<std::uint8_t, 8> csi_numbers{{15, 17, 18, 19, 20, 21, 23, 24}};
     push(0x1B);
     if (n <= 4) {
       push('O');
@@ -195,7 +196,7 @@ private:
   }
 
   void push_decimal(std::uint32_t v) noexcept {
-    char digits[10];
+    reloco::array<char, 10> digits{};
     std::size_t n = 0;
     do {
       digits[n++] = static_cast<char>('0' + v % 10);
@@ -361,7 +362,7 @@ private:
   input_device_ref input_;
   vt100_terminal term_;
   uart_config cfg_{};
-  std::uint8_t pending_[pending_capacity]{};
+  reloco::array<std::uint8_t, pending_capacity> pending_{};
   std::size_t head_ = 0;
   std::size_t tail_ = 0;
   char last_tx_ = 0;

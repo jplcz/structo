@@ -52,6 +52,7 @@
 #include <structo/hw/input_device_ref.hpp>
 #include <structo/hw/uart_ref.hpp>
 
+#include <reloco/array.hpp>
 #include <reloco/error.hpp>
 
 #include <cstddef>
@@ -109,8 +110,8 @@ private:
   void emit(const input_event &e) noexcept { queue_[tail_++] = e; }
 
   void emit_key(std::uint16_t usage, unsigned mods) noexcept {
-    const std::uint16_t mod_keys[] = {U(hid_key::left_shift), U(hid_key::left_ctrl), U(hid_key::left_alt)};
-    const unsigned mod_bits[] = {mod_shift, mod_ctrl, mod_alt};
+    const reloco::array<std::uint16_t, 3> mod_keys{{U(hid_key::left_shift), U(hid_key::left_ctrl), U(hid_key::left_alt)}};
+    const reloco::array<unsigned, 3> mod_bits{{mod_shift, mod_ctrl, mod_alt}};
     for (std::size_t i = 0; i < 3; ++i)
       if (mods & mod_bits[i])
         emit(make_key_event(mod_keys[i], input_key_state::pressed));
@@ -201,7 +202,7 @@ private:
         emit(make_rel_event((b & 2u) ? input_axis::hwheel : input_axis::wheel, d));
       }
     } else if (!(b & 32u)) { // 32 = motion without a button change
-      static constexpr input_button buttons[] = {input_button::left, input_button::middle, input_button::right};
+      static constexpr reloco::array<input_button, 3> buttons{{input_button::left, input_button::middle, input_button::right}};
       if ((b & 3u) < 3)
         emit(make_button_event(buttons[b & 3u], final_byte == 'M'));
     }
@@ -336,11 +337,11 @@ private:
 
   uart_ref uart_;
   uart_input_config cfg_;
-  input_event queue_[queue_capacity]{};
+  reloco::array<input_event, queue_capacity> queue_{};
   std::size_t head_ = 0;
   std::size_t tail_ = 0;
   state state_ = state::ground;
-  std::uint32_t params_[max_params]{};
+  reloco::array<std::uint32_t, max_params> params_{};
   std::size_t nparams_ = 0;
   std::uint32_t cur_ = 0;
   bool have_cur_ = false;

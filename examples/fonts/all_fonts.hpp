@@ -36,6 +36,9 @@
 #include "terminus_8x16_font.hpp"
 #include "terminus_bold_8x16_font.hpp"
 
+#include <reloco/array.hpp>
+#include <reloco/lifetime.hpp>
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -56,15 +59,18 @@ struct font_entry {
   const char *description;
 };
 
-inline constexpr font_entry font_list[] = {
+inline constexpr reloco::array<font_entry, 5> font_list{{
     {"terminus", "Terminus 8x16 (SIL OFL 1.1) - crisp classic console font, the default"},
     {"terminus-bold", "Terminus Bold 8x16 (SIL OFL 1.1)"},
     {"terminus-14", "Terminus 8x14 (SIL OFL 1.1) - more rows per screen"},
     {"spleen", "Spleen 8x16 (BSD-2-Clause)"},
     {"dejavu", "DejaVu Sans Mono 8x16 (Bitstream Vera License) - rasterized from outlines, softer"},
-};
+}};
 
 inline constexpr const char *default_font_name = "terminus";
+
+// Printing and argv parsing sit on the libc/process boundary, so unsafe-buffer diagnostics are suppressed here.
+RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
 
 /** @brief Prints the available fonts to stdout. */
 inline void print_font_list() {
@@ -122,6 +128,8 @@ template <typename Visitor> int select_font(int argc, char **argv, Visitor &&vis
   }
   return result;
 }
+
+RELOCO_END_UNSAFE_BUFFER_USAGE
 
 } // namespace fonts
 } // namespace examples

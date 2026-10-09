@@ -59,11 +59,12 @@ TEST_F(Vt100Test, PlainTextAdvancesCursorAndWritesGlyphs) {
   EXPECT_EQ(cell_at(term.console(), 1, 0).ch, 'B');
 }
 
-TEST_F(Vt100Test, NulBelDelAndHighBytesAreIgnored) {
-  term.feed(std::string_view("A\0\a\x7f\xe2\x9e\x9c" "B", 8));
-  EXPECT_EQ(term.console().cursor_x(), 2u);
+TEST_F(Vt100Test, NulBelAndDelAreIgnoredAndUtf8ArrowIsOneCell) {
+  term.feed(std::string_view("A\0\a\x7f\xe2\x9e\x9c" "B", 8)); // U+279C (zsh prompt arrow) is one cell
+  EXPECT_EQ(term.console().cursor_x(), 3u);
   EXPECT_EQ(cell_at(term.console(), 0, 0).ch, 'A');
-  EXPECT_EQ(cell_at(term.console(), 1, 0).ch, 'B');
+  EXPECT_EQ(cell_at(term.console(), 1, 0).ch, '>');
+  EXPECT_EQ(cell_at(term.console(), 2, 0).ch, 'B');
 }
 
 TEST_F(Vt100Test, PrivateModeAndIntermediateSequencesAreConsumedSilently) {
@@ -505,4 +506,20 @@ TEST_F(Vt100Test, MouseModesAreTracked) {
   EXPECT_FALSE(term.mouse_sgr());
   term.feed("\x1b[?1003h\x1b" "c");
   EXPECT_EQ(term.mouse_tracking(), vt100_mouse_tracking::off);
+}
+
+TEST_F(Vt100Test, Utf8SequencesDrawOneCellEach) {
+  // mc/ncurses borders in a UTF-8 locale: one cell per character keeps later cursor-addressed redraws aligned.
+  term.feed("\xe2\x94\x82" "ab" "\xe2\x94\x8c\xe2\x94\x80\xe2\x94\x90"); // │ab┌─┐
+  EXPECT_EQ(row_text(term.console(), 0), "|ab+-+");
+  EXPECT_EQ(term.console().cursor_x(), 6u);
+  term.feed("\x1b[2;1H" "Nadrz\xc4\x99" "d" "\xc5\x82" "\xc3\xb3"); // Nadrzędłó -> accents dropped
+  EXPECT_EQ(row_text(term.console(), 1), "Nadrzedlo");
+}
+
+TEST_F(Vt100Test, MalformedUtf8IsDroppedWithoutDesync) {
+  term.feed("a\xc4" "b");    // truncated sequence: 'b' is printed as ASCII
+  term.feed("\x80" "c");     // stray continuation byte is ignored
+  term.feed("\xe2\x94\x1b[1;1HX"); // sequence broken by ESC: the escape still works
+  EXPECT_EQ(row_text(term.console(), 0), "Xbc");
 }
