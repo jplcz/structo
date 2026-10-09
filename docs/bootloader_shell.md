@@ -31,7 +31,7 @@ reloco::task<void> cmd_tftp(structo::bootldr::command_call &call) noexcept {
   (void)call.print("{} bytes loaded at {:#x}\n", n, *addr); // print() formats with microfmt
 }
 
-structo::bootldr::shell<> sh{sched, uart};   // 128-char lines, 16 arguments; prompt "> "
+structo::bootldr::shell sh{sched, uart};      // lines up to 256 chars, heap-backed arguments; prompt "> "
 structo::bootldr::shell_command tftp_cmd{    // owned by us; must outlive its registration
     "tftp",                                  // name typed by the user (no blanks)
     "tftp <file> <addr>: download a file",   // one line shown by "help"
@@ -43,7 +43,29 @@ structo::bootldr::shell_command tftp_cmd{    // owned by us; must outlive its re
 
 - Line editing: Backspace/DEL, Ctrl-U (erase line), Ctrl-C (drop line).
 - Quoting: `"a b"`, `'a b'`, `a\ b`; `#` starts a comment.
+- The evaluation state is a separate class, `bootldr::shell_context` (`bootldr/shell_context.hpp`, sans-IO,
+  C++17; `sh.context()`): heap-backed variables, shell functions and native expression functions.
+- Variables: `set NAME VALUE` (`set NAME` shows it, `set` lists all, `set -g` writes the global scope),
+  `unset NAME`, or from C++ `sh.context().set("name", "value")` / `get` / `unset`. `$NAME` / `${NAME}` expand
+  before the line is split (not inside `'...'` or after `\`); unknown names expand to nothing and a
+  value is always exactly one argument. Names match `[A-Za-z_][A-Za-z0-9_]*`.
+- `$((expr))` expands to the decimal value of an integer expression: `+ - * / % << >> & | ^ ~`,
+  parentheses, literals as in `parse_number` (`0x1000`, `0b101`), variable names
+  (`set base 0x80000000`, then `md $((base + 0x40)) 16`) and function calls. Arithmetic is unsigned 64-bit; an
+  unset variable counts as 0; a syntax error or division by zero fails the line (`error: invalid_argument`).
+  Built-in functions: `min(a, b)`, `max(a, b)`, `align_up(x, a)`, `align_down(x, a)`; add your own with
+  `sh.context().add_function("crc", fn, user)` (`fn(user, args)` returns the value).
+  `bootldr::evaluate_expression(text, lookup, call)` in `cmdline.hpp` is the sans-IO evaluator.
+- Shell functions: `function NAME 'stmt1 $1; stmt2'` (single quotes, so `$1` is expanded at call time, not
+  when defining), `function` lists, `function NAME` shows the body, `unfunction NAME` removes it. `NAME a b` runs
+  the statements (`;` separated; the first failure stops it) with `$0`=name, `$1`.. and `$#`. Every call has its
+  **own dynamic scope**: variables it sets are local (they shadow the caller's and vanish on return; `unset` and
+  `set` touch only that scope), but lookups still see the callers' variables, innermost first. `set -g` writes the
+  global scope. Calls nest up to 16 deep; a function cannot take the name of a command.
 - `help` lists all commands. Errors from a handler print `error: <code>`.
+- A line may hold several statements separated by `;` (outside quotes). Scripts: `shell::execute_script(sh, text)`
+  (or `shell_base::run_script(text)` inside a command) runs a multi-line buffer, one line per `\n`, in the current
+  variable scope and stops at the first failing statement; `text` must outlive the task.
 - `shell::execute(sh, "tftp kernel.bin 0x80000")` runs a line
   without the console (boot scripts); it fails with `busy` while a command runs.
 
@@ -69,7 +91,12 @@ structo::bootldr::generic_commands cmds{sh, hooks}; // owns the command objects;
 | `md <addr> [len]` | hex dump (microfmt `hexdump_checked`) |
 | `mw <addr> <value> [width]` | write 1/2/4/8 bytes |
 | `cp <dst> <src> <len>`, `fill <addr> <len> <byte>` | overlap-safe copy, fill; yield every 4 KiB |
+| `source <addr> [len]` | runs the script stored in memory (copied first); without `len` it ends at the first NUL |
 | `cmp <a> <b> <len>` | prints a microfmt `mem_diff` at the first difference and fails |
+
+`add_all()` also registers expression functions for `$((...))`: `peek8/16/32/64(addr)` (native-endian
+read through the `read_memory` hook; `out_of_bounds` on a fault), `bit(n)` and `mask(n)`; e.g.
+`set magic $((peek32(0x1000)))`.
 
 Failing commands print `error: <name>` (microfmt formats `reloco::error` by name).
 

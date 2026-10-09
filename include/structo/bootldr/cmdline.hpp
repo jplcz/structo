@@ -15,6 +15,8 @@
  *  - outside quotes a backslash escapes the next character;
  *  - `#` at the start of an argument ends the line (comment).
  *
+ * `evaluate_expression` is the integer calculator behind the shell's `$((expression))` arguments.
+ *
  * ```cpp
  * char line[] = "load kernel \"my image.bin\" 0x80000";  // writable, NUL-terminated
  * char *argv[8];
@@ -23,6 +25,7 @@
  * ```
  */
 
+#include <reloco/array.hpp>
 #include <reloco/error.hpp>
 #include <reloco/lifetime.hpp>
 #include <reloco/span.hpp>
@@ -144,6 +147,206 @@ RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
     value = value * base + d;
   }
   return value;
+}
+
+/**
+ * @brief Evaluates an unsigned 64-bit integer expression (wrapping arithmetic).
+ *
+ * Operators, lowest to highest precedence: `|`, `^`, `&`, `<<` `>>`, `+` `-`, `*` `/` `%`, then unary
+ * `+` `-` `~` and parentheses. Numbers use `parse_number` syntax (`42`, `0x1000`, `0b101`, `017`); a name
+ * (optionally written `$name`) is looked up with `lookup` and its value parsed the same way; an unknown name is 0.
+ * `name(arg, ...)` (at most 8 arguments) calls a function through `call`.
+ *
+ * @param lookup  callable `reloco::result<reloco::string_view>(reloco::string_view name)`; `error::not_found` means unset.
+ * @param call    callable `reloco::result<std::uint64_t>(reloco::string_view name, reloco::span<const std::uint64_t> args)`;
+ *                its error (e.g. `error::not_found` for an unknown function) fails the evaluation.
+ * @return the value; `error::invalid_argument` for a syntax error, a non-numeric variable or a division by zero,
+ *         `error::out_of_range` for overflowing literals, too many arguments or nesting deeper than 32.
+ */
+template <typename Lookup, typename Call>
+[[nodiscard]] reloco::result<std::uint64_t> evaluate_expression(reloco::string_view text, const Lookup &lookup,
+                                                                const Call &call) noexcept;
+
+/** @brief `evaluate_expression` without functions: any `name(...)` fails with `error::not_found`. */
+template <typename Lookup>
+[[nodiscard]] reloco::result<std::uint64_t> evaluate_expression(reloco::string_view text, const Lookup &lookup) noexcept {
+  return evaluate_expression(text, lookup, [](reloco::string_view, reloco::span<const std::uint64_t>) noexcept {
+    return reloco::result<std::uint64_t>(reloco::unexpected(reloco::error::not_found));
+  });
+}
+
+namespace detail {
+
+template <typename Lookup, typename Call> class expression_parser {
+public:
+  expression_parser(reloco::string_view text, const Lookup &lookup, const Call &call) noexcept
+      : s_(text), lookup_(lookup), call_(call) {}
+
+  reloco::result<std::uint64_t> parse() noexcept {
+    auto v = binary(0, 0);
+    if (!v)
+      return v;
+    skip();
+    if (i_ != s_.size())
+      return reloco::unexpected(reloco::error::invalid_argument);
+    return v;
+  }
+
+private:
+  static constexpr int max_depth = 32;
+  static constexpr int top_level = 5;
+
+  char at(std::size_t k) const noexcept { return k < s_.size() ? s_[k] : '\0'; }
+  void skip() noexcept {
+    while (at(i_) == ' ' || at(i_) == '\t')
+      ++i_;
+  }
+
+  // Operator of the given precedence level at the cursor: stores it in op_ and returns its length (0 if none).
+  std::size_t match(int level) noexcept {
+    const char c = at(i_);
+    switch (level) {
+    case 0:
+      return c == '|' ? (op_ = c, 1) : 0;
+    case 1:
+      return c == '^' ? (op_ = c, 1) : 0;
+    case 2:
+      return c == '&' ? (op_ = c, 1) : 0;
+    case 3:
+      return (c == '<' || c == '>') && at(i_ + 1) == c ? (op_ = c, 2) : 0;
+    case 4:
+      return c == '+' || c == '-' ? (op_ = c, 1) : 0;
+    default:
+      return c == '*' || c == '/' || c == '%' ? (op_ = c, 1) : 0;
+    }
+  }
+
+  reloco::result<std::uint64_t> binary(int level, int depth) noexcept {
+    if (level > top_level)
+      return unary(depth);
+    auto lhs = binary(level + 1, depth);
+    if (!lhs)
+      return lhs;
+    for (;;) {
+      skip();
+      const std::size_t len = match(level);
+      if (len == 0)
+        return lhs;
+      const char op = op_;
+      i_ += len;
+      auto rhs = binary(level + 1, depth);
+      if (!rhs)
+        return rhs;
+      const std::uint64_t a = *lhs, b = *rhs;
+      switch (op) {
+      case '|': lhs = a | b; break;
+      case '^': lhs = a ^ b; break;
+      case '&': lhs = a & b; break;
+      case '<': lhs = b >= 64 ? 0 : a << b; break;
+      case '>': lhs = b >= 64 ? 0 : a >> b; break;
+      case '+': lhs = a + b; break;
+      case '-': lhs = a - b; break;
+      case '*': lhs = a * b; break;
+      default:
+        if (b == 0)
+          return reloco::unexpected(reloco::error::invalid_argument);
+        lhs = op == '/' ? a / b : a % b;
+      }
+    }
+  }
+
+  reloco::result<std::uint64_t> unary(int depth) noexcept {
+    if (depth > max_depth)
+      return reloco::unexpected(reloco::error::out_of_range);
+    skip();
+    const char c = at(i_);
+    if (c == '-' || c == '+' || c == '~') {
+      ++i_;
+      auto v = unary(depth + 1);
+      if (!v)
+        return v;
+      return c == '-' ? std::uint64_t{0} - *v : c == '~' ? ~*v : *v;
+    }
+    if (c == '(') {
+      ++i_;
+      auto v = binary(0, depth + 1);
+      if (!v)
+        return v;
+      skip();
+      if (at(i_) != ')')
+        return reloco::unexpected(reloco::error::invalid_argument);
+      ++i_;
+      return v;
+    }
+    const bool dollar = c == '$';
+    const std::size_t b = dollar ? i_ + 1 : i_;
+    std::size_t e = b;
+    while (is_word(at(e)))
+      ++e;
+    if (e == b)
+      return reloco::unexpected(reloco::error::invalid_argument);
+    const reloco::string_view word = s_.substr(b, e - b);
+    i_ = e;
+    if (!dollar) {
+      skip();
+      if (at(i_) == '(')
+        return call_function(word, depth);
+    }
+    const char first = word[0];
+    if (!dollar && first >= '0' && first <= '9')
+      return parse_number(word);
+    auto value = lookup_(word);
+    if (!value)
+      return value.error() == reloco::error::not_found ? reloco::result<std::uint64_t>(std::uint64_t{0})
+                                                       : reloco::result<std::uint64_t>(reloco::unexpected(value.error()));
+    if (value->empty())
+      return std::uint64_t{0};
+    return parse_number(*value);
+  }
+
+  reloco::result<std::uint64_t> call_function(reloco::string_view name, int depth) noexcept {
+    reloco::array<std::uint64_t, 8> args{};
+    std::size_t n = 0;
+    ++i_; // '('
+    skip();
+    if (at(i_) == ')') {
+      ++i_;
+    } else {
+      for (;;) {
+        if (n == args.size())
+          return reloco::unexpected(reloco::error::out_of_range);
+        auto v = binary(0, depth + 1);
+        if (!v)
+          return v;
+        args[n++] = *v;
+        skip();
+        const char c = at(i_++);
+        if (c == ')')
+          break;
+        if (c != ',')
+          return reloco::unexpected(reloco::error::invalid_argument);
+      }
+    }
+    return call_(name, reloco::span<const std::uint64_t>(args.data(), n));
+  }
+
+  static bool is_word(char c) noexcept {
+    return c == '_' || (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+  }
+
+  reloco::string_view s_;
+  const Lookup &lookup_;
+  const Call &call_;
+  std::size_t i_ = 0;
+  char op_ = 0;
+};
+
+} // namespace detail
+
+template <typename Lookup, typename Call>
+[[nodiscard]] reloco::result<std::uint64_t> evaluate_expression(reloco::string_view text, const Lookup &lookup,
+                                                                const Call &call) noexcept {
+  return detail::expression_parser<Lookup, Call>(text, lookup, call).parse();
 }
 
 RELOCO_END_UNSAFE_BUFFER_USAGE

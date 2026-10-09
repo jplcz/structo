@@ -17,8 +17,20 @@
  * | `cp <dst> <src> <len>` | copy memory (overlap-safe) |
  * | `cmp <a> <b> <len>` | compare memory; on a mismatch prints a `microfmt::mem_diff` of the differing rows |
  * | `fill <addr> <len> <byte>` | fill memory |
+ * | `source <addr> [len]` | run the script stored in memory (one line per `\n`, `;` separates statements); without `len` it ends at the first NUL |
  * | `go <addr>` | jump to an address (only if a `go` hook is provided) |
  * | `reset` | restart the board (only if a `reset` hook is provided) |
+ *
+ * Expression functions (usable inside `$((...))`, registered by `add_all()`/`add_functions()` next to the
+ * built-in `min`/`max`/`align_up`/`align_down`):
+ *
+ * | function | value |
+ * |----------|-------|
+ * | `peek8(addr)`, `peek16(addr)`, `peek32(addr)`, `peek64(addr)` | the native-endian value at `addr`, read with the `read_memory` hook (fails with `out_of_bounds` on a fault) |
+ * | `bit(n)` | `1 << n` (0 when `n >= 64`) |
+ * | `mask(n)` | the `n` low bits set (all ones when `n >= 64`) |
+ *
+ * For example `set magic $((peek32(0x1000)))` or `mw $((align_up(addr, 8))) $((bit(3) | mask(2)))`.
  *
  * `help` is not part of this set: every `shell` has it built in.
  * Addresses and numbers accept decimal, `0x` hex, `0b` binary and octal (`parse_number`).
@@ -26,7 +38,7 @@
  * only as safe as the addresses you type; long copies/fills yield to other tasks every 4 KiB.
  *
  * ```cpp
- * structo::bootldr::shell<> sh{sched, uart};
+ * structo::bootldr::shell sh{sched, uart};
  *
  * // Platform hooks are optional; a command whose hook is null is not registered.
  * structo::bootldr::generic_commands_hooks hooks;
@@ -47,11 +59,15 @@
 #include <microfmt/inspector/memory_diff.hpp>
 #include <microfmt/microfmt.hpp>
 
+#include <reloco/array.hpp>
 #include <reloco/error.hpp>
 #include <reloco/lifetime.hpp>
+#include <reloco/sso_string.hpp>
 
+#include <bit>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 
 #if RELOCO_HAS_COROUTINES
 
@@ -80,12 +96,37 @@ public:
         cp_("cp", "cp <dst> <src> <len>: copy memory", &cp_cmd),
         cmp_("cmp", "cmp <a> <b> <len>: compare memory", &cmp_cmd, this),
         fill_("fill", "fill <addr> <len> <byte>: fill memory", &fill_cmd),
+        source_("source", "source <addr> [len]: run the script (lines, ';'-separated statements) stored in memory",
+                &source_cmd, this),
         go_("go", "go <addr>: jump to an address", &go_cmd, this),
         reset_("reset", "reset: restart the board", &reset_cmd, this) {}
 
-  /** @brief Registers every command (hook-backed ones only if their hook is set). Stops at the first failure. */
+  generic_commands(const generic_commands &) = delete;
+  generic_commands &operator=(const generic_commands &) = delete;
+  ~generic_commands() {
+    for (const reloco::string_view n : function_names)
+      (void)sh_->context().remove_function(n);
+  }
+
+  /**
+   * @brief Registers the expression functions `peek8/16/32/64`, `bit` and `mask` in the shell's context
+   * (unregistered on destruction). Calling it twice just replaces them.
+   */
+  [[nodiscard]] reloco::result<void> add_functions() noexcept {
+    shell_context &ctx = sh_->context();
+    const shell_context::native_fn fns[] = {&peek8_fn, &peek16_fn, &peek32_fn, &peek64_fn, &bit_fn, &mask_fn};
+    for (std::size_t i = 0; i < function_names.size(); ++i)
+      if (auto r = ctx.add_function(function_names[i], fns[i], this); !r)
+        return r;
+    return {};
+  }
+
+  /** @brief Registers every command (hook-backed ones only if their hook is set) and the expression functions.
+   * Stops at the first failure. */
   [[nodiscard]] reloco::result<void> add_all() noexcept {
-    shell_command *all[] = {&echo_, &sleep_, &uptime_, &md_, &mw_, &cp_, &cmp_, &fill_};
+    if (auto r = add_functions(); !r)
+      return r;
+    shell_command *all[] = {&echo_, &sleep_, &uptime_, &md_, &mw_, &cp_, &cmp_, &fill_, &source_};
     for (shell_command *c : all)
       if (auto r = sh_->add(*c); !r)
         return r;
@@ -100,6 +141,39 @@ public:
 
 private:
   static constexpr std::size_t chunk = 4096;
+  static constexpr std::uint64_t script_max = 64 * 1024;
+  static constexpr reloco::array<reloco::string_view, 6> function_names{"peek8", "peek16", "peek32",
+                                                                       "peek64", "bit",    "mask"};
+
+  // peekN(addr): reads `width` bytes through the reader (a hook may be fault-safe) as a native-endian integer.
+  static reloco::result<std::uint64_t> peek(void *user, reloco::span<const std::uint64_t> args,
+                                            std::size_t width) noexcept {
+    if (args.size() != 1)
+      return reloco::unexpected(reloco::error::invalid_argument);
+    std::uint64_t value = 0; // little-endian hosts fill the low bytes; big-endian ones are shifted below
+    std::uint8_t bytes[8]{};
+    if (static_cast<generic_commands *>(user)->reader()(static_cast<generic_commands *>(user)->hooks_.ctx,
+                                                        static_cast<std::uintptr_t>(args[0]), bytes, width) != width)
+      return reloco::unexpected(reloco::error::out_of_bounds);
+    std::memcpy(&value, bytes, width);
+    if constexpr (std::endian::native == std::endian::big)
+      value >>= (8 - width) * 8;
+    return value;
+  }
+  static reloco::result<std::uint64_t> peek8_fn(void *u, reloco::span<const std::uint64_t> a) noexcept { return peek(u, a, 1); }
+  static reloco::result<std::uint64_t> peek16_fn(void *u, reloco::span<const std::uint64_t> a) noexcept { return peek(u, a, 2); }
+  static reloco::result<std::uint64_t> peek32_fn(void *u, reloco::span<const std::uint64_t> a) noexcept { return peek(u, a, 4); }
+  static reloco::result<std::uint64_t> peek64_fn(void *u, reloco::span<const std::uint64_t> a) noexcept { return peek(u, a, 8); }
+  static reloco::result<std::uint64_t> bit_fn(void *, reloco::span<const std::uint64_t> a) noexcept {
+    if (a.size() != 1)
+      return reloco::unexpected(reloco::error::invalid_argument);
+    return a[0] >= 64 ? std::uint64_t{0} : std::uint64_t{1} << a[0];
+  }
+  static reloco::result<std::uint64_t> mask_fn(void *, reloco::span<const std::uint64_t> a) noexcept {
+    if (a.size() != 1)
+      return reloco::unexpected(reloco::error::invalid_argument);
+    return a[0] >= 64 ? ~std::uint64_t{0} : (std::uint64_t{1} << a[0]) - 1;
+  }
 
   // Prints "usage: <help>" for the running command and returns the error to fail with.
   static reloco::error usage(command_call &call) noexcept {
@@ -158,7 +232,7 @@ private:
     // One 16-byte row per print(); the reader is probed per row so a fault shows up as a short row.
     for (std::uint64_t off = 0; off < *len; off += 16) {
       const std::size_t n = *len - off < 16 ? static_cast<std::size_t>(*len - off) : 16;
-      (void)call.print<160>("{}\n", microfmt::hexdump_checked(static_cast<std::uintptr_t>(*addr + off), n,
+      (void)call.print("{}\n", microfmt::hexdump_checked(static_cast<std::uintptr_t>(*addr + off), n,
                                                                 self.reader(), self.hooks_.ctx));
       if ((off / 16) % 16 == 15)
         co_await call.sh().sched().yield();
@@ -244,7 +318,7 @@ private:
         const std::size_t rb = self.reader()(self.hooks_.ctx, static_cast<std::uintptr_t>(*b + start), wb, n);
         const std::size_t got = ra < rb ? ra : rb;
         (void)call.print("differ at offset {:#x}\n", i);
-        (void)call.print<512>("{}", microfmt::mem_diff(microfmt::span<const std::uint8_t>(wa, got),
+        (void)call.print("{}", microfmt::mem_diff(microfmt::span<const std::uint8_t>(wa, got),
                                                         microfmt::span<const std::uint8_t>(wb, got),
                                                         static_cast<std::uintptr_t>(*a + start)));
         co_await reloco::unexpected(reloco::error::invalid_state);
@@ -273,6 +347,47 @@ private:
 
   RELOCO_END_UNSAFE_BUFFER_USAGE
 
+  // source <addr> [len]: copies the buffer to the heap (the script may overwrite the memory it came from),
+  // then runs it as a script in the current scope. Without `len` it ends at the first NUL (at most script_max bytes).
+  static reloco::task<void> source_cmd(command_call &call) noexcept {
+    auto &self = *static_cast<generic_commands *>(call.ctx());
+    if (call.argc() < 2 || call.argc() > 3)
+      co_await reloco::unexpected(usage(call));
+    auto addr = parse_number(call.arg(1));
+    auto len = call.argc() == 3 ? parse_number(call.arg(2)) : reloco::result<std::uint64_t>(script_max);
+    if (!addr || !len)
+      co_await reloco::unexpected(usage(call));
+    const bool explicit_len = call.argc() == 3;
+
+    reloco::sso_string text(call.sh().sched().allocator());
+    std::uint8_t part[64];
+    std::uint64_t got = 0;
+    while (got < *len) {
+      const std::size_t want = *len - got < sizeof part ? static_cast<std::size_t>(*len - got) : sizeof part;
+      const std::size_t n = self.reader()(self.hooks_.ctx, static_cast<std::uintptr_t>(*addr + got), part, want);
+      std::size_t keep = n;
+      bool done = n != want;
+      if (!explicit_len)
+        for (std::size_t i = 0; i < n; ++i)
+          if (part[i] == 0) {
+            keep = i;
+            done = true;
+            break;
+          }
+      if (auto r = text.try_append(reloco::string_view(reinterpret_cast<const char *>(part), keep)); !r)
+        co_await reloco::unexpected(r.error());
+      got += keep;
+      if (done) {
+        if (explicit_len && n != want) // fault inside the requested range
+          co_await reloco::unexpected(reloco::error::out_of_bounds);
+        break;
+      }
+      if (got % chunk == 0)
+        co_await call.sh().sched().yield();
+    }
+    co_await co_await call.sh().run_script(text.view());
+  }
+
   static reloco::task<void> go_cmd(command_call &call) noexcept {
     auto &self = *static_cast<generic_commands *>(call.ctx());
     auto addr = call.argc() == 2 ? parse_number(call.arg(1)) : reloco::result<std::uint64_t>(reloco::unexpected(reloco::error::invalid_argument));
@@ -291,7 +406,7 @@ private:
 
   shell_base *sh_;
   generic_commands_hooks hooks_;
-  shell_command echo_, sleep_, uptime_, md_, mw_, cp_, cmp_, fill_, go_, reset_;
+  shell_command echo_, sleep_, uptime_, md_, mw_, cp_, cmp_, fill_, source_, go_, reset_;
 };
 
 } // namespace structo::bootldr
