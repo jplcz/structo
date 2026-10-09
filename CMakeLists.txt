@@ -331,6 +331,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_filesystem_ref.cpp
         tests/test_fat.cpp
         tests/test_ext4.cpp
+        tests/test_recursive_remapper.cpp
         tests/test_uart_ref.cpp
         tests/test_uart_input.cpp
         tests/test_input_device_ref.cpp
