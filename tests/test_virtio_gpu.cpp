@@ -135,7 +135,7 @@ protected:
 TEST_F(VirtioGpuTest, IdentityAndConfig) {
   EXPECT_EQ(rd(reg::device_id), 16u);
   EXPECT_EQ(dev_.size(), reg::config + gpu::config_size);
-  EXPECT_EQ(rd(reg::config + 8), 1u); // num_scanouts
+  EXPECT_EQ(rd(reg::config + 8), 1u);  // num_scanouts
   EXPECT_EQ(rd(reg::config + 12), 0u); // num_capsets
 }
 
@@ -222,7 +222,7 @@ TEST_F(VirtioGpuTest, DisplayFailureReportsUnspec) {
 
 TEST_F(VirtioGpuTest, RejectsBadCreates) {
   bring_up();
-  EXPECT_EQ(cmd(gpu::cmd_resource_create_2d, {0, 2, 8, 4}), gpu::resp_err_invalid_parameter); // id 0
+  EXPECT_EQ(cmd(gpu::cmd_resource_create_2d, {0, 2, 8, 4}), gpu::resp_err_invalid_parameter);  // id 0
   EXPECT_EQ(cmd(gpu::cmd_resource_create_2d, {1, 99, 8, 4}), gpu::resp_err_invalid_parameter); // format
   EXPECT_EQ(cmd(gpu::cmd_resource_create_2d, {1, 2, 0, 4}), gpu::resp_err_invalid_parameter);
   EXPECT_EQ(cmd(gpu::cmd_resource_create_2d, {1, 2, 0xffffffffu, 0xffffffffu}), gpu::resp_err_invalid_parameter);
@@ -253,7 +253,7 @@ TEST_F(VirtioGpuTest, RejectsBadRectsAndIds) {
   EXPECT_EQ(cmd(gpu::cmd_set_scanout, {0, 0, 9, 4, 0, 1}), gpu::resp_err_invalid_parameter);
   EXPECT_EQ(cmd(gpu::cmd_set_scanout, {0, 0, 8, 4, 0, 7}), gpu::resp_err_invalid_resource_id);
   EXPECT_EQ(cmd(gpu::cmd_resource_flush, {7, 0, 0xfffffffeu, 1, 1, 0}), gpu::resp_err_invalid_parameter); // wrap
-  EXPECT_EQ(cmd(gpu::cmd_resource_flush, {0, 0, 0, 4, 1, 0}), gpu::resp_err_invalid_parameter); // empty
+  EXPECT_EQ(cmd(gpu::cmd_resource_flush, {0, 0, 0, 4, 1, 0}), gpu::resp_err_invalid_parameter);           // empty
   EXPECT_EQ(cmd(gpu::cmd_resource_flush, {0, 0, 8, 4, 9, 0}), gpu::resp_err_invalid_resource_id);
   EXPECT_EQ(cmd(gpu::cmd_transfer_to_host_2d, {0, 0, 9, 4, 0, 0, 1, 0}), gpu::resp_err_invalid_parameter);
   // Offset pushing the read past the backing (32 pixels = 128 bytes).
@@ -331,8 +331,8 @@ TEST_F(VirtioGpuTest, FenceIsEchoed) {
 
 TEST_F(VirtioGpuTest, UnknownAndShortCommandsAreAnswered) {
   bring_up();
-  EXPECT_EQ(cmd(0x108, {0, 0}), gpu::resp_err_unspec); // GET_CAPSET_INFO: no capsets
-  EXPECT_EQ(cmd(0x10a, {0, 0}), gpu::resp_err_unspec); // GET_EDID: not offered
+  EXPECT_EQ(cmd(0x108, {0, 0}), gpu::resp_err_unspec);                               // GET_CAPSET_INFO: no capsets
+  EXPECT_EQ(cmd(0x10a, {0, 0}), gpu::resp_err_unspec);                               // GET_EDID: not offered
   EXPECT_EQ(cmd(gpu::cmd_resource_create_2d, {1}), gpu::resp_err_invalid_parameter); // truncated body
   std::uint8_t tiny[4] = {};
   EXPECT_EQ(send(tiny, sizeof tiny), gpu::resp_err_invalid_parameter);
@@ -392,8 +392,8 @@ template <> struct structo::hw::gpu_accel_traits<counting_backend> {
                         rgb_color c) noexcept {
     b.fb->fill_rect(x, y, w, h, c);
   }
-  static void draw_line(counting_backend &b, std::ptrdiff_t x0, std::ptrdiff_t y0, std::ptrdiff_t x1,
-                        std::ptrdiff_t y1, rgb_color c) noexcept {
+  static void draw_line(counting_backend &b, std::ptrdiff_t x0, std::ptrdiff_t y0, std::ptrdiff_t x1, std::ptrdiff_t y1,
+                        rgb_color c) noexcept {
     b.fb->draw_line(x0, y0, x1, y1, c);
   }
 };

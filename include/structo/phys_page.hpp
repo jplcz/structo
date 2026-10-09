@@ -202,8 +202,7 @@ public:
     // platform-independent), but `PhysInt` may legitimately be narrower (e.g.
     // uint32_t on a 32-bit target, or even on a 64-bit one) -- the explicit
     // cast is intentional and matches the caller-chosen address width.
-    return phys_addr<void, SpaceTag, PhysInt>{
-        static_cast<PhysInt>(OsTraits::to_pfn(page_) << PageTraits::page_shift)};
+    return phys_addr<void, SpaceTag, PhysInt>{static_cast<PhysInt>(OsTraits::to_pfn(page_) << PageTraits::page_shift)};
   }
 
   [[nodiscard]] os_page_type get_os_page() const noexcept { return page_; }

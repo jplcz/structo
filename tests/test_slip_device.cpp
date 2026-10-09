@@ -66,14 +66,15 @@ TEST_F(Slip, EncodeEscapes) {
 TEST_F(Slip, DecoderRoundTripAndEdgeCases) {
   reloco::array<std::uint8_t, 8> buf{};
   slip_decoder d(buf);
-  const bytes wire = make_bytes({slip_end, slip_end, 1, slip_esc, slip_esc_end, 3, slip_end, // good frame
-                                 5, slip_esc, 0x01, 6, slip_end,                             // bad escape
-                                 1, 2, 3, 4, 5, 6, 7, 8, 9, slip_end,                        // too long
-                                 7, slip_end});                                              // good again
+  const bytes wire = make_bytes({slip_end, slip_end, 1,    slip_esc, slip_esc_end,
+                                 3,        slip_end,                           // good frame
+                                 5,        slip_esc, 0x01, 6,        slip_end, // bad escape
+                                 1,        2,        3,    4,        5,
+                                 6,        7,        8,    9,        slip_end, // too long
+                                 7,        slip_end});                         // good again
   reloco::vector<bytes> frames;
   for (std::size_t i = 0; i < wire.size(); ++i)
-    if (d.push(wire[i]))
-    {
+    if (d.push(wire[i])) {
       auto f = d.frame();
       ASSERT_TRUE(frames.try_push_back(make_bytes(f)).has_value());
     }

@@ -178,8 +178,7 @@ public:
   }
 
   /** @brief `on_packet` followed by `apply`. */
-  template <std::size_t Mtu>
-  bool handle(ipv4_node<Mtu> &node, const ipv4_packet &pkt, std::uint64_t now_ms) noexcept {
+  template <std::size_t Mtu> bool handle(ipv4_node<Mtu> &node, const ipv4_packet &pkt, std::uint64_t now_ms) noexcept {
     const bool consumed = on_packet(pkt, now_ms);
     apply(node);
     return consumed;

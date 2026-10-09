@@ -78,7 +78,7 @@ TEST(ArmSmcccTest, IsConstexprEvaluable) {
   constexpr smccc_function_id id = decode_smccc_function_id(0xC4000001U);
   static_assert(id.convention == smccc_convention::smc64, "must be constexpr");
   constexpr std::uint32_t raw = encode_smccc_function_id(smccc_call_type::fast, smccc_convention::smc64,
-                                                          static_cast<std::uint8_t>(smccc_owner::standard), 1);
+                                                         static_cast<std::uint8_t>(smccc_owner::standard), 1);
   static_assert(raw == 0xC4000001U, "must be constexpr");
   constexpr bool supported32 = smccc_convention_supported<std::uint32_t>(smccc_convention::smc64);
   static_assert(!supported32, "must be constexpr");

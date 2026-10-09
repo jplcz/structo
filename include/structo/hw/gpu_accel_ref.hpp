@@ -94,11 +94,10 @@ namespace detail {
 template <typename Backend, typename = void> struct has_gpu_accel_traits : std::false_type {};
 
 template <typename Backend>
-struct has_gpu_accel_traits<Backend, std::void_t<decltype(gpu_accel_traits<Backend>::width),
-                                                 decltype(gpu_accel_traits<Backend>::height),
-                                                 decltype(gpu_accel_traits<Backend>::clear),
-                                                 decltype(gpu_accel_traits<Backend>::fill_rect),
-                                                 decltype(gpu_accel_traits<Backend>::draw_line)>> : std::true_type {};
+struct has_gpu_accel_traits<
+    Backend, std::void_t<decltype(gpu_accel_traits<Backend>::width), decltype(gpu_accel_traits<Backend>::height),
+                         decltype(gpu_accel_traits<Backend>::clear), decltype(gpu_accel_traits<Backend>::fill_rect),
+                         decltype(gpu_accel_traits<Backend>::draw_line)>> : std::true_type {};
 
 template <typename Traits, typename = void> struct gpu_accel_has_draw_rect : std::false_type {};
 template <typename Traits>

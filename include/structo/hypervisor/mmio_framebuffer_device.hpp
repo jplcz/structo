@@ -86,8 +86,8 @@
 #include <reloco/allocator.hpp>
 #include <reloco/default_allocator.hpp>
 #include <reloco/error.hpp>
-#include <reloco/lifetime.hpp>
 #include <reloco/expected.hpp>
+#include <reloco/lifetime.hpp>
 #include <reloco/span.hpp>
 #include <utility>
 
@@ -105,12 +105,24 @@ template <typename PixelFormat> struct pixel_format_id {
 /** @brief Reserved id reported for any `PixelFormat` without its own @ref pixel_format_id specialization. */
 inline constexpr std::uint32_t pixel_format_id_custom = 0xFFFFFFFFu;
 
-template <> struct pixel_format_id<hw::rgb888> { static constexpr std::uint32_t value = 1; };
-template <> struct pixel_format_id<hw::bgr888> { static constexpr std::uint32_t value = 2; };
-template <> struct pixel_format_id<hw::xrgb8888> { static constexpr std::uint32_t value = 3; };
-template <> struct pixel_format_id<hw::rgba8888> { static constexpr std::uint32_t value = 4; };
-template <> struct pixel_format_id<hw::rgb565> { static constexpr std::uint32_t value = 5; };
-template <> struct pixel_format_id<hw::gray8> { static constexpr std::uint32_t value = 6; };
+template <> struct pixel_format_id<hw::rgb888> {
+  static constexpr std::uint32_t value = 1;
+};
+template <> struct pixel_format_id<hw::bgr888> {
+  static constexpr std::uint32_t value = 2;
+};
+template <> struct pixel_format_id<hw::xrgb8888> {
+  static constexpr std::uint32_t value = 3;
+};
+template <> struct pixel_format_id<hw::rgba8888> {
+  static constexpr std::uint32_t value = 4;
+};
+template <> struct pixel_format_id<hw::rgb565> {
+  static constexpr std::uint32_t value = 5;
+};
+template <> struct pixel_format_id<hw::gray8> {
+  static constexpr std::uint32_t value = 6;
+};
 
 /**
  * @brief Emulated linear-framebuffer graphics device: a plain `hw::framebuffer<PixelFormat>` (either
@@ -142,8 +154,8 @@ public:
   constexpr explicit mmio_framebuffer_device(allocator_ref alloc = default_allocator()) noexcept : alloc_(alloc) {}
 
   mmio_framebuffer_device(mmio_framebuffer_device &&other) noexcept
-      : alloc_(other.alloc_), owned_base_(other.owned_base_), owned_size_(other.owned_size_),
-        fb_(std::move(other.fb_)), dirty_(other.dirty_) {
+      : alloc_(other.alloc_), owned_base_(other.owned_base_), owned_size_(other.owned_size_), fb_(std::move(other.fb_)),
+        dirty_(other.dirty_) {
     other.owned_base_ = nullptr;
     other.owned_size_ = 0;
     other.fb_ = hw::framebuffer<PixelFormat>();
@@ -184,9 +196,9 @@ public:
    * `width`/`height`/`page_size` are zero or `page_size` is not a power of two, or
    * `error::allocation_failed` if @p alloc could not provide the backing storage.
    */
-  [[nodiscard]] static result<mmio_framebuffer_device> try_allocate(allocator_ref alloc, std::size_t width,
-                                                                    std::size_t height,
-                                                                    std::size_t page_size = default_page_size) noexcept {
+  [[nodiscard]] static result<mmio_framebuffer_device>
+  try_allocate(allocator_ref alloc, std::size_t width, std::size_t height,
+               std::size_t page_size = default_page_size) noexcept {
     if (width == 0 || height == 0 || page_size == 0 || (page_size & (page_size - 1)) != 0) {
       return unexpected(error::invalid_argument);
     }
@@ -212,8 +224,8 @@ public:
       b = std::byte{0};
     }
 
-    auto fb = hw::framebuffer<PixelFormat>::try_create(span<std::byte>(dev.owned_base_, pixel_bytes), width, height,
-                                                       stride);
+    auto fb =
+        hw::framebuffer<PixelFormat>::try_create(span<std::byte>(dev.owned_base_, pixel_bytes), width, height, stride);
     // Cannot fail here: width/height are already non-zero and stride == width * bytes_per_pixel exactly, and
     // the span passed in is exactly stride * height bytes, well within owned_size_.
     dev.fb_ = std::move(*fb);
@@ -222,7 +234,7 @@ public:
 
   /** @brief `try_allocate()` using `reloco::default_allocator()`. */
   [[nodiscard]] static result<mmio_framebuffer_device> try_create(std::size_t width, std::size_t height,
-                                                                   std::size_t page_size = default_page_size) noexcept {
+                                                                  std::size_t page_size = default_page_size) noexcept {
     return try_allocate(default_allocator(), width, height, page_size);
   }
 

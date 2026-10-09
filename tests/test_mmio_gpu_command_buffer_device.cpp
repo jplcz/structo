@@ -14,6 +14,8 @@
 // Test fixtures index raw buffers freely; bounds are checked by the assertions.
 RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
 
+using reloco::error;
+using reloco::span;
 using structo::hw::framebuffer;
 using structo::hw::gpu_accel_ref;
 using structo::hw::rgb_color;
@@ -26,8 +28,6 @@ using structo::hypervisor::mmio_device_ref;
 using structo::hypervisor::mmio_gpu_command_buffer_device;
 using structo::hypervisor::pack_gpu_color;
 using structo::hypervisor::unpack_gpu_color;
-using reloco::error;
-using reloco::span;
 
 namespace {
 
@@ -126,8 +126,7 @@ TEST(MmioGpuCommandBufferDeviceAllocation, CommandBufferIsPageAlignedAndSizedFor
 
 TEST_F(MmioGpuCommandBufferDeviceTest, ExecutePendingRunsStagedCommandsDirectly) {
   stage_command(dev_, 0, gpu_command{gpu_command_opcode::clear, 0, 0, 0, 0, pack_gpu_color({5, 5, 5})});
-  stage_command(dev_, 1,
-                gpu_command{gpu_command_opcode::fill_rect, 2, 2, 4, 4, pack_gpu_color({10, 20, 30})});
+  stage_command(dev_, 1, gpu_command{gpu_command_opcode::fill_rect, 2, 2, 4, 4, pack_gpu_color({10, 20, 30})});
   ASSERT_TRUE(dev_.set_count(2).has_value());
 
   std::size_t executed = dev_.execute_pending();
@@ -190,8 +189,8 @@ TEST_F(MmioGpuCommandBufferDeviceTest, ControlWindowReportsCapacityCountAndLastE
   EXPECT_EQ(read_u32(ref, device::control_off_count), 1u);
 
   ASSERT_TRUE(write_u32(ref, device::control_off_execute, 0xdeadbeef).has_value()); // value itself ignored
-  EXPECT_EQ(read_u32(ref, device::control_off_count), 0u); // reset after execution
-  EXPECT_EQ(read_u32(ref, device::control_off_execute), 1u); // last_executed
+  EXPECT_EQ(read_u32(ref, device::control_off_count), 0u);                          // reset after execution
+  EXPECT_EQ(read_u32(ref, device::control_off_execute), 1u);                        // last_executed
   EXPECT_EQ(pixel_at(screen_, 5, 5), (rgb_color{42, 42, 42}));
 }
 

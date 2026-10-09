@@ -206,14 +206,14 @@ void log_packet(const char *dir, reloco::span<const std::uint8_t> p) {
   if (proto == 17 && p.size() >= ihl + 8) {
     const unsigned sp = static_cast<unsigned>(p[ihl] << 8 | p[ihl + 1]);
     const unsigned dp = static_cast<unsigned>(p[ihl + 2] << 8 | p[ihl + 3]);
-    logger.info("{} UDP {}.{}.{}.{}:{} -> {}.{}.{}.{}:{} len {}", dir, p[12], p[13], p[14], p[15], sp, p[16], p[17], p[18],
-                p[19], dp, p.size());
+    logger.info("{} UDP {}.{}.{}.{}:{} -> {}.{}.{}.{}:{} len {}", dir, p[12], p[13], p[14], p[15], sp, p[16], p[17],
+                p[18], p[19], dp, p.size());
   } else if (proto == 1 && p.size() >= ihl + 2) {
-    logger.info("{} ICMP type {} {}.{}.{}.{} -> {}.{}.{}.{} len {}", dir, p[ihl], p[12], p[13], p[14], p[15], p[16], p[17],
-                p[18], p[19], p.size());
+    logger.info("{} ICMP type {} {}.{}.{}.{} -> {}.{}.{}.{} len {}", dir, p[ihl], p[12], p[13], p[14], p[15], p[16],
+                p[17], p[18], p[19], p.size());
   } else {
-    logger.info("{} {} {}.{}.{}.{} -> {}.{}.{}.{} len {}", dir, proto_name(proto), p[12], p[13], p[14], p[15], p[16], p[17],
-                p[18], p[19], p.size());
+    logger.info("{} {} {}.{}.{}.{} -> {}.{}.{}.{} len {}", dir, proto_name(proto), p[12], p[13], p[14], p[15], p[16],
+                p[17], p[18], p[19], p.size());
   }
   if (dump_hex)
     logger.debug("\n{}", microfmt::hexdump(microfmt::span<const std::uint8_t>(p.data(), p.size()), 0));
@@ -243,8 +243,7 @@ private:
 };
 
 // Runs the stack over whichever framing was chosen; `Dev` is slip_device or ppp_device.
-template <class Dev>
-int run(Dev &dev, linux_uart &uart, bool ppp, net::ipv4_config static_ip, std::uint16_t port) {
+template <class Dev> int run(Dev &dev, linux_uart &uart, bool ppp, net::ipv4_config static_ip, std::uint16_t port) {
   logging_device<Dev> logged{dev};
   hw::polled_net_device<logging_device<Dev>> pnd{logged};
   hw::net_device_ref nic{pnd};

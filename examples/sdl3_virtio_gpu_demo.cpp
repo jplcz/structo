@@ -61,8 +61,8 @@ using sg_t = sg_entry<guest_space, std::uint64_t>;
 // Guest "physical" layout.
 constexpr std::uint64_t ram_base = 0x10000;
 constexpr std::uint64_t ram_size = 4u << 20;
-constexpr std::uint64_t ring_addr = ram_base; // one ring per queue, 0x1000 apart
-constexpr std::uint64_t cmd_buf = ram_base + 0x4000; // request buffer
+constexpr std::uint64_t ring_addr = ram_base;         // one ring per queue, 0x1000 apart
+constexpr std::uint64_t cmd_buf = ram_base + 0x4000;  // request buffer
 constexpr std::uint64_t resp_buf = ram_base + 0x6000; // response buffer
 constexpr std::uint32_t ring_size = 8;
 
@@ -196,9 +196,9 @@ public:
   // Tells the device which rectangle of the guest backing changed, then shows it.
   void present(const gpu::rect &r) {
     const std::uint64_t offset = (std::uint64_t{r.y} * width + r.x) * 4;
-    if (command(gpu::cmd_transfer_to_host_2d,
-                {r.x, r.y, r.width, r.height, static_cast<std::uint32_t>(offset),
-                 static_cast<std::uint32_t>(offset >> 32), resource_id, 0}) != gpu::resp_ok_nodata)
+    if (command(gpu::cmd_transfer_to_host_2d, {r.x, r.y, r.width, r.height, static_cast<std::uint32_t>(offset),
+                                               static_cast<std::uint32_t>(offset >> 32), resource_id, 0}) !=
+        gpu::resp_ok_nodata)
       die("TRANSFER_TO_HOST_2D");
     if (command(gpu::cmd_resource_flush, {r.x, r.y, r.width, r.height, resource_id, 0}) != gpu::resp_ok_nodata)
       die("RESOURCE_FLUSH");
@@ -339,14 +339,13 @@ int main(int argc, char **argv) {
   // Self-check of what reached the host surface: a background pixel and the centre of the last box.
   const auto bg_px = screen->pixels().get_pixel(5, 5);
   const auto box_px = screen->pixels().get_pixel(prev.x + box / 2, prev.y + box / 2);
-  const bool picture_ok = bg_px.has_value() && box_px.has_value() && bg_px->r == 20 && bg_px->g == 20 &&
-                          bg_px->b == 60 && box_px->r == 255;
+  const bool picture_ok =
+      bg_px.has_value() && box_px.has_value() && bg_px->r == 20 && bg_px->g == 20 && bg_px->b == 60 && box_px->r == 255;
 
   std::printf("frames=%ld commands=%llu transfers=%llu flushes=%llu errors=%llu host_bytes=%llu picture=%s\n", frame,
               static_cast<unsigned long long>(gpu.stats().commands),
               static_cast<unsigned long long>(gpu.stats().transfers),
-              static_cast<unsigned long long>(gpu.stats().flushes),
-              static_cast<unsigned long long>(gpu.stats().errors),
+              static_cast<unsigned long long>(gpu.stats().flushes), static_cast<unsigned long long>(gpu.stats().errors),
               static_cast<unsigned long long>(gpu.host_bytes()), picture_ok ? "ok" : "WRONG");
 
   SDL_DestroyTexture(texture);

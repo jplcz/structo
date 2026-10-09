@@ -33,8 +33,9 @@
  * | Architecture | Guest-visible register | Offset register | Native relationship |
  * |---|---|---|---|
  * | ARMv8-A/ARMv9-A | `CNTVCT_EL0` | `CNTVOFF_EL2` | `guest = host - CNTVOFF_EL2` |
- * | x86-64 (Intel VMX) | `RDTSC`/`RDTSCP` | VMCS `TSC_OFFSET` | `guest = host + TSC_OFFSET` (ignoring the optional VMCS `TSC_MULTIPLIER` scaling field -- see the note below) |
- * | RISC-V (H-extension) | `time` CSR (VS-level) | `htimedelta`/`htimedeltah` | `guest = host + htimedelta` |
+ * | x86-64 (Intel VMX) | `RDTSC`/`RDTSCP` | VMCS `TSC_OFFSET` | `guest = host + TSC_OFFSET` (ignoring the optional VMCS
+ * `TSC_MULTIPLIER` scaling field -- see the note below) | | RISC-V (H-extension) | `time` CSR (VS-level) |
+ * `htimedelta`/`htimedeltah` | `guest = host + htimedelta` |
  *
  * Two of the three add the offset; ARM subtracts it. Rather than push
  * that sign difference onto every call site, `vm_time_manager` fixes

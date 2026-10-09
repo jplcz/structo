@@ -279,10 +279,10 @@ private:
     std::size_t base_x = x * Font::glyph_width;
     std::size_t base_y = y * Font::glyph_height;
     for (std::size_t row = 0; row < Font::glyph_height; ++row) {
-    // Row index is < glyph_height by construction; the bitmap is glyph_height bytes.
-    RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+      // Row index is < glyph_height by construction; the bitmap is glyph_height bytes.
+      RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
       std::uint8_t bits = bitmap[row];
-    RELOCO_END_UNSAFE_BUFFER_USAGE
+      RELOCO_END_UNSAFE_BUFFER_USAGE
       for (std::size_t col = 0; col < Font::glyph_width; ++col) {
         bool set = (bits & (0x80u >> col)) != 0;
         auto discard = fb_.put_pixel(base_x + col, base_y + row, set ? fg_rgb : bg_rgb);

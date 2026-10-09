@@ -88,8 +88,10 @@ loopback_result run_loopback(const std::vector<std::uint8_t> &image, const xmode
     std::uint8_t resp = 0;
     for (std::uint8_t b : wire) {
       rev = rx.on_byte(b);
-      if (rev == xmodem_event::block)
-        { auto blk = rx.block(); out.data.insert(out.data.end(), blk.begin(), blk.end()); }
+      if (rev == xmodem_event::block) {
+        auto blk = rx.block();
+        out.data.insert(out.data.end(), blk.begin(), blk.end());
+      }
       if (!rx.reply().empty())
         resp = rep(rx);
     }

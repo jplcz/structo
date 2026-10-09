@@ -293,13 +293,13 @@ TEST_F(Shell, FunctionsHaveTheirOwnDynamicScope) {
   dev.type("function f 'set x 2; set y 5; sum $x $x; g; set -g z 7'\r");
   dev.type("f\r");
   run(200);
-  EXPECT_TRUE(out_has("4\r\n"));  // f sees its own x
-  EXPECT_TRUE(out_has("2\r\n"));  // g, called by f, sees f's x (dynamic scope)
+  EXPECT_TRUE(out_has("4\r\n")); // f sees its own x
+  EXPECT_TRUE(out_has("2\r\n")); // g, called by f, sees f's x (dynamic scope)
   const auto x = sh.context().get("x");
   ASSERT_TRUE(x.has_value());
-  EXPECT_EQ(*x, "1");                                  // the caller's x is untouched
-  EXPECT_FALSE(sh.context().get("y").has_value());     // locals vanish on return
-  EXPECT_TRUE(sh.context().get("z").has_value());      // set -g is global
+  EXPECT_EQ(*x, "1");                              // the caller's x is untouched
+  EXPECT_FALSE(sh.context().get("y").has_value()); // locals vanish on return
+  EXPECT_TRUE(sh.context().get("z").has_value());  // set -g is global
   dev.type("g\r");
   run();
   EXPECT_TRUE(out_has("1\r\n"));

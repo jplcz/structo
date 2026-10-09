@@ -67,10 +67,12 @@
  * calls `run()`/`run_once()`; there is no locking.
  */
 
-#include <reloco/intrusive_c_tailq.hpp>
 #include <reloco/coroutine.hpp>
+#include <reloco/intrusive_c_tailq.hpp>
 
 #if RELOCO_HAS_COROUTINES
+
+#include <structo/hw/clock_ref.hpp>
 
 #include <reloco/allocator.hpp>
 #include <reloco/default_allocator.hpp>
@@ -80,6 +82,7 @@
 #include <coroutine>
 #include <cstddef>
 #include <cstdint>
+#include <type_traits>
 #include <utility>
 
 namespace structo::bootldr {
@@ -178,6 +181,17 @@ public:
   void set_clock(clock_fn fn, void *ctx) noexcept {
     clock_ = fn;
     clock_ctx_ = ctx;
+  }
+
+  /**
+   * @brief Uses a hardware clock reader (see `hw::clock_reader`/`hw::atomic_clock_reader`) as the monotonic
+   * millisecond clock. The reader must be `reset()` and outlive the scheduler's use of it.
+   */
+  template <typename Reader,
+            std::enable_if_t<
+                std::is_same_v<Reader, hw::clock_reader> || std::is_same_v<Reader, hw::atomic_clock_reader>, int> = 0>
+  void set_clock(Reader &reader) noexcept {
+    set_clock(&hw::reader_now_ms<Reader>, &reader);
   }
 
   /** @brief Current time from the configured clock, or 0 if none is set. */
@@ -317,7 +331,7 @@ public:
     struct timed_wait_awaiter {
       event &e;
       std::uint64_t ms;
-      detail::wait_node wait_node_; // in the event's waiters
+      detail::wait_node wait_node_;  // in the event's waiters
       detail::wait_node timer_node_; // in the scheduler's timers; whichever fires first resumes us
       timed_wait_awaiter(event &ev, std::uint64_t t) noexcept : e(ev), ms(t) {}
       [[nodiscard]] bool await_ready() const noexcept { return e.set_ || e.s_->clock_ == nullptr; }

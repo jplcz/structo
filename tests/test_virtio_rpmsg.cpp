@@ -95,9 +95,8 @@ protected:
                     .has_value());
   }
   void get(std::uint64_t off, void *dst, std::size_t n) {
-    ASSERT_TRUE(
-        gtraits::try_read(mem_, gaddr{kBuf + off}, reloco::span<std::byte>(static_cast<std::byte *>(dst), n))
-            .has_value());
+    ASSERT_TRUE(gtraits::try_read(mem_, gaddr{kBuf + off}, reloco::span<std::byte>(static_cast<std::byte *>(dst), n))
+                    .has_value());
   }
 
   // Guest sends one rpmsg buffer (queue 1) and kicks. `claimed_len` lets tests lie about the length.
@@ -182,7 +181,8 @@ TEST_F(VirtioRpmsgTest, BadGuestMessagesAreCountedAndDropped) {
   seen s;
   ASSERT_TRUE(rpmsg_
                   .try_bind(
-                      0x400, [](void *c, std::uint32_t, std::uint32_t, reloco::span<const std::byte>) noexcept {
+                      0x400,
+                      [](void *c, std::uint32_t, std::uint32_t, reloco::span<const std::byte>) noexcept {
                         ++static_cast<seen *>(c)->calls;
                       },
                       &s)
@@ -212,7 +212,8 @@ TEST_F(VirtioRpmsgTest, OversizeGuestPayloadIsDropped) {
   seen s;
   ASSERT_TRUE(rpmsg_
                   .try_bind(
-                      0x400, [](void *c, std::uint32_t, std::uint32_t, reloco::span<const std::byte>) noexcept {
+                      0x400,
+                      [](void *c, std::uint32_t, std::uint32_t, reloco::span<const std::byte>) noexcept {
                         ++static_cast<seen *>(c)->calls;
                       },
                       &s)

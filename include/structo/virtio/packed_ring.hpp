@@ -214,8 +214,8 @@ public:
       bool wrap = avail_wrap_;
       detail::packed_advance(pos, wrap, static_cast<std::uint32_t>(k), queue_size_);
 
-      const std::uint16_t flags = static_cast<std::uint16_t>(
-          detail::packed_avail_flags(wrap) | (is_in ? desc_f_write : 0u) | (last ? 0u : desc_f_next));
+      const std::uint16_t flags = static_cast<std::uint16_t>(detail::packed_avail_flags(wrap) |
+                                                             (is_in ? desc_f_write : 0u) | (last ? 0u : desc_f_next));
       if (auto w = write_body(pos, e.addr.value, static_cast<std::uint32_t>(e.length), id); !w)
         return fail(w.error());
       if (k == 0)
@@ -419,9 +419,8 @@ public:
   using chain = avail_chain<BufSpace>;
 
   /** @brief Binds a device to a packed ring; @p event_idx: `VIRTIO_F_EVENT_IDX` was negotiated. */
-  [[nodiscard]] static reloco::result<packed_virtq_device> try_create(Mem &mem, const ring_addrs &addrs,
-                                                                      std::uint32_t queue_size,
-                                                                      bool event_idx = false) noexcept {
+  [[nodiscard]] static reloco::result<packed_virtq_device>
+  try_create(Mem &mem, const ring_addrs &addrs, std::uint32_t queue_size, bool event_idx = false) noexcept {
     auto layout = try_packed_layout(queue_size);
     if (!layout)
       return reloco::unexpected(layout.error());
@@ -552,8 +551,8 @@ public:
     if (auto w = traits::try_store16(*mem_, *id_at, c.head); !w)
       return w;
     Barriers::wmb();
-    const std::uint16_t flags = static_cast<std::uint16_t>(detail::packed_used_flags(used_wrap_) |
-                                                           (written > 0 ? desc_f_write : 0u));
+    const std::uint16_t flags =
+        static_cast<std::uint16_t>(detail::packed_used_flags(used_wrap_) | (written > 0 ? desc_f_write : 0u));
     if (auto w = traits::try_store16(*mem_, *flags_at, flags); !w)
       return w;
 

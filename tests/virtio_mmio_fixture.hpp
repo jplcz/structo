@@ -80,9 +80,8 @@ protected:
                     .has_value());
   }
   void get(std::uint64_t off, void *dst, std::size_t n) {
-    ASSERT_TRUE(
-        gtraits::try_read(mem_, gaddr{kBuf + off}, reloco::span<std::byte>(static_cast<std::byte *>(dst), n))
-            .has_value());
+    ASSERT_TRUE(gtraits::try_read(mem_, gaddr{kBuf + off}, reloco::span<std::byte>(static_cast<std::byte *>(dst), n))
+                    .has_value());
   }
 
   // Posts a device-readable buffer (guest output) / a device-writable buffer (guest input) without kicking.

@@ -5,13 +5,13 @@
 #include <gtest/gtest.h>
 #include <structo/hw/vdso_clock_writer.hpp>
 
+using reloco::duration;
 using structo::hw::cycles;
 using structo::hw::vdso_clock_page;
 using structo::hw::vdso_clock_slot;
 using structo::hw::vdso_clock_source;
 using structo::hw::vdso_clock_update_guard;
 using structo::hw::vdso_clock_writer;
-using reloco::duration;
 
 namespace {
 

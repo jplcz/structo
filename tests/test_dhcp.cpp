@@ -241,9 +241,7 @@ template <> struct structo::hw::uart_traits<fake_uart> {
   static reloco::result<void> configure(fake_uart &, const uart_config &) noexcept { return {}; }
   static reloco::result<bool> tx_ready(fake_uart &) noexcept { return true; }
   static reloco::result<bool> rx_ready(fake_uart &b) noexcept { return !b.rx.empty(); }
-  static reloco::result<void> try_put_byte(fake_uart &b, std::uint8_t v) noexcept {
-    return b.tx.try_push_back(v);
-  }
+  static reloco::result<void> try_put_byte(fake_uart &b, std::uint8_t v) noexcept { return b.tx.try_push_back(v); }
   static reloco::result<std::uint8_t> try_get_byte(fake_uart &b) noexcept {
     auto v = b.rx[0];
     (void)b.rx.try_pop_front();

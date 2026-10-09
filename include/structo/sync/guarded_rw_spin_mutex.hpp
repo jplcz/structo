@@ -108,7 +108,8 @@ namespace structo::sync {
  * (or any type matching their shape); defaults to a no-op
  * (`detail::no_irq_locker`) when no IRQ/preemption exclusion is needed.
  */
-template <typename T, typename RwLock, typename IrqLocker = detail::no_irq_locker> class RELOCO_OWNER guarded_rw_spin_mutex {
+template <typename T, typename RwLock, typename IrqLocker = detail::no_irq_locker>
+class RELOCO_OWNER guarded_rw_spin_mutex {
 public:
   using value_type = T;
   using lock_type = RwLock;
@@ -141,11 +142,13 @@ public:
     read_guard(const read_guard &) = delete;
     read_guard &operator=(const read_guard &) = delete;
 
-    /** @brief Transfers ownership of both the `IrqLocker` and the held reader slot; `other` is left a no-op on destruction. */
+    /** @brief Transfers ownership of both the `IrqLocker` and the held reader slot; `other` is left a no-op on
+     * destruction. */
     read_guard(read_guard &&other) noexcept
         : m_irq(std::move(other.m_irq)), m_owner(std::exchange(other.m_owner, nullptr)) {}
 
-    /** @brief Releases this guard's own state first, then takes over `other`'s; `other` is left a no-op on destruction. */
+    /** @brief Releases this guard's own state first, then takes over `other`'s; `other` is left a no-op on destruction.
+     */
     read_guard &operator=(read_guard &&other) noexcept {
       if (this != &other) {
         unlock();
@@ -158,10 +161,12 @@ public:
     [[nodiscard]] const T &operator*() const noexcept RELOCO_LIFETIMEBOUND { return m_owner->m_value; }
     [[nodiscard]] const T *operator->() const noexcept RELOCO_LIFETIMEBOUND { return &m_owner->m_value; }
 
-    /** @brief Read-only access to the protected value; equivalent to `*this` with `const` emphasized at the call site. */
+    /** @brief Read-only access to the protected value; equivalent to `*this` with `const` emphasized at the call site.
+     */
     [[nodiscard]] const T &get() const noexcept RELOCO_LIFETIMEBOUND { return m_owner->m_value; }
 
-    /** @brief Early explicit release before scope exit: releases the reader slot first, then the `IrqLocker`; idempotent. */
+    /** @brief Early explicit release before scope exit: releases the reader slot first, then the `IrqLocker`;
+     * idempotent. */
     void unlock() noexcept {
       if (m_owner != nullptr) {
         m_owner->m_lock.read_unlock();
@@ -211,12 +216,14 @@ public:
     write_guard(const write_guard &) = delete;
     write_guard &operator=(const write_guard &) = delete;
 
-    /** @brief Transfers ownership of both the `IrqLocker` and the held writer side; `other` is left a no-op on destruction. */
+    /** @brief Transfers ownership of both the `IrqLocker` and the held writer side; `other` is left a no-op on
+     * destruction. */
     write_guard(write_guard &&other) noexcept
         : m_irq(std::move(other.m_irq)), m_owner(std::exchange(other.m_owner, nullptr)),
           m_node(std::exchange(other.m_node, nullptr)) {}
 
-    /** @brief Releases this guard's own state first, then takes over `other`'s; `other` is left a no-op on destruction. */
+    /** @brief Releases this guard's own state first, then takes over `other`'s; `other` is left a no-op on destruction.
+     */
     write_guard &operator=(write_guard &&other) noexcept {
       if (this != &other) {
         unlock();
@@ -230,12 +237,14 @@ public:
     [[nodiscard]] T &operator*() const noexcept RELOCO_LIFETIMEBOUND { return m_owner->m_value; }
     [[nodiscard]] T *operator->() const noexcept RELOCO_LIFETIMEBOUND { return &m_owner->m_value; }
 
-    /** @brief Read-only access to the protected value; equivalent to `*this` with `const` emphasized at the call site. */
+    /** @brief Read-only access to the protected value; equivalent to `*this` with `const` emphasized at the call site.
+     */
     [[nodiscard]] const T &get() const noexcept RELOCO_LIFETIMEBOUND { return m_owner->m_value; }
     /** @brief Mutable access to the protected value; equivalent to `*this`, spelled out for parity with `get()`. */
     [[nodiscard]] T &get_mut() const noexcept RELOCO_LIFETIMEBOUND { return m_owner->m_value; }
 
-    /** @brief Early explicit release before scope exit: releases the writer side first, then the `IrqLocker`; idempotent. */
+    /** @brief Early explicit release before scope exit: releases the writer side first, then the `IrqLocker`;
+     * idempotent. */
     void unlock() noexcept {
       if (m_owner != nullptr) {
         if constexpr (write_uses_node) {
@@ -297,12 +306,14 @@ public:
     return reloco::optional<read_guard>(std::in_place, typename read_guard::adopt_t{}, std::move(irq), *this);
   }
 
-  /** @brief Engages `IrqLocker`, then blocks until the exclusive (write) side is acquired; see `RwLock::write_lock()`. */
+  /** @brief Engages `IrqLocker`, then blocks until the exclusive (write) side is acquired; see `RwLock::write_lock()`.
+   */
   template <bool B = write_uses_node, std::enable_if_t<!B, int> = 0> [[nodiscard]] write_guard write_lock() & noexcept {
     return write_guard(*this);
   }
 
-  /** @brief `queue_rw_spin_lock`-shaped overload: enqueues `n` onto the writer admission queue; see `RwLock::write_lock(node&)`. */
+  /** @brief `queue_rw_spin_lock`-shaped overload: enqueues `n` onto the writer admission queue; see
+   * `RwLock::write_lock(node&)`. */
   template <bool B = write_uses_node, std::enable_if_t<B, int> = 0>
   [[nodiscard]] write_guard write_lock(node &n) & noexcept {
     return write_guard(*this, n);

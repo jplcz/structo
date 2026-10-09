@@ -137,7 +137,7 @@ struct surface {
 /** @brief Bounds on what a guest can make the device allocate. */
 struct limits {
   std::uint64_t max_total_bytes = std::uint64_t{64} << 20; ///< Sum of all resources' host pixel memory.
-  std::uint32_t max_backing_entries = 16384; ///< Scatter entries accepted per `ATTACH_BACKING`.
+  std::uint32_t max_backing_entries = 16384;               ///< Scatter entries accepted per `ATTACH_BACKING`.
 };
 
 /** @brief Diagnostic counters. */
@@ -157,11 +157,12 @@ struct has_scanout_disabled<D, std::void_t<decltype(std::declval<D &>().scanout_
 
 template <typename D, typename = void> struct has_cursor : std::false_type {};
 template <typename D>
-struct has_cursor<D, std::void_t<decltype(std::declval<D &>().cursor_update(
-                                      std::uint32_t{}, static_cast<const surface *>(nullptr), std::uint32_t{},
-                                      std::uint32_t{}, std::uint32_t{}, std::uint32_t{})),
-                                 decltype(std::declval<D &>().cursor_move(std::uint32_t{}, std::uint32_t{},
-                                                                          std::uint32_t{}))>> : std::true_type {};
+struct has_cursor<
+    D, std::void_t<decltype(std::declval<D &>().cursor_update(std::uint32_t{}, static_cast<const surface *>(nullptr),
+                                                              std::uint32_t{}, std::uint32_t{}, std::uint32_t{},
+                                                              std::uint32_t{})),
+                   decltype(std::declval<D &>().cursor_move(std::uint32_t{}, std::uint32_t{}, std::uint32_t{}))>>
+    : std::true_type {};
 
 [[nodiscard]] constexpr bool in_bounds(const rect &r, std::uint32_t w, std::uint32_t h) noexcept {
   return r.width != 0 && r.height != 0 && r.x <= w && r.width <= w - r.x && r.y <= h && r.height <= h - r.y;
@@ -533,14 +534,15 @@ private:
     const reloco::span<std::byte> pix(r->pixels, static_cast<std::size_t>(r->pixel_bytes));
     ++stats_.transfers;
     if (rc.x == 0 && rc.width == r->width) { // full-width rows are contiguous on both sides
-      if (!read_backing(mem, *r, offset, pix.subspan(static_cast<std::size_t>(dst0),
-                                                    static_cast<std::size_t>(stride * rc.height))))
+      if (!read_backing(mem, *r, offset,
+                        pix.subspan(static_cast<std::size_t>(dst0), static_cast<std::size_t>(stride * rc.height))))
         return gpu::resp_err_unspec;
       return gpu::resp_ok_nodata;
     }
     for (std::uint32_t row = 0; row < rc.height; ++row) {
-      if (!read_backing(mem, *r, offset + stride * row,
-                        pix.subspan(static_cast<std::size_t>(dst0 + stride * row), static_cast<std::size_t>(row_bytes))))
+      if (!read_backing(
+              mem, *r, offset + stride * row,
+              pix.subspan(static_cast<std::size_t>(dst0 + stride * row), static_cast<std::size_t>(row_bytes))))
         return gpu::resp_err_unspec;
     }
     return gpu::resp_ok_nodata;

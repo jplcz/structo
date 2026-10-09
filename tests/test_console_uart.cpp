@@ -156,8 +156,9 @@ TEST_F(ConsoleUartTest, CtrlLettersAndNonKeyEventsIgnored) {
 }
 
 TEST_F(ConsoleUartTest, FunctionKeysUseXtermSequences) {
-  const reloco::array<std::string, 12> expected{{"\x1bOP",   "\x1bOQ",   "\x1bOR",   "\x1bOS",   "\x1b[15~", "\x1b[17~",
-                                                 "\x1b[18~", "\x1b[19~", "\x1b[20~", "\x1b[21~", "\x1b[23~", "\x1b[24~"}};
+  const reloco::array<std::string, 12> expected{{"\x1bOP", "\x1bOQ", "\x1bOR", "\x1bOS", "\x1b[15~", "\x1b[17~",
+                                                 "\x1b[18~", "\x1b[19~", "\x1b[20~", "\x1b[21~", "\x1b[23~",
+                                                 "\x1b[24~"}};
   for (std::uint16_t i = 0; i < 12; ++i) {
     tap(static_cast<std::uint16_t>(K(hid_key::f1) + i));
     EXPECT_EQ(drain(), expected[i]) << "F" << (i + 1);

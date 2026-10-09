@@ -90,8 +90,8 @@ TEST_F(VirtqMemoryTest, HostileLengthsCannotOverflowBounds) {
   // addr + len would wrap if computed naively; len is larger than the window.
   auto r = traits::try_read(mem_, guest_addr{kBase + 8}, reloco::span<std::byte>(buf.data(), buf.size()));
   EXPECT_TRUE(r.has_value());
-  EXPECT_FALSE(traits::try_read(mem_, guest_addr{0xFFFFFFFFFFFFFFF8ull}, reloco::span<std::byte>(buf.data(), 8))
-                   .has_value());
+  EXPECT_FALSE(
+      traits::try_read(mem_, guest_addr{0xFFFFFFFFFFFFFFF8ull}, reloco::span<std::byte>(buf.data(), 8)).has_value());
 }
 
 TEST_F(VirtqMemoryTest, ZeroLengthAccessInRange) {

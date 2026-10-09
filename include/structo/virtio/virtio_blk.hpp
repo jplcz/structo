@@ -145,9 +145,8 @@ private:
       status = do_out(mem, c, sector);
       break;
     case blk::req_flush:
-      status = c.readable_bytes == blk::header_size && c.writable_bytes == 1 && store_->try_flush()
-                   ? blk::status_ok
-                   : blk::status_ioerr;
+      status = c.readable_bytes == blk::header_size && c.writable_bytes == 1 && store_->try_flush() ? blk::status_ok
+                                                                                                    : blk::status_ioerr;
       break;
     case blk::req_get_id:
       status = do_get_id(mem, c, data_written);
@@ -207,8 +206,7 @@ private:
     return blk::status_ok;
   }
 
-  template <typename Mem, typename Chain>
-  std::uint8_t do_out(Mem &mem, const Chain &c, std::uint64_t sector) noexcept {
+  template <typename Mem, typename Chain> std::uint8_t do_out(Mem &mem, const Chain &c, std::uint64_t sector) noexcept {
     if (store_->read_only() || c.writable_bytes != 1)
       return blk::status_ioerr;
     const std::uint64_t bytes = c.readable_bytes - blk::header_size;

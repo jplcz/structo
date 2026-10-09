@@ -168,8 +168,8 @@ template <typename Tag> struct trap_time_failure_policy {
    * assertions are compiled out for this target and no trap mechanism is available either. */
   [[nodiscard]] static reloco::duration recover(time_manager &, reloco::error) noexcept {
     RELOCO_ASSERT(false, "instant_clock_traits: time_manager clock read failed and "
-                          "time_manager_clock_failure_policy<Tag> resolved to trap_time_failure_policy, "
-                          "which has no recovery path by design");
+                         "time_manager_clock_failure_policy<Tag> resolved to trap_time_failure_policy, "
+                         "which has no recovery path by design");
     return reloco::duration{};
   }
 };
@@ -249,16 +249,14 @@ namespace reloco {
 // defaulted template parameter still lets plain `now()` calls deduce it).
 
 template <> struct instant_clock_traits<structo::hw::kernel_monotonic_clock_tag> {
-  template <typename = void>
-  [[nodiscard]] static duration now() noexcept {
+  template <typename = void> [[nodiscard]] static duration now() noexcept {
     auto &mgr = structo::hw::kernel_time_manager();
     return structo::hw::detail::clock_now<structo::hw::kernel_monotonic_clock_tag>(mgr.try_monotonic_now(), mgr);
   }
 };
 
 template <> struct instant_clock_traits<structo::hw::kernel_realtime_clock_tag> {
-  template <typename = void>
-  [[nodiscard]] static duration now() noexcept {
+  template <typename = void> [[nodiscard]] static duration now() noexcept {
     auto &mgr = structo::hw::kernel_time_manager();
     return structo::hw::detail::clock_now<structo::hw::kernel_realtime_clock_tag>(mgr.try_realtime_now(), mgr);
   }

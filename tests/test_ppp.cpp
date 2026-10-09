@@ -127,7 +127,7 @@ protected:
     };
     pump();
     ASSERT_TRUE(have(ppp_proto_lcp, 1));
-    feed(ppp_proto_lcp, lcp(2, last_id(ppp_proto_lcp, 1), {})); // ack ours
+    feed(ppp_proto_lcp, lcp(2, last_id(ppp_proto_lcp, 1), {}));           // ack ours
     feed(ppp_proto_lcp, lcp(1, 7, {1, 4, 0x05, 0xdc, 5, 6, 1, 2, 3, 4})); // their request: MRU + magic
     pump();
     ASSERT_TRUE(have(ppp_proto_lcp, 2));
@@ -135,9 +135,11 @@ protected:
     pump();
     ASSERT_TRUE(have(ppp_proto_ipcp, 1));
     // Nak our 0.0.0.0 with the address to use, then ack the retry.
-    feed(ppp_proto_ipcp, lcp(3, last_id(ppp_proto_ipcp, 1), {3, 6, board.octets[0], board.octets[1], board.octets[2], board.octets[3]}));
+    feed(ppp_proto_ipcp, lcp(3, last_id(ppp_proto_ipcp, 1),
+                             {3, 6, board.octets[0], board.octets[1], board.octets[2], board.octets[3]}));
     pump();
-    feed(ppp_proto_ipcp, lcp(2, last_id(ppp_proto_ipcp, 1), {3, 6, board.octets[0], board.octets[1], board.octets[2], board.octets[3]}));
+    feed(ppp_proto_ipcp, lcp(2, last_id(ppp_proto_ipcp, 1),
+                             {3, 6, board.octets[0], board.octets[1], board.octets[2], board.octets[3]}));
     feed(ppp_proto_ipcp, lcp(1, 9, {3, 6, host.octets[0], host.octets[1], host.octets[2], host.octets[3]}));
     pump();
   }
@@ -316,9 +318,11 @@ TEST_F(Ppp, NetstackTakesPppAddress) {
   step();
   step();
   ASSERT_TRUE(have(ppp_proto_ipcp, 1));
-  feed(ppp_proto_ipcp, lcp(3, last_id(ppp_proto_ipcp, 1), {3, 6, board.octets[0], board.octets[1], board.octets[2], board.octets[3]}));
+  feed(ppp_proto_ipcp,
+       lcp(3, last_id(ppp_proto_ipcp, 1), {3, 6, board.octets[0], board.octets[1], board.octets[2], board.octets[3]}));
   step();
-  feed(ppp_proto_ipcp, lcp(2, last_id(ppp_proto_ipcp, 1), {3, 6, board.octets[0], board.octets[1], board.octets[2], board.octets[3]}));
+  feed(ppp_proto_ipcp,
+       lcp(2, last_id(ppp_proto_ipcp, 1), {3, 6, board.octets[0], board.octets[1], board.octets[2], board.octets[3]}));
   feed(ppp_proto_ipcp, lcp(1, 9, {3, 6, host.octets[0], host.octets[1], host.octets[2], host.octets[3]}));
   step();
   step();

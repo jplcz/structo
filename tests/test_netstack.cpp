@@ -405,7 +405,8 @@ reloco::task<void> run_get(bootldr::tftp_client &c, ipv4_address srv, reloco::sp
   }
 }
 
-reloco::task<void> run_put(bootldr::tftp_client &c, ipv4_address srv, reloco::span<const std::uint8_t> src, tftp_out &out) {
+reloco::task<void> run_put(bootldr::tftp_client &c, ipv4_address srv, reloco::span<const std::uint8_t> src,
+                           tftp_out &out) {
   auto r = co_await c.put(srv, "up.bin", src);
   out.done = true;
   if (r) {
@@ -546,7 +547,8 @@ TEST_F(Netstack, TftpUploadsFromMemory) {
 
   bytes src = make_bytes(600, 0x5A);
   tftp_out out;
-  ASSERT_TRUE(sched.spawn(run_put(tftp, host, reloco::span<const std::uint8_t>(src.data(), src.size()), out)).has_value());
+  ASSERT_TRUE(
+      sched.spawn(run_put(tftp, host, reloco::span<const std::uint8_t>(src.data(), src.size()), out)).has_value());
   step();
   auto wrq = as_udp(take_tx());
   EXPECT_EQ(wrq.dst_port, 69);

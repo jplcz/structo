@@ -39,7 +39,7 @@ template <typename BufSpace> struct chain_segment {
  * are valid only while it is.
  */
 template <typename BufSpace> struct avail_chain {
-  std::uint16_t head = 0; ///< Head descriptor id (split) / buffer id (packed), echoed back in the used ring.
+  std::uint16_t head = 0;       ///< Head descriptor id (split) / buffer id (packed), echoed back in the used ring.
   std::uint16_t desc_count = 0; ///< Ring descriptors the chain occupies (packed rings advance by this on completion).
   reloco::span<const chain_segment<BufSpace>> readable;
   reloco::span<const chain_segment<BufSpace>> writable;

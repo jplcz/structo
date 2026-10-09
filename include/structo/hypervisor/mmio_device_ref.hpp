@@ -168,8 +168,8 @@ namespace detail {
 template <typename Backend, typename = void> struct has_mmio_device_traits : std::false_type {};
 
 template <typename Backend>
-struct has_mmio_device_traits<Backend, std::void_t<decltype(mmio_device_traits<Backend>::size),
-                                                   decltype(mmio_device_traits<Backend>::try_read)>>
+struct has_mmio_device_traits<
+    Backend, std::void_t<decltype(mmio_device_traits<Backend>::size), decltype(mmio_device_traits<Backend>::try_read)>>
     : std::true_type {};
 
 // Detects the optional Traits::try_write probe.
@@ -384,9 +384,8 @@ private:
   }
 
   template <typename Backend>
-  static constexpr vtable s_vtbl{&size_entry<Backend>,         &read_entry<Backend>,
-                                 &write_entry<Backend>,        &is_read_only_entry<Backend>,
-                                 &is_available_entry<Backend>, &reset_entry<Backend>};
+  static constexpr vtable s_vtbl{&size_entry<Backend>,         &read_entry<Backend>,         &write_entry<Backend>,
+                                 &is_read_only_entry<Backend>, &is_available_entry<Backend>, &reset_entry<Backend>};
 
   void *ctx_ = nullptr;
   const vtable *vtbl_ = nullptr;

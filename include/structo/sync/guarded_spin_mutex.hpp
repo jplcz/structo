@@ -172,12 +172,14 @@ public:
     guard(const guard &) = delete;
     guard &operator=(const guard &) = delete;
 
-    /** @brief Transfers ownership of both the `IrqLocker` and the held `Lock`; `other` is left a no-op on destruction. */
+    /** @brief Transfers ownership of both the `IrqLocker` and the held `Lock`; `other` is left a no-op on destruction.
+     */
     guard(guard &&other) noexcept
         : m_irq(std::move(other.m_irq)), m_owner(std::exchange(other.m_owner, nullptr)),
           m_node(std::exchange(other.m_node, nullptr)) {}
 
-    /** @brief Releases this guard's own state first, then takes over `other`'s; `other` is left a no-op on destruction. */
+    /** @brief Releases this guard's own state first, then takes over `other`'s; `other` is left a no-op on destruction.
+     */
     guard &operator=(guard &&other) noexcept {
       if (this != &other) {
         unlock();
@@ -191,7 +193,8 @@ public:
     [[nodiscard]] T &operator*() const noexcept RELOCO_LIFETIMEBOUND { return m_owner->m_value; }
     [[nodiscard]] T *operator->() const noexcept RELOCO_LIFETIMEBOUND { return &m_owner->m_value; }
 
-    /** @brief Read-only access to the protected value; equivalent to `*this` with `const` emphasized at the call site. */
+    /** @brief Read-only access to the protected value; equivalent to `*this` with `const` emphasized at the call site.
+     */
     [[nodiscard]] const T &get() const noexcept RELOCO_LIFETIMEBOUND { return m_owner->m_value; }
     /** @brief Mutable access to the protected value; equivalent to `*this`, spelled out for parity with `get()`. */
     [[nodiscard]] T &get_mut() const noexcept RELOCO_LIFETIMEBOUND { return m_owner->m_value; }

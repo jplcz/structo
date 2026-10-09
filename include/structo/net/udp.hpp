@@ -45,9 +45,8 @@ struct udp_datagram {
   const std::size_t len = static_cast<std::size_t>((d[4] << 8) | d[5]);
   if (len < udp_header_size || len > d.size())
     return unexpected(error::invalid_argument);
-  if ((d[6] | d[7]) != 0 &&
-      internet_checksum(span<const std::uint8_t>(d.data(), len), ipv4_pseudo_header_sum(src, dst, ip_proto_udp, len)) !=
-          0)
+  if ((d[6] | d[7]) != 0 && internet_checksum(span<const std::uint8_t>(d.data(), len),
+                                              ipv4_pseudo_header_sum(src, dst, ip_proto_udp, len)) != 0)
     return unexpected(error::invalid_argument);
   udp_datagram out;
   out.src_port = static_cast<std::uint16_t>((d[0] << 8) | d[1]);

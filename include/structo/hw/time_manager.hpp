@@ -153,8 +153,7 @@ public:
       vdso_page_ = other.vdso_page_;
       rtc_offset_ = other.rtc_offset_;
       backstep_count_ = other.backstep_count_;
-      live_backstep_count_.store(other.live_backstep_count_.load(std::memory_order_relaxed),
-                                  std::memory_order_relaxed);
+      live_backstep_count_.store(other.live_backstep_count_.load(std::memory_order_relaxed), std::memory_order_relaxed);
       started_ = other.started_;
       move_slot(monotonic_slot_, other.monotonic_slot_);
       move_slot(realtime_slot_, other.realtime_slot_);
@@ -419,7 +418,7 @@ private:
   };
 
   time_manager(time_source_ref counter, vdso_clock_source source, time_source_capabilities caps,
-              vdso_clock_page *vdso_page) noexcept
+               vdso_clock_page *vdso_page) noexcept
       : counter_(counter), source_(source), caps_(caps), vdso_page_(vdso_page) {}
 
   [[nodiscard]] static duration reference_instant(const vdso_clock_slot &slot) noexcept {

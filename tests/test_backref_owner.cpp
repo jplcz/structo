@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 #include <gtest/gtest.h>
-#include <reloco/lifetime.hpp>
 #include <reloco/intrusive_c_tailq.hpp>
 #include <reloco/intrusive_splay_tree.hpp>
+#include <reloco/lifetime.hpp>
 #include <structo/backref_owner.hpp>
 
 #include <functional>

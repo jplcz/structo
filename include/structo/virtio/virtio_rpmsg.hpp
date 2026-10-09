@@ -61,8 +61,8 @@ namespace structo::virtio {
 
 namespace rpmsg {
 inline constexpr std::uint32_t device_id = 7;
-inline constexpr unsigned feature_ns = 0; ///< The device announces/receives services via endpoint 53.
-inline constexpr std::uint32_t ns_addr = 53; ///< Well-known name-service endpoint.
+inline constexpr unsigned feature_ns = 0;              ///< The device announces/receives services via endpoint 53.
+inline constexpr std::uint32_t ns_addr = 53;           ///< Well-known name-service endpoint.
 inline constexpr std::uint32_t addr_any = 0xFFFFFFFFu; ///< "No endpoint"; never bindable.
 inline constexpr std::size_t header_size = 16;
 inline constexpr std::size_t name_size = 32;
@@ -126,18 +126,19 @@ inline void encode_ns(reloco::span<std::byte> dst, const ns_msg &m) noexcept {
   return m;
 }
 
-/** @brief Endpoint receive callback (see `virtio_rpmsg_function::try_bind`). @p payload is valid only during the call. */
+/** @brief Endpoint receive callback (see `virtio_rpmsg_function::try_bind`). @p payload is valid only during the call.
+ */
 using rx_fn = void (*)(void *ctx, std::uint32_t src, std::uint32_t dst, reloco::span<const std::byte> payload) noexcept;
 
 /** @brief Diagnostic counters. */
 struct stats {
   std::uint64_t rx_delivered = 0; ///< Guest messages dispatched to a bound endpoint.
-  std::uint64_t rx_unrouted = 0; ///< Guest messages for an address with no endpoint.
+  std::uint64_t rx_unrouted = 0;  ///< Guest messages for an address with no endpoint.
   std::uint64_t rx_malformed = 0; ///< Short buffer, `len` beyond the buffer, or unreadable guest memory.
-  std::uint64_t rx_oversize = 0; ///< Payload larger than `MaxPayload`.
+  std::uint64_t rx_oversize = 0;  ///< Payload larger than `MaxPayload`.
   std::uint64_t tx_delivered = 0; ///< Messages written into a guest rx buffer.
-  std::uint64_t tx_lost = 0; ///< Staged messages dropped (guest buffer too small or unwritable).
-  std::uint64_t tx_full = 0; ///< `try_send` refused because the staging queue was full.
+  std::uint64_t tx_lost = 0;      ///< Staged messages dropped (guest buffer too small or unwritable).
+  std::uint64_t tx_full = 0;      ///< `try_send` refused because the staging queue was full.
 };
 } // namespace rpmsg
 
@@ -157,7 +158,8 @@ public:
   static constexpr std::uint32_t queue_max_size = 512;
 
   static_assert(MaxEndpoints >= 1 && PendingDepth >= 1, "need at least one endpoint and one staging slot");
-  static_assert(MaxPayload >= rpmsg::ns_msg_size && MaxPayload <= 0xFFFFu, "payload must fit the name-service message and le16");
+  static_assert(MaxPayload >= rpmsg::ns_msg_size && MaxPayload <= 0xFFFFu,
+                "payload must fit the name-service message and le16");
 
   /** @param offer_ns Offer `VIRTIO_RPMSG_F_NS`: the guest then sends and expects name-service messages. */
   explicit virtio_rpmsg_function(bool offer_ns = true) noexcept : offer_ns_(offer_ns) {}

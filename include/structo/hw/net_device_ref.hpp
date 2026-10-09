@@ -43,8 +43,8 @@
  * tasks complete immediately with it).
  */
 
-#include <reloco/detail/compat.hpp>
 #include <reloco/coroutine.hpp>
+#include <reloco/detail/compat.hpp>
 
 #if RELOCO_HAS_COROUTINES
 
@@ -52,10 +52,10 @@
 #include <reloco/lifetime.hpp>
 #include <reloco/span.hpp>
 
-#include <reloco/array.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <reloco/array.hpp>
 #include <type_traits>
 #include <utility>
 
@@ -78,8 +78,8 @@ template <typename Backend, typename = void> struct has_net_device_traits : std:
 template <typename Backend>
 struct has_net_device_traits<
     Backend, std::void_t<decltype(net_device_traits<Backend>::mtu), decltype(net_device_traits<Backend>::link_up),
-                         decltype(net_device_traits<Backend>::send),
-                         decltype(net_device_traits<Backend>::receive)>> : std::true_type {};
+                         decltype(net_device_traits<Backend>::send), decltype(net_device_traits<Backend>::receive)>>
+    : std::true_type {};
 
 // Detects the optional Traits::mac_address.
 template <typename Traits, typename Backend, typename = void> struct net_has_mac_address : std::false_type {};

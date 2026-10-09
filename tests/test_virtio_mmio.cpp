@@ -158,7 +158,8 @@ protected:
         reloco::array<std::byte, 16> msg{};
         for (std::size_t i = 0; i < msg.size(); ++i)
           msg[i] = static_cast<std::byte>(qi * 16 + i + static_cast<unsigned>(round));
-        ASSERT_TRUE(gtraits::try_write(mem_, gaddr{src}, reloco::span<const std::byte>(msg.data(), msg.size())).has_value());
+        ASSERT_TRUE(
+            gtraits::try_write(mem_, gaddr{src}, reloco::span<const std::byte>(msg.data(), msg.size())).has_value());
 
         const sg_t out{gaddr{src}, 16};
         const sg_t in{gaddr{dst}, 16};

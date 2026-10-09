@@ -84,7 +84,8 @@ inline constexpr std::size_t xmodem_max_packet = 3 + xmodem_max_block + 2;
   for (std::uint8_t b : data) {
     crc = static_cast<std::uint16_t>(crc ^ (static_cast<std::uint16_t>(b) << 8));
     for (int i = 0; i < 8; ++i)
-      crc = static_cast<std::uint16_t>((crc & 0x8000u) ? (static_cast<unsigned>(crc << 1) ^ 0x1021u) : static_cast<unsigned>(crc << 1));
+      crc = static_cast<std::uint16_t>((crc & 0x8000u) ? (static_cast<unsigned>(crc << 1) ^ 0x1021u)
+                                                       : static_cast<unsigned>(crc << 1));
   }
   return crc;
 }
@@ -209,9 +210,7 @@ public:
   }
 
   /** @brief Bytes (0 or 1) to transmit back to the sender after the last call. */
-  [[nodiscard]] span<const std::uint8_t> reply() const noexcept {
-    return span<const std::uint8_t>(reply_, reply_len_);
-  }
+  [[nodiscard]] span<const std::uint8_t> reply() const noexcept { return span<const std::uint8_t>(reply_, reply_len_); }
 
   /** @brief Payload of the packet signalled by `xmodem_event::block`; valid until the next `on_byte`. */
   [[nodiscard]] span<const std::uint8_t> block() const noexcept { return span<const std::uint8_t>(buf_.data(), size_); }
@@ -385,7 +384,9 @@ public:
   }
 
   /** @brief Bytes to put on the wire after a `transmit` (or `failed`, which holds CAN) event. */
-  [[nodiscard]] span<const std::uint8_t> packet() const noexcept { return span<const std::uint8_t>(pkt_.data(), pkt_len_); }
+  [[nodiscard]] span<const std::uint8_t> packet() const noexcept {
+    return span<const std::uint8_t>(pkt_.data(), pkt_len_);
+  }
 
   /** @brief Whether CRC-16 mode was negotiated. */
   [[nodiscard]] constexpr bool crc_mode() const noexcept { return crc_; }

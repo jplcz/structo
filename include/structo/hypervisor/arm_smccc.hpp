@@ -144,8 +144,8 @@ struct smccc_function_id {
  * before trapping. @p owner above 63 (outside the 6-bit field) is truncated, not rejected -- callers
  * building a Function Identifier from one of the named `smccc_owner` values never hit this. */
 [[nodiscard]] constexpr std::uint32_t encode_smccc_function_id(smccc_call_type type, smccc_convention convention,
-                                                                std::uint8_t owner,
-                                                                std::uint16_t function_number) noexcept {
+                                                               std::uint8_t owner,
+                                                               std::uint16_t function_number) noexcept {
   return (static_cast<std::uint32_t>(type) << 31) | (static_cast<std::uint32_t>(convention) << 30) |
          ((static_cast<std::uint32_t>(owner) & 0x3FU) << 24) | static_cast<std::uint32_t>(function_number);
 }

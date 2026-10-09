@@ -40,7 +40,7 @@ inline constexpr std::uint8_t dhcp_request = 3;
 inline constexpr std::uint8_t dhcp_ack = 5;
 inline constexpr std::uint8_t dhcp_nak = 6;
 
-inline constexpr std::size_t dhcp_fixed_size = 236; ///< BOOTP header up to (excluding) the magic cookie.
+inline constexpr std::size_t dhcp_fixed_size = 236;       ///< BOOTP header up to (excluding) the magic cookie.
 inline constexpr std::size_t dhcp_max_request_size = 320; ///< Always enough for `build_dhcp`.
 
 /** @brief What the client wants to send. */
@@ -61,8 +61,8 @@ struct dhcp_message {
   ipv4_address your_address{};
   ipv4_address server_id{};
   ipv4_address netmask{};
-  ipv4_address gateway{}; ///< First router (option 3).
-  ipv4_address dns{};     ///< First DNS server (option 6).
+  ipv4_address gateway{};          ///< First router (option 3).
+  ipv4_address dns{};              ///< First DNS server (option 6).
   std::uint32_t lease_seconds = 0; ///< Option 51; 0 if absent.
   std::uint32_t renew_seconds = 0; ///< T1, option 58; 0 if absent.
 };
@@ -114,8 +114,8 @@ struct dhcp_message {
   }
   out[n++] = 55; // parameter request list: mask, router, DNS, lease, T1, T2
   out[n++] = 6;
-  for (std::uint8_t o : {std::uint8_t{1}, std::uint8_t{3}, std::uint8_t{6}, std::uint8_t{51}, std::uint8_t{58},
-                         std::uint8_t{59}})
+  for (std::uint8_t o :
+       {std::uint8_t{1}, std::uint8_t{3}, std::uint8_t{6}, std::uint8_t{51}, std::uint8_t{58}, std::uint8_t{59}})
     out[n++] = o;
   out[n++] = 255;
   return n;

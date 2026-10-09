@@ -27,11 +27,11 @@
  * | `\r` or `\n`, `\t`, `0x7F` or `0x08`          | Enter, Tab, Backspace                                   |
  * | `ESC` + character                             | Alt + that key                                          |
  * | `ESC [ A/B/C/D/H/F`, `ESC O A/B/C/D/H/F`      | arrows, Home, End                                       |
- * | `ESC [ n ~`                                   | Home(1,7), Insert(2), Delete(3), End(4,8), PgUp(5), PgDn(6), F1-F5 (11-15), F6-F10 (17-21), F11/F12 (23/24) |
- * | `ESC O P/Q/R/S`, `ESC [ P/Q/R/S`             | F1-F4                                                   |
- * | `ESC [ Z`                                     | Shift + Tab                                             |
- * | `ESC [ 1 ; m <final>` / `ESC [ n ; m ~`       | the same keys with the xterm modifier `m` (1 + bitmask of Shift=1, Alt=2, Ctrl=4) |
- * | `ESC [ < b ; x ; y M/m` (SGR mouse, mode 1006)| `abs` x/y (0-based cell), button press/release, wheel   |
+ * | `ESC [ n ~`                                   | Home(1,7), Insert(2), Delete(3), End(4,8), PgUp(5), PgDn(6), F1-F5
+ * (11-15), F6-F10 (17-21), F11/F12 (23/24) | | `ESC O P/Q/R/S`, `ESC [ P/Q/R/S`             | F1-F4 | | `ESC [ Z` |
+ * Shift + Tab                                             | | `ESC [ 1 ; m <final>` / `ESC [ n ; m ~`       | the same
+ * keys with the xterm modifier `m` (1 + bitmask of Shift=1, Alt=2, Ctrl=4) | | `ESC [ < b ; x ; y M/m` (SGR mouse, mode
+ * 1006)| `abs` x/y (0-based cell), button press/release, wheel   |
  *
  * A terminal does not report key releases, so each decoded key becomes
  * "modifiers pressed, key pressed, key released, modifiers released" followed
@@ -97,7 +97,8 @@ public:
   }
 
 private:
-  static constexpr std::size_t queue_capacity = 16; // one decoded sequence is at most 9 events; refilled only when empty
+  static constexpr std::size_t queue_capacity =
+      16; // one decoded sequence is at most 9 events; refilled only when empty
   static constexpr std::size_t max_params = 4;
 
   enum class state : std::uint8_t { ground, escape, ss3, csi };
@@ -110,7 +111,8 @@ private:
   void emit(const input_event &e) noexcept { queue_[tail_++] = e; }
 
   void emit_key(std::uint16_t usage, unsigned mods) noexcept {
-    const reloco::array<std::uint16_t, 3> mod_keys{{U(hid_key::left_shift), U(hid_key::left_ctrl), U(hid_key::left_alt)}};
+    const reloco::array<std::uint16_t, 3> mod_keys{
+        {U(hid_key::left_shift), U(hid_key::left_ctrl), U(hid_key::left_alt)}};
     const reloco::array<unsigned, 3> mod_bits{{mod_shift, mod_ctrl, mod_alt}};
     for (std::size_t i = 0; i < 3; ++i)
       if (mods & mod_bits[i])
@@ -146,12 +148,21 @@ private:
   void decode_char(std::uint8_t b, unsigned alt) noexcept {
     switch (b) {
     case '\r':
-    case '\n': emit_key(U(hid_key::enter), alt); return;
-    case '\t': emit_key(U(hid_key::tab), alt); return;
+    case '\n':
+      emit_key(U(hid_key::enter), alt);
+      return;
+    case '\t':
+      emit_key(U(hid_key::tab), alt);
+      return;
     case 0x7F:
-    case 0x08: emit_key(U(hid_key::backspace), alt); return;
-    case 0x00: emit_key(U(hid_key::space), mod_ctrl | alt); return;
-    default: break;
+    case 0x08:
+      emit_key(U(hid_key::backspace), alt);
+      return;
+    case 0x00:
+      emit_key(U(hid_key::space), mod_ctrl | alt);
+      return;
+    default:
+      break;
     }
     if (b >= 0x01 && b <= 0x1A) {
       emit_key(static_cast<std::uint16_t>(U(hid_key::a) + (b - 1)), mod_ctrl | alt);
@@ -186,7 +197,9 @@ private:
     return m > 1 ? static_cast<unsigned>(m - 1) & (mod_shift | mod_alt | mod_ctrl) : 0u;
   }
 
-  static std::uint16_t function_key(unsigned n) noexcept { return static_cast<std::uint16_t>(U(hid_key::f1) + (n - 1)); }
+  static std::uint16_t function_key(unsigned n) noexcept {
+    return static_cast<std::uint16_t>(U(hid_key::f1) + (n - 1));
+  }
 
   void decode_mouse(char final_byte) noexcept {
     if (nparams_ < 3)
@@ -202,7 +215,8 @@ private:
         emit(make_rel_event((b & 2u) ? input_axis::hwheel : input_axis::wheel, d));
       }
     } else if (!(b & 32u)) { // 32 = motion without a button change
-      static constexpr reloco::array<input_button, 3> buttons{{input_button::left, input_button::middle, input_button::right}};
+      static constexpr reloco::array<input_button, 3> buttons{
+          {input_button::left, input_button::middle, input_button::right}};
       if ((b & 3u) < 3)
         emit(make_button_event(buttons[b & 3u], final_byte == 'M'));
     }
@@ -219,38 +233,81 @@ private:
     }
     const unsigned mods = xterm_mods();
     switch (f) {
-    case 'A': emit_key(U(hid_key::up), mods); return;
-    case 'B': emit_key(U(hid_key::down), mods); return;
-    case 'C': emit_key(U(hid_key::right), mods); return;
-    case 'D': emit_key(U(hid_key::left), mods); return;
-    case 'H': emit_key(U(hid_key::home), mods); return;
-    case 'F': emit_key(U(hid_key::end), mods); return;
+    case 'A':
+      emit_key(U(hid_key::up), mods);
+      return;
+    case 'B':
+      emit_key(U(hid_key::down), mods);
+      return;
+    case 'C':
+      emit_key(U(hid_key::right), mods);
+      return;
+    case 'D':
+      emit_key(U(hid_key::left), mods);
+      return;
+    case 'H':
+      emit_key(U(hid_key::home), mods);
+      return;
+    case 'F':
+      emit_key(U(hid_key::end), mods);
+      return;
     case 'P':
     case 'Q':
     case 'R':
-    case 'S': emit_key(function_key(static_cast<unsigned>(f - 'P') + 1u), mods); return;
-    case 'Z': emit_key(U(hid_key::tab), mod_shift); return;
-    case '~': break;
-    default: return;
+    case 'S':
+      emit_key(function_key(static_cast<unsigned>(f - 'P') + 1u), mods);
+      return;
+    case 'Z':
+      emit_key(U(hid_key::tab), mod_shift);
+      return;
+    case '~':
+      break;
+    default:
+      return;
     }
     switch (params_[0]) {
     case 1:
-    case 7: emit_key(U(hid_key::home), mods); return;
-    case 2: emit_key(U(hid_key::insert), mods); return;
-    case 3: emit_key(U(hid_key::delete_key), mods); return;
+    case 7:
+      emit_key(U(hid_key::home), mods);
+      return;
+    case 2:
+      emit_key(U(hid_key::insert), mods);
+      return;
+    case 3:
+      emit_key(U(hid_key::delete_key), mods);
+      return;
     case 4:
-    case 8: emit_key(U(hid_key::end), mods); return;
-    case 5: emit_key(U(hid_key::page_up), mods); return;
-    case 6: emit_key(U(hid_key::page_down), mods); return;
-    case 11: case 12: case 13: case 14: case 15:
+    case 8:
+      emit_key(U(hid_key::end), mods);
+      return;
+    case 5:
+      emit_key(U(hid_key::page_up), mods);
+      return;
+    case 6:
+      emit_key(U(hid_key::page_down), mods);
+      return;
+    case 11:
+    case 12:
+    case 13:
+    case 14:
+    case 15:
       emit_key(function_key(params_[0] - 10), mods);
       return;
-    case 17: case 18: case 19: case 20: case 21:
+    case 17:
+    case 18:
+    case 19:
+    case 20:
+    case 21:
       emit_key(function_key(params_[0] - 11), mods); // 17 -> F6 ... 21 -> F10
       return;
-    case 23: emit_key(function_key(11), mods); return;
-    case 24: emit_key(function_key(12), mods); return;
-    default: return;
+    case 23:
+      emit_key(function_key(11), mods);
+      return;
+    case 24:
+      emit_key(function_key(12), mods);
+      return;
+    default:
+      return;
     }
   }
 
@@ -280,16 +337,32 @@ private:
     case state::ss3:
       state_ = state::ground;
       switch (b) {
-      case 'A': emit_key(U(hid_key::up), 0); return;
-      case 'B': emit_key(U(hid_key::down), 0); return;
-      case 'C': emit_key(U(hid_key::right), 0); return;
-      case 'D': emit_key(U(hid_key::left), 0); return;
-      case 'H': emit_key(U(hid_key::home), 0); return;
-      case 'F': emit_key(U(hid_key::end), 0); return;
-      case 'P': case 'Q': case 'R': case 'S':
+      case 'A':
+        emit_key(U(hid_key::up), 0);
+        return;
+      case 'B':
+        emit_key(U(hid_key::down), 0);
+        return;
+      case 'C':
+        emit_key(U(hid_key::right), 0);
+        return;
+      case 'D':
+        emit_key(U(hid_key::left), 0);
+        return;
+      case 'H':
+        emit_key(U(hid_key::home), 0);
+        return;
+      case 'F':
+        emit_key(U(hid_key::end), 0);
+        return;
+      case 'P':
+      case 'Q':
+      case 'R':
+      case 'S':
         emit_key(function_key(static_cast<unsigned>(b - 'P') + 1u), 0);
         return;
-      default: return;
+      default:
+        return;
       }
     case state::csi:
       if (b >= '0' && b <= '9') {

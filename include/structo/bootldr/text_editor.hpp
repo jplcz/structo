@@ -440,7 +440,7 @@ public:
     if (auto r = move_to(uart, rows_ + 1, 1); !r)
       return r;
     const auto status = microfmt::format<96>("\x1b[7m Ln {}, Col {} {}  ^S save  ^X quit  {}", line() + 1, column() + 1,
-                                              modified_ ? "[modified]" : "", message_);
+                                             modified_ ? "[modified]" : "", message_);
     if (auto r = uart.write_string(status.view()); !r)
       return r;
     if (auto r = uart.write_string("\x1b[K\x1b[0m"); !r)

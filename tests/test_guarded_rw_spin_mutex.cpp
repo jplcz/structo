@@ -73,7 +73,8 @@ struct fake_spinlock_entry_traits {
   static void reset() noexcept { depth = 0; }
 };
 
-/** @brief Fixture for `guarded_rw_spin_mutex` tests; resets all fake backends' mutable static state before each test. */
+/** @brief Fixture for `guarded_rw_spin_mutex` tests; resets all fake backends' mutable static state before each test.
+ */
 class GuardedRwSpinMutexTest : public ::testing::Test {
 protected:
   void SetUp() override {

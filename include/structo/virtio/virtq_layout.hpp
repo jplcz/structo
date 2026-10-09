@@ -120,7 +120,7 @@ struct packed_layout {
  * @return `error::security_violation` if `index >= limit`.
  */
 [[nodiscard]] inline RELOCO_CONSTEXPR20 reloco::result<std::uint32_t> try_checked_index(std::uint32_t index,
-                                                                         std::uint32_t limit) noexcept {
+                                                                                        std::uint32_t limit) noexcept {
   const bool ok = index < limit;
   const std::uint32_t safe = reloco::nospec::sanitize(index, ok, std::uint32_t{0});
   if (!ok)
@@ -137,7 +137,7 @@ namespace detail {
  * @return `error::invalid_argument` if @p queue_size is not a power of two in `[1, 32768]`.
  */
 [[nodiscard]] inline RELOCO_CONSTEXPR20 reloco::result<split_layout> try_split_layout(std::uint32_t queue_size,
-                                                                       bool event_idx) noexcept {
+                                                                                      bool event_idx) noexcept {
   if (!is_valid_split_queue_size(queue_size))
     return reloco::unexpected(reloco::error::invalid_argument);
 
@@ -158,7 +158,8 @@ namespace detail {
  * @brief Computes the packed-ring layout for @p queue_size.
  * @return `error::invalid_argument` if @p queue_size is not in `[1, 32768]`.
  */
-[[nodiscard]] inline RELOCO_CONSTEXPR20 reloco::result<packed_layout> try_packed_layout(std::uint32_t queue_size) noexcept {
+[[nodiscard]] inline RELOCO_CONSTEXPR20 reloco::result<packed_layout>
+try_packed_layout(std::uint32_t queue_size) noexcept {
   if (!is_valid_packed_queue_size(queue_size))
     return reloco::unexpected(reloco::error::invalid_argument);
 
@@ -178,7 +179,7 @@ namespace detail {
 /** @brief Validates one ring area: non-null, aligned, and `[addr, addr + size)` does not wrap. */
 template <typename RingSpace>
 [[nodiscard]] RELOCO_CONSTEXPR20 reloco::result<void> check_area(phys_addr<void, RingSpace> addr, std::size_t size,
-                                                        std::size_t align) noexcept {
+                                                                 std::size_t align) noexcept {
   if (addr.is_null())
     return reloco::unexpected(reloco::error::invalid_argument);
   if (addr.value % align != 0)
@@ -207,8 +208,8 @@ template <typename RingSpace> struct split_ring_addrs {
    * @brief Places all three areas contiguously from @p base following @p layout.
    * @return `error::integer_overflow` if the ring would run past the end of the address space.
    */
-  [[nodiscard]] static RELOCO_CONSTEXPR20 reloco::result<split_ring_addrs> try_from_contiguous(addr_type base,
-                                                                                      const split_layout &layout) noexcept {
+  [[nodiscard]] static RELOCO_CONSTEXPR20 reloco::result<split_ring_addrs>
+  try_from_contiguous(addr_type base, const split_layout &layout) noexcept {
     auto d = base.try_add(layout.desc_offset);
     auto a = base.try_add(layout.avail_offset);
     auto u = base.try_add(layout.used_offset);
@@ -228,13 +229,13 @@ template <typename RingSpace> struct split_ring_addrs {
 
   /** @brief Address of descriptor-table entry @p index (`error::security_violation` if `index >= queue_size`). */
   [[nodiscard]] RELOCO_CONSTEXPR20 reloco::result<addr_type> desc_at(std::uint32_t index,
-                                                            std::uint32_t queue_size) const noexcept {
+                                                                     std::uint32_t queue_size) const noexcept {
     return element_at(desc, index, queue_size, desc_size_v);
   }
 
   /** @brief Address of `avail.ring[index]` (past the 4-byte header). */
   [[nodiscard]] RELOCO_CONSTEXPR20 reloco::result<addr_type> avail_ring_at(std::uint32_t index,
-                                                                  std::uint32_t queue_size) const noexcept {
+                                                                           std::uint32_t queue_size) const noexcept {
     auto base = avail.try_add(sizeof(virtq_avail_header));
     if (!base)
       return reloco::unexpected(base.error());
@@ -243,7 +244,7 @@ template <typename RingSpace> struct split_ring_addrs {
 
   /** @brief Address of `used.ring[index]` (past the 4-byte header). */
   [[nodiscard]] RELOCO_CONSTEXPR20 reloco::result<addr_type> used_elem_at(std::uint32_t index,
-                                                                 std::uint32_t queue_size) const noexcept {
+                                                                          std::uint32_t queue_size) const noexcept {
     auto base = used.try_add(sizeof(virtq_used_header));
     if (!base)
       return reloco::unexpected(base.error());
@@ -275,9 +276,8 @@ template <typename RingSpace> struct split_ring_addrs {
 private:
   static constexpr std::uint64_t desc_size_v = sizeof(virtq_desc);
 
-  [[nodiscard]] static RELOCO_CONSTEXPR20 reloco::result<addr_type> element_at(addr_type base, std::uint32_t index,
-                                                                      std::uint32_t queue_size,
-                                                                      std::uint64_t stride) noexcept {
+  [[nodiscard]] static RELOCO_CONSTEXPR20 reloco::result<addr_type>
+  element_at(addr_type base, std::uint32_t index, std::uint32_t queue_size, std::uint64_t stride) noexcept {
     auto safe = try_checked_index(index, queue_size);
     if (!safe)
       return reloco::unexpected(safe.error());
@@ -306,7 +306,7 @@ template <typename RingSpace> struct packed_ring_addrs {
 
   /** @brief Address of packed descriptor @p index (`error::security_violation` if `index >= queue_size`). */
   [[nodiscard]] RELOCO_CONSTEXPR20 reloco::result<addr_type> desc_at(std::uint32_t index,
-                                                            std::uint32_t queue_size) const noexcept {
+                                                                     std::uint32_t queue_size) const noexcept {
     auto safe = try_checked_index(index, queue_size);
     if (!safe)
       return reloco::unexpected(safe.error());

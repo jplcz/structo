@@ -7,13 +7,13 @@
 
 #include <vector>
 
+using reloco::error;
+using reloco::span;
 using structo::hw::framebuffer;
 using structo::hw::gpu_accel_ref;
 using structo::hw::gpu_accel_traits;
 using structo::hw::rgb_color;
 using structo::hw::xrgb8888;
-using reloco::error;
-using reloco::span;
 
 namespace {
 
@@ -43,11 +43,11 @@ template <> struct structo::hw::gpu_accel_traits<minimal_backend> {
   static std::size_t height(const minimal_backend &b) noexcept { return b.fb.height(); }
   static void clear(minimal_backend &b, rgb_color c) noexcept { b.fb.clear(c); }
   static void fill_rect(minimal_backend &b, std::size_t x, std::size_t y, std::size_t w, std::size_t h,
-                       rgb_color c) noexcept {
+                        rgb_color c) noexcept {
     b.fb.fill_rect(x, y, w, h, c);
   }
-  static void draw_line(minimal_backend &b, std::ptrdiff_t x0, std::ptrdiff_t y0, std::ptrdiff_t x1,
-                       std::ptrdiff_t y1, rgb_color c) noexcept {
+  static void draw_line(minimal_backend &b, std::ptrdiff_t x0, std::ptrdiff_t y0, std::ptrdiff_t x1, std::ptrdiff_t y1,
+                        rgb_color c) noexcept {
     b.fb.draw_line(x0, y0, x1, y1, c);
   }
 };

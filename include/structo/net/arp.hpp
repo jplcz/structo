@@ -64,7 +64,8 @@ struct arp_packet {
   return arp_packet_size;
 }
 
-/** @brief Decodes an ARP payload; `error::invalid_argument` if short or not Ethernet/IPv4, or the opcode isn't request/reply. */
+/** @brief Decodes an ARP payload; `error::invalid_argument` if short or not Ethernet/IPv4, or the opcode isn't
+ * request/reply. */
 [[nodiscard]] inline result<arp_packet> parse_arp(span<const std::uint8_t> d) noexcept {
   if (d.size() < arp_packet_size || d[0] != 0 || d[1] != 1 || d[2] != 0x08 || d[3] != 0x00 || d[4] != 6 || d[5] != 4)
     return unexpected(error::invalid_argument);

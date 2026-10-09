@@ -58,10 +58,10 @@ class udp_demux;
 
 /** @brief Result of `udp_socket::receive_from()`. */
 struct udp_received {
-  std::size_t size = 0;           ///< Bytes copied into the caller's buffer.
-  net::ipv4_address source{};     ///< Sender's address.
-  std::uint16_t source_port = 0;  ///< Sender's UDP port.
-  bool truncated = false;         ///< The datagram was longer than the buffer; the rest was discarded.
+  std::size_t size = 0;          ///< Bytes copied into the caller's buffer.
+  net::ipv4_address source{};    ///< Sender's address.
+  std::uint16_t source_port = 0; ///< Sender's UDP port.
+  bool truncated = false;        ///< The datagram was longer than the buffer; the rest was discarded.
 };
 
 class udp_socket {
@@ -80,7 +80,8 @@ public:
    */
   [[nodiscard]] inline reloco::result<std::uint16_t> bind(std::uint16_t port = 0) noexcept;
 
-  /** @brief Unbinds, discards queued datagrams and wakes waiting receivers (they fail with `error::operation_canceled`). */
+  /** @brief Unbinds, discards queued datagrams and wakes waiting receivers (they fail with
+   * `error::operation_canceled`). */
   inline void close() noexcept;
 
   [[nodiscard]] bool is_bound() const noexcept { return bound_; }

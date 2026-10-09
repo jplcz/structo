@@ -8,8 +8,8 @@
 // into `framebuffer_console`, confirming the generator's output is a
 // genuine drop-in replacement for `block_font_8x8`.
 
-#include <gtest/gtest.h>
 #include <cstring>
+#include <gtest/gtest.h>
 #include <structo/hw/framebuffer_console.hpp>
 
 #include "fonts/all_fonts.hpp"
@@ -77,18 +77,20 @@ TEST(DejavuFontTest, Glyph8x8RendersRealShapeNotABlock) { exercise_font<dejavu_s
 namespace {
 
 template <typename Font> void expect_sane_bitmap_font() {
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE;
   auto ink = [](const std::uint8_t *g) {
     unsigned bits = 0;
     for (std::size_t y = 0; y < Font::glyph_height; ++y)
       bits |= g[y];
     return bits;
   };
-  EXPECT_EQ(ink(Font::glyph_bitmap(' ')), 0u);        // space has no ink
-  EXPECT_EQ(ink(Font::glyph_bitmap('\x01')), 0u);     // outside 0x20..0x7E is blank
+  EXPECT_EQ(ink(Font::glyph_bitmap(' ')), 0u);    // space has no ink
+  EXPECT_EQ(ink(Font::glyph_bitmap('\x01')), 0u); // outside 0x20..0x7E is blank
   EXPECT_NE(ink(Font::glyph_bitmap('A')), 0u);
   EXPECT_NE(ink(Font::glyph_bitmap('~')), 0u);
   EXPECT_NE(Font::glyph_bitmap('A')[0] | Font::glyph_bitmap('A')[Font::glyph_height / 2], 0u);
   EXPECT_NE(std::memcmp(Font::glyph_bitmap('l'), Font::glyph_bitmap('I'), Font::glyph_height), 0);
+  RELOCO_END_UNSAFE_BUFFER_USAGE;
 }
 
 } // namespace

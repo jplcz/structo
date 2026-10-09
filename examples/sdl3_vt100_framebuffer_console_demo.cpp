@@ -57,8 +57,8 @@ template <typename Font> int run() {
     return 1;
   }
 
-  SDL_Window *window = SDL_CreateWindow("structo: vt100_terminal + framebuffer_console",
-                                        static_cast<int>(window_width), static_cast<int>(window_height), 0);
+  SDL_Window *window = SDL_CreateWindow("structo: vt100_terminal + framebuffer_console", static_cast<int>(window_width),
+                                        static_cast<int>(window_height), 0);
   SDL_Renderer *renderer = window != nullptr ? SDL_CreateRenderer(window, nullptr) : nullptr;
   if (window == nullptr || renderer == nullptr) {
     std::fprintf(stderr, "SDL window/renderer creation failed: %s\n", SDL_GetError());
@@ -168,8 +168,8 @@ template <typename Font> int run() {
 } // namespace
 
 int main(int argc, char **argv) {
-  return structo::examples::fonts::select_font(
-      argc, argv, [](auto tag) { return run<typename decltype(tag)::type>(); });
+  return structo::examples::fonts::select_font(argc, argv,
+                                               [](auto tag) { return run<typename decltype(tag)::type>(); });
 }
 
 RELOCO_END_UNSAFE_BUFFER_USAGE

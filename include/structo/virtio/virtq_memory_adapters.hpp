@@ -118,7 +118,8 @@ public:
   }
 
 private:
-  template <typename Backend> static constexpr vtable s_vtbl = {
+  template <typename Backend>
+  static constexpr vtable s_vtbl = {
       [](void *c, addr_type a, reloco::span<std::byte> dst) noexcept -> reloco::result<void> {
         return virtq_memory_traits<Backend, Space>::try_read(*static_cast<Backend *>(c), a, dst);
       },

@@ -52,9 +52,9 @@ inline constexpr std::size_t config_size = 12; ///< cols(2) rows(2) max_nr_ports
 
 /** @brief Diagnostic counters. */
 struct stats {
-  std::uint64_t output_bytes = 0; ///< Bytes the guest wrote that the sink consumed.
+  std::uint64_t output_bytes = 0;   ///< Bytes the guest wrote that the sink consumed.
   std::uint64_t output_dropped = 0; ///< Bytes the sink refused.
-  std::uint64_t input_bytes = 0; ///< Bytes delivered into guest buffers.
+  std::uint64_t input_bytes = 0;    ///< Bytes delivered into guest buffers.
 };
 } // namespace console
 

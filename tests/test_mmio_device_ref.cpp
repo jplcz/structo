@@ -12,11 +12,11 @@
 // Test fixtures index raw buffers freely; bounds are checked by the assertions.
 RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
 
-using structo::hypervisor::mmio_device_ref;
 using reloco::error;
 using reloco::result;
 using reloco::span;
 using reloco::unexpected;
+using structo::hypervisor::mmio_device_ref;
 
 namespace {
 
@@ -107,8 +107,7 @@ TEST_F(MmioDeviceRefTest, SizeReportsBackendWindow) { EXPECT_EQ(ref_.size(), 16u
 
 TEST_F(MmioDeviceRefTest, WriteThenReadRoundTrips) {
   const std::uint32_t value = 0xDEADBEEFu;
-  ASSERT_TRUE(
-      ref_.try_write(4, span<const std::byte>(reinterpret_cast<const std::byte *>(&value), 4)).has_value());
+  ASSERT_TRUE(ref_.try_write(4, span<const std::byte>(reinterpret_cast<const std::byte *>(&value), 4)).has_value());
 
   std::uint32_t readback = 0;
   ASSERT_TRUE(ref_.try_read(4, span<std::byte>(reinterpret_cast<std::byte *>(&readback), 4)).has_value());
@@ -165,8 +164,7 @@ TEST_F(MmioDeviceRefTest, ReadFailurePropagatesFromBackend) {
 
 TEST_F(MmioDeviceRefTest, TryResetClearsBackendStateAndCounts) {
   const std::uint32_t value = 0x11223344u;
-  ASSERT_TRUE(
-      ref_.try_write(0, span<const std::byte>(reinterpret_cast<const std::byte *>(&value), 4)).has_value());
+  ASSERT_TRUE(ref_.try_write(0, span<const std::byte>(reinterpret_cast<const std::byte *>(&value), 4)).has_value());
 
   ASSERT_TRUE(ref_.try_reset().has_value());
   EXPECT_EQ(dev_.reset_count, 1);

@@ -172,9 +172,7 @@ struct vdso_clock_page {
   reloco::array<vdso_clock_slot, vdso_clock_id_count> slots{};
 
   /** @brief The slot for @p id. */
-  [[nodiscard]] vdso_clock_slot &slot(vdso_clock_id id) noexcept {
-    return slots[static_cast<std::uint32_t>(id)];
-  }
+  [[nodiscard]] vdso_clock_slot &slot(vdso_clock_id id) noexcept { return slots[static_cast<std::uint32_t>(id)]; }
 
   /** @copydoc slot */
   [[nodiscard]] const vdso_clock_slot &slot(vdso_clock_id id) const noexcept {

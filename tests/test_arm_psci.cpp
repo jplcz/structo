@@ -24,13 +24,27 @@ TEST(ArmPsciTest, DecodesCpuOnSmc64FunctionId) {
 
 TEST(ArmPsciTest, DecodesAllDefinedFunctionNumbers) {
   const psci_function expected[] = {
-      psci_function::version,       psci_function::cpu_suspend,          psci_function::cpu_off,
-      psci_function::cpu_on,        psci_function::affinity_info,        psci_function::migrate,
-      psci_function::migrate_info_type, psci_function::migrate_info_up_cpu, psci_function::system_off,
-      psci_function::system_reset,  psci_function::features,             psci_function::cpu_freeze,
-      psci_function::cpu_default_suspend, psci_function::node_hw_state,  psci_function::system_suspend,
-      psci_function::set_suspend_mode,    psci_function::stat_residency, psci_function::stat_count,
-      psci_function::system_reset2, psci_function::mem_protect,          psci_function::mem_protect_check_range,
+      psci_function::version,
+      psci_function::cpu_suspend,
+      psci_function::cpu_off,
+      psci_function::cpu_on,
+      psci_function::affinity_info,
+      psci_function::migrate,
+      psci_function::migrate_info_type,
+      psci_function::migrate_info_up_cpu,
+      psci_function::system_off,
+      psci_function::system_reset,
+      psci_function::features,
+      psci_function::cpu_freeze,
+      psci_function::cpu_default_suspend,
+      psci_function::node_hw_state,
+      psci_function::system_suspend,
+      psci_function::set_suspend_mode,
+      psci_function::stat_residency,
+      psci_function::stat_count,
+      psci_function::system_reset2,
+      psci_function::mem_protect,
+      psci_function::mem_protect_check_range,
   };
   for (std::uint16_t n = 0; n < 21; ++n) {
     smccc_function_id id{};

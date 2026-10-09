@@ -14,13 +14,13 @@
 // Test fixtures index raw buffers freely; bounds are checked by the assertions.
 RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
 
+using reloco::error;
+using reloco::span;
 using structo::hw::console_cell;
 using structo::hw::console_color;
 using structo::hw::console_ref;
 using structo::hypervisor::mmio_device_ref;
 using structo::hypervisor::mmio_text_console;
-using reloco::error;
-using reloco::span;
 
 namespace {
 
@@ -75,7 +75,7 @@ TEST(MmioTextConsoleAllocation, MoveTransfersOwnershipAndLeavesSourceEmpty) {
   auto b_fb = b.framebuffer();
   EXPECT_EQ(b_fb.data(), buffer_ptr);
   EXPECT_EQ(b.columns(), 80u);
-  EXPECT_EQ(a.columns(), 0u); // NOLINT(bugprone-use-after-move) -- checking the moved-from state itself
+  EXPECT_EQ(a.columns(), 0u);            // NOLINT(bugprone-use-after-move) -- checking the moved-from state itself
   EXPECT_EQ(a.framebuffer().size(), 0u); // NOLINT(bugprone-use-after-move)
 }
 

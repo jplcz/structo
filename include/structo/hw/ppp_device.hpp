@@ -33,6 +33,7 @@
 
 #if RELOCO_HAS_COROUTINES
 
+#include "clock_ref.hpp"
 #include "ppp_framing.hpp"
 #include "uart_ref.hpp"
 
@@ -55,6 +56,12 @@ public:
       : uart_(uart), clock_(clock), clock_ctx_(clock_ctx), link_(with_mru(cfg)), dec_(reloco::span<std::uint8_t>(rx_)) {
     link_.open();
   }
+  /** @brief Same, with time from a hardware clock reader (`clock_reader`/`atomic_clock_reader`, already `reset()`). */
+  template <
+      typename Reader,
+      std::enable_if_t<std::is_same_v<Reader, clock_reader> || std::is_same_v<Reader, atomic_clock_reader>, int> = 0>
+  ppp_device(uart_ref uart, Reader &reader, net::ppp_config cfg = {}) noexcept
+      : ppp_device(uart, &reader_now_ms<Reader>, &reader, cfg) {}
   ppp_device(const ppp_device &) = delete;
   ppp_device &operator=(const ppp_device &) = delete;
 

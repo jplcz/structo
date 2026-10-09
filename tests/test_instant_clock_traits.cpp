@@ -6,6 +6,9 @@
 #include <reloco/lifetime.hpp>
 #include <structo/hw/instant_clock_traits.hpp>
 
+using reloco::duration;
+using reloco::error;
+using reloco::result;
 using structo::hw::cycles;
 using structo::hw::kernel_monotonic_clock_tag;
 using structo::hw::kernel_realtime_clock_tag;
@@ -13,9 +16,6 @@ using structo::hw::time_manager;
 using structo::hw::time_source_capabilities;
 using structo::hw::time_source_ref;
 using structo::hw::vdso_clock_source;
-using reloco::duration;
-using reloco::error;
-using reloco::result;
 
 namespace {
 
@@ -67,9 +67,11 @@ struct test_spin_tag {};
 // This test binary acts as the "kernel" for the real kernel_monotonic_clock_tag/kernel_realtime_clock_tag
 // specializations exercised below, so it must supply their failure policies too (time_manager_clock_failure_policy
 // is left undefined by design until a kernel opts in -- see instant_clock_traits.hpp's file-level docs).
-template <> struct structo::hw::time_manager_clock_failure_policy<kernel_monotonic_clock_tag>
+template <>
+struct structo::hw::time_manager_clock_failure_policy<kernel_monotonic_clock_tag>
     : structo::hw::trap_time_failure_policy<kernel_monotonic_clock_tag> {};
-template <> struct structo::hw::time_manager_clock_failure_policy<kernel_realtime_clock_tag>
+template <>
+struct structo::hw::time_manager_clock_failure_policy<kernel_realtime_clock_tag>
     : structo::hw::trap_time_failure_policy<kernel_realtime_clock_tag> {};
 
 namespace {

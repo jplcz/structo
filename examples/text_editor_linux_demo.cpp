@@ -80,8 +80,7 @@ struct outcome {
 };
 
 // Wraps edit_text so main can see when the editor has finished.
-reloco::task<void> editor_task(bootldr::scheduler &sched,
-                               tty_uart &uart, reloco::string &text, outcome &out) noexcept {
+reloco::task<void> editor_task(bootldr::scheduler &sched, tty_uart &uart, reloco::string &text, outcome &out) noexcept {
   auto r = co_await bootldr::edit_text(sched, hw::uart_ref(uart), text);
   out.saved = r && *r;
   out.done = true;

@@ -35,9 +35,9 @@
 #include <reloco/error.hpp>
 #include <reloco/span.hpp>
 
-#include <reloco/array.hpp>
 #include <cstddef>
 #include <cstdint>
+#include <reloco/array.hpp>
 
 namespace structo::net {
 

@@ -6,13 +6,13 @@
 #include <structo/hw/vdso_clock_reader.hpp>
 #include <structo/hw/vdso_clock_writer.hpp>
 
+using reloco::duration;
+using reloco::error;
 using structo::hw::cycles;
 using structo::hw::vdso_clock_reader;
 using structo::hw::vdso_clock_slot;
 using structo::hw::vdso_clock_source;
 using structo::hw::vdso_clock_writer;
-using reloco::duration;
-using reloco::error;
 
 namespace {
 

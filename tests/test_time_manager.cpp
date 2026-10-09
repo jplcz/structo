@@ -6,6 +6,9 @@
 #include <structo/hw/time_manager.hpp>
 #include <structo/hw/vdso_clock_reader.hpp>
 
+using reloco::duration;
+using reloco::error;
+using reloco::result;
 using structo::hw::cycles;
 using structo::hw::time_manager;
 using structo::hw::time_source_capabilities;
@@ -14,9 +17,6 @@ using structo::hw::vdso_clock_id;
 using structo::hw::vdso_clock_page;
 using structo::hw::vdso_clock_reader;
 using structo::hw::vdso_clock_source;
-using reloco::duration;
-using reloco::error;
-using reloco::result;
 
 namespace {
 
@@ -199,7 +199,7 @@ TEST_F(TimeManagerTest, LiveReadBackstepClampsAndIncrementsLiveDiagnosticWithout
 
   backend_.value = 100; // live read dips below the published reference
   auto now = mgr->try_monotonic_now();
-  ASSERT_TRUE(now.has_value()); // must not error
+  ASSERT_TRUE(now.has_value());         // must not error
   EXPECT_EQ(now.value().as_secs(), 1u); // pinned
   EXPECT_EQ(mgr->live_backstep_count(), 1u);
   EXPECT_EQ(mgr->backstep_count(), 0u); // independent of the writer-path diagnostic

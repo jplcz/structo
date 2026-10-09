@@ -77,7 +77,9 @@ template <> struct structo::hw::input_traits<fake_input> {
 };
 
 template <> struct structo::hw::input_traits<bare_input> {
-  static input_capabilities capabilities(const bare_input &) noexcept { return {static_cast<std::uint32_t>(input_class::gamepad)}; }
+  static input_capabilities capabilities(const bare_input &) noexcept {
+    return {static_cast<std::uint32_t>(input_class::gamepad)};
+  }
   static reloco::result<bool> event_ready(bare_input &b) noexcept { return !b.events.empty(); }
   static reloco::result<input_event> try_read_event(bare_input &b) noexcept {
     if (b.events.empty())
@@ -152,8 +154,8 @@ TEST(InputDeviceRef, ReadAvailableDrainsUpToCapacity) {
 
 TEST(InputDeviceRef, ReadKeySkipsReleasesAndOtherEvents) {
   fake_input f;
-  f.events = {make_rel_event(input_axis::x, 1), make_key_event(0x04, input_key_state::released),
-              make_sync_event(), make_key_event(0x05, input_key_state::pressed)};
+  f.events = {make_rel_event(input_axis::x, 1), make_key_event(0x04, input_key_state::released), make_sync_event(),
+              make_key_event(0x05, input_key_state::pressed)};
   input_device_ref d(f);
   auto k = d.read_key(10);
   ASSERT_TRUE(k);
@@ -206,8 +208,8 @@ TEST(InputDeviceRef, CallbackFiresOnInputAndPollingStillWorks) {
 
   ASSERT_TRUE(d.clear_callback());
   f.inject(make_sync_event());
-  EXPECT_EQ(calls, 2);                // no longer notified...
-  EXPECT_TRUE(d.try_read_event());    // ...but the event is still pollable
+  EXPECT_EQ(calls, 2);             // no longer notified...
+  EXPECT_TRUE(d.try_read_event()); // ...but the event is still pollable
 }
 
 TEST(InputDeviceRef, MissingOptionalOperationsAreUnsupported) {

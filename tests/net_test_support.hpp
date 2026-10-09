@@ -55,9 +55,7 @@ inline bytes make_bytes(byte_span s) {
   return b;
 }
 
-inline bytes make_bytes(std::initializer_list<std::uint8_t> il) {
-  return make_bytes(byte_span(il.begin(), il.size()));
-}
+inline bytes make_bytes(std::initializer_list<std::uint8_t> il) { return make_bytes(byte_span(il.begin(), il.size())); }
 
 inline bytes make_bytes(std::size_t n, std::uint8_t fill) {
   bytes b;

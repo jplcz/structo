@@ -108,9 +108,10 @@ public:
    * @param slots Caller-owned bookkeeping, at least @p queue_size entries.
    * `error::invalid_argument` on a bad queue size/addresses/slot count.
    */
-  [[nodiscard]] static reloco::result<split_virtq_driver>
-  try_create(Mem &mem, const ring_addrs &addrs, std::uint32_t queue_size, reloco::span<split_driver_slot> slots,
-             bool event_idx = false) noexcept {
+  [[nodiscard]] static reloco::result<split_virtq_driver> try_create(Mem &mem, const ring_addrs &addrs,
+                                                                     std::uint32_t queue_size,
+                                                                     reloco::span<split_driver_slot> slots,
+                                                                     bool event_idx = false) noexcept {
     auto layout = try_split_layout(queue_size, event_idx);
     if (!layout)
       return reloco::unexpected(layout.error());
@@ -224,11 +225,10 @@ public:
    * `try_add`; `error::invalid_argument` if @p table_bytes is too small.
    */
   template <typename TableMem, typename TableSpace>
-  [[nodiscard]] reloco::result<void> try_add_indirect(reloco::span<const sg_type> out, reloco::span<const sg_type> in,
-                                                      std::uintptr_t token, TableMem &table_mem,
-                                                      phys_addr<void, TableSpace> table_write,
-                                                      phys_addr<void, BufSpace> table_dev,
-                                                      std::size_t table_bytes) noexcept {
+  [[nodiscard]] reloco::result<void>
+  try_add_indirect(reloco::span<const sg_type> out, reloco::span<const sg_type> in, std::uintptr_t token,
+                   TableMem &table_mem, phys_addr<void, TableSpace> table_write, phys_addr<void, BufSpace> table_dev,
+                   std::size_t table_bytes) noexcept {
     if (broken_)
       return reloco::unexpected(reloco::error::invalid_state);
     const std::size_t total = out.size() + in.size();
@@ -463,9 +463,8 @@ public:
   using chain = avail_chain<BufSpace>;
 
   /** @brief Binds a device to a ring and initialises the used ring header. */
-  [[nodiscard]] static reloco::result<split_virtq_device> try_create(Mem &mem, const ring_addrs &addrs,
-                                                                     std::uint32_t queue_size,
-                                                                     bool event_idx = false) noexcept {
+  [[nodiscard]] static reloco::result<split_virtq_device>
+  try_create(Mem &mem, const ring_addrs &addrs, std::uint32_t queue_size, bool event_idx = false) noexcept {
     auto layout = try_split_layout(queue_size, event_idx);
     if (!layout)
       return reloco::unexpected(layout.error());
@@ -658,7 +657,6 @@ private:
   }
 
 public:
-
   /**
    * @brief Completes @p c, reporting @p written bytes placed in its writable
    * segments, and publishes the used element (write barrier, then `used.idx`).

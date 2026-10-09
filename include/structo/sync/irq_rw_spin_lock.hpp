@@ -104,7 +104,8 @@ public:
     read_guard(const read_guard &) = delete;
     read_guard &operator=(const read_guard &) = delete;
 
-    read_guard(read_guard &&other) noexcept : m_irq(std::move(other.m_irq)), m_lock(std::exchange(other.m_lock, nullptr)) {}
+    read_guard(read_guard &&other) noexcept
+        : m_irq(std::move(other.m_irq)), m_lock(std::exchange(other.m_lock, nullptr)) {}
 
     read_guard &operator=(read_guard &&other) noexcept {
       if (this != &other) {
@@ -232,12 +233,14 @@ public:
     return reloco::optional<read_guard>(std::in_place, typename read_guard::adopt_t{}, std::move(irq), m_lock);
   }
 
-  /** @brief Engages `IrqLocker`, then blocks until the exclusive (write) side is acquired; see `RwLock::write_lock()`. */
+  /** @brief Engages `IrqLocker`, then blocks until the exclusive (write) side is acquired; see `RwLock::write_lock()`.
+   */
   template <bool B = write_uses_node, std::enable_if_t<!B, int> = 0> [[nodiscard]] write_guard write_lock() & noexcept {
     return write_guard(m_lock);
   }
 
-  /** @brief `queue_rw_spin_lock`-shaped overload: enqueues `n` onto the writer admission queue; see `RwLock::write_lock(node&)`. */
+  /** @brief `queue_rw_spin_lock`-shaped overload: enqueues `n` onto the writer admission queue; see
+   * `RwLock::write_lock(node&)`. */
   template <bool B = write_uses_node, std::enable_if_t<B, int> = 0>
   [[nodiscard]] write_guard write_lock(node &n) & noexcept {
     return write_guard(m_lock, n);

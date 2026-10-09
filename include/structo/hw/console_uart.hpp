@@ -48,10 +48,10 @@
  * | Enter                       | `'\r'` (as a serial terminal sends it)        |
  * | Backspace                   | `0x7F`                                         |
  * | Tab / Escape                | `'\t'` / `0x1B`                                |
- * | arrows, Home, End           | `ESC [ A/B/C/D`, `ESC [ H`, `ESC [ F`; `ESC O A/B/C/D/H/F` while the program enabled application cursor keys (`CSI ? 1 h`) |
- * | Insert/Delete/PgUp/PgDn     | `ESC [ 2~`, `ESC [ 3~`, `ESC [ 5~`, `ESC [ 6~` |
- * | F1..F4                      | `ESC O P`, `ESC O Q`, `ESC O R`, `ESC O S`     |
- * | F5..F12                     | `ESC [ 15~`, `17~`, `18~`, `19~`, `20~`, `21~`, `23~`, `24~` |
+ * | arrows, Home, End           | `ESC [ A/B/C/D`, `ESC [ H`, `ESC [ F`; `ESC O A/B/C/D/H/F` while the program enabled
+ * application cursor keys (`CSI ? 1 h`) | | Insert/Delete/PgUp/PgDn     | `ESC [ 2~`, `ESC [ 3~`, `ESC [ 5~`, `ESC [
+ * 6~` | | F1..F4                      | `ESC O P`, `ESC O Q`, `ESC O R`, `ESC O S`     | | F5..F12 | `ESC [ 15~`,
+ * `17~`, `18~`, `19~`, `20~`, `21~`, `23~`, `24~` |
  *
  * (xterm/VT220 numbering; modifier combinations with F-keys are not encoded.) Other keys (modifiers alone,
  * keypad, ...) produce nothing.
@@ -134,7 +134,8 @@ public:
   void set_config(const uart_config &cfg) noexcept { cfg_ = cfg; }
 
 private:
-  static constexpr std::size_t pending_capacity = 24; // longest sequence is an SGR mouse report (~14 bytes); refilled only when empty
+  static constexpr std::size_t pending_capacity =
+      24; // longest sequence is an SGR mouse report (~14 bytes); refilled only when empty
 
   void push(std::uint8_t b) noexcept { pending_[tail_++] = b; }
   void push_csi(char final_byte, char prefix_digit = 0) noexcept {
@@ -284,8 +285,8 @@ private:
         push_mouse_report(bit, !down, false);
     } else if (ev.type == input_event_type::sync) {
       const bool moved = ptr_x_ != last_x_ || ptr_y_ != last_y_;
-      const bool wants_motion = tracking == vt100_mouse_tracking::any ||
-                                (tracking == vt100_mouse_tracking::button && buttons_ != 0);
+      const bool wants_motion =
+          tracking == vt100_mouse_tracking::any || (tracking == vt100_mouse_tracking::button && buttons_ != 0);
       if (moved && wants_motion) {
         unsigned held = 3;
         for (unsigned b = 3; b-- > 0;) {
@@ -308,11 +309,13 @@ private:
     const bool down = ev.value != 0;
     const bool is_press = ev.value == static_cast<std::int32_t>(input_key_state::pressed);
 
-    if (code == static_cast<std::uint16_t>(hid_key::left_shift) || code == static_cast<std::uint16_t>(hid_key::right_shift)) {
+    if (code == static_cast<std::uint16_t>(hid_key::left_shift) ||
+        code == static_cast<std::uint16_t>(hid_key::right_shift)) {
       (code == static_cast<std::uint16_t>(hid_key::left_shift) ? lshift_ : rshift_) = down;
       return;
     }
-    if (code == static_cast<std::uint16_t>(hid_key::left_ctrl) || code == static_cast<std::uint16_t>(hid_key::right_ctrl)) {
+    if (code == static_cast<std::uint16_t>(hid_key::left_ctrl) ||
+        code == static_cast<std::uint16_t>(hid_key::right_ctrl)) {
       (code == static_cast<std::uint16_t>(hid_key::left_ctrl) ? lctrl_ : rctrl_) = down;
       return;
     }
@@ -328,19 +331,44 @@ private:
       return;
 
     switch (static_cast<hid_key>(code)) {
-    case hid_key::enter: push('\r'); return;
-    case hid_key::backspace: push(0x7F); return;
-    case hid_key::up: push_cursor_key('A'); return;
-    case hid_key::down: push_cursor_key('B'); return;
-    case hid_key::right: push_cursor_key('C'); return;
-    case hid_key::left: push_cursor_key('D'); return;
-    case hid_key::home: push_cursor_key('H'); return;
-    case hid_key::end: push_cursor_key('F'); return;
-    case hid_key::insert: push_csi('~', '2'); return;
-    case hid_key::delete_key: push_csi('~', '3'); return;
-    case hid_key::page_up: push_csi('~', '5'); return;
-    case hid_key::page_down: push_csi('~', '6'); return;
-    default: break;
+    case hid_key::enter:
+      push('\r');
+      return;
+    case hid_key::backspace:
+      push(0x7F);
+      return;
+    case hid_key::up:
+      push_cursor_key('A');
+      return;
+    case hid_key::down:
+      push_cursor_key('B');
+      return;
+    case hid_key::right:
+      push_cursor_key('C');
+      return;
+    case hid_key::left:
+      push_cursor_key('D');
+      return;
+    case hid_key::home:
+      push_cursor_key('H');
+      return;
+    case hid_key::end:
+      push_cursor_key('F');
+      return;
+    case hid_key::insert:
+      push_csi('~', '2');
+      return;
+    case hid_key::delete_key:
+      push_csi('~', '3');
+      return;
+    case hid_key::page_up:
+      push_csi('~', '5');
+      return;
+    case hid_key::page_down:
+      push_csi('~', '6');
+      return;
+    default:
+      break;
     }
 
     if (code >= static_cast<std::uint16_t>(hid_key::f1) && code <= static_cast<std::uint16_t>(hid_key::f12)) {
@@ -349,7 +377,8 @@ private:
     }
 
     const bool shift = lshift_ || rshift_;
-    const bool letter = code >= static_cast<std::uint16_t>(hid_key::a) && code <= static_cast<std::uint16_t>(hid_key::z);
+    const bool letter =
+        code >= static_cast<std::uint16_t>(hid_key::a) && code <= static_cast<std::uint16_t>(hid_key::z);
     if (letter && (lctrl_ || rctrl_)) {
       push(static_cast<std::uint8_t>(code - static_cast<std::uint16_t>(hid_key::a) + 1));
       return;

@@ -44,15 +44,14 @@ public:
                                                  std::uint32_t dst_y) noexcept {
     if (scanout != 0)
       return reloco::unexpected(reloco::error::not_found);
-    if (src.stride < src.width * gpu::bytes_per_pixel ||
-        src.pixels.size() < std::size_t{src.stride} * src.height)
+    if (src.stride < src.width * gpu::bytes_per_pixel || src.pixels.size() < std::size_t{src.stride} * src.height)
       return reloco::unexpected(reloco::error::invalid_argument);
     for (std::uint32_t row = 0; row < src_rect.height; ++row) {
       const std::size_t base = std::size_t{src_rect.y + row} * src.stride + std::size_t{src_rect.x} * 4;
       for (std::uint32_t col = 0; col < src_rect.width; ++col) {
         const std::size_t o = base + std::size_t{col} * 4;
-        const hw::rgb_color px{static_cast<std::uint8_t>(src.pixels[o + 2]), static_cast<std::uint8_t>(src.pixels[o + 1]),
-                               static_cast<std::uint8_t>(src.pixels[o])};
+        const hw::rgb_color px{static_cast<std::uint8_t>(src.pixels[o + 2]),
+                               static_cast<std::uint8_t>(src.pixels[o + 1]), static_cast<std::uint8_t>(src.pixels[o])};
         (void)fb_->put_pixel(dst_x + col, dst_y + row, px); // off-framebuffer pixels are clipped
       }
     }

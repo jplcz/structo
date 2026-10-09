@@ -37,7 +37,8 @@
  * - Control characters: `\r`, `\n`/`\v`/`\f` (**strict line feed: moves down
  *   one row without returning the carriage**, scrolling at the bottom of
  *   the scroll region -- pair with `\r`, as a pty's `onlcr` does), `\b`,
- *   `\t`, BEL (callback). NUL and DEL are ignored; UTF-8 is decoded to one cell per character (ASCII look-alikes, see `unicode_to_ascii`).
+ *   `\t`, BEL (callback). NUL and DEL are ignored; UTF-8 is decoded to one cell per character (ASCII look-alikes, see
+ * `unicode_to_ascii`).
  * - Character sets: `ESC ( 0` / `ESC ) 0` select the DEC special graphics set for G0/G1
  *   (`ESC ( B` / `ESC ) B` back to ASCII), `SO`/`SI` (`0x0E`/`0x0F`) switch between them. Line-drawing
  *   characters (used by `mc`, `dialog`, ncurses boxes) are drawn with ASCII look-alikes (`-`, `|`, `+`)
@@ -243,10 +244,22 @@ private:
     int r, g, b;
   };
   // RGB of each console_color, in enum order (CGA/VGA palette), used to map 256/true colours.
-  static constexpr reloco::array<rgb3, 16> palette{{{0, 0, 0},       {0, 0, 170},     {0, 170, 0},    {0, 170, 170},
-                                                    {170, 0, 0},     {170, 0, 170},   {170, 85, 0},   {170, 170, 170},
-                                                    {85, 85, 85},    {85, 85, 255},   {85, 255, 85},  {85, 255, 255},
-                                                    {255, 85, 85},   {255, 85, 255},  {255, 255, 85}, {255, 255, 255}}};
+  static constexpr reloco::array<rgb3, 16> palette{{{0, 0, 0},
+                                                    {0, 0, 170},
+                                                    {0, 170, 0},
+                                                    {0, 170, 170},
+                                                    {170, 0, 0},
+                                                    {170, 0, 170},
+                                                    {170, 85, 0},
+                                                    {170, 170, 170},
+                                                    {85, 85, 85},
+                                                    {85, 85, 255},
+                                                    {85, 255, 85},
+                                                    {85, 255, 255},
+                                                    {255, 85, 85},
+                                                    {255, 85, 255},
+                                                    {255, 255, 85},
+                                                    {255, 255, 255}}};
 
   // Current graphic rendition. `*_direct` is a console_color index (0..15) set by 256/true-colour SGR.
   struct attributes {
@@ -732,16 +745,46 @@ private:
   static constexpr char unicode_to_ascii(std::uint32_t cp) noexcept {
     if (cp >= 0x2500 && cp <= 0x257F) {
       switch (cp) {
-      case 0x2500: case 0x2501: case 0x2504: case 0x2505: case 0x2508: case 0x2509: case 0x254C: case 0x254D:
-      case 0x2550: case 0x2574: case 0x2576: case 0x2578: case 0x257A: case 0x257C: case 0x257E:
+      case 0x2500:
+      case 0x2501:
+      case 0x2504:
+      case 0x2505:
+      case 0x2508:
+      case 0x2509:
+      case 0x254C:
+      case 0x254D:
+      case 0x2550:
+      case 0x2574:
+      case 0x2576:
+      case 0x2578:
+      case 0x257A:
+      case 0x257C:
+      case 0x257E:
         return '-';
-      case 0x2502: case 0x2503: case 0x2506: case 0x2507: case 0x250A: case 0x250B: case 0x254E: case 0x254F:
-      case 0x2551: case 0x2575: case 0x2577: case 0x2579: case 0x257B: case 0x257D: case 0x257F:
+      case 0x2502:
+      case 0x2503:
+      case 0x2506:
+      case 0x2507:
+      case 0x250A:
+      case 0x250B:
+      case 0x254E:
+      case 0x254F:
+      case 0x2551:
+      case 0x2575:
+      case 0x2577:
+      case 0x2579:
+      case 0x257B:
+      case 0x257D:
+      case 0x257F:
         return '|';
-      case 0x2571: return '/';
-      case 0x2572: return '\\';
-      case 0x2573: return 'X';
-      default: return '+';
+      case 0x2571:
+        return '/';
+      case 0x2572:
+        return '\\';
+      case 0x2573:
+        return 'X';
+      default:
+        return '+';
       }
     }
     if (cp >= 0x2580 && cp <= 0x259F) {
@@ -752,36 +795,79 @@ private:
       return latin1[cp - 0xC0];
     }
     switch (cp) {
-    case 0xA0: return ' ';
-    case 0xA9: return 'c';
-    case 0xB0: return 'o';
-    case 0xB7: return '.';
-    case 0x104: return 'A';
-    case 0x105: return 'a';
-    case 0x106: return 'C';
-    case 0x107: return 'c';
-    case 0x118: return 'E';
-    case 0x119: return 'e';
-    case 0x141: return 'L';
-    case 0x142: return 'l';
-    case 0x143: return 'N';
-    case 0x144: return 'n';
-    case 0x15A: return 'S';
-    case 0x15B: return 's';
-    case 0x179: case 0x17B: return 'Z';
-    case 0x17A: case 0x17C: return 'z';
-    case 0x2013: case 0x2014: case 0x2212: return '-';
-    case 0x2018: case 0x2019: return '\'';
-    case 0x201C: case 0x201D: return '"';
-    case 0x2022: case 0x25CF: return '*';
-    case 0x2026: return '.';
-    case 0x2190: case 0x25C0: case 0x25C4: return '<';
-    case 0x2191: case 0x25B2: return '^';
-    case 0x2192: case 0x25B6: case 0x25BA: return '>';
-    case 0x279C: return '>'; // zsh/oh-my-zsh prompt arrow
-    case 0x2193: case 0x25BC: return 'v';
-    case 0x20AC: return 'E';
-    default: return '?';
+    case 0xA0:
+      return ' ';
+    case 0xA9:
+      return 'c';
+    case 0xB0:
+      return 'o';
+    case 0xB7:
+      return '.';
+    case 0x104:
+      return 'A';
+    case 0x105:
+      return 'a';
+    case 0x106:
+      return 'C';
+    case 0x107:
+      return 'c';
+    case 0x118:
+      return 'E';
+    case 0x119:
+      return 'e';
+    case 0x141:
+      return 'L';
+    case 0x142:
+      return 'l';
+    case 0x143:
+      return 'N';
+    case 0x144:
+      return 'n';
+    case 0x15A:
+      return 'S';
+    case 0x15B:
+      return 's';
+    case 0x179:
+    case 0x17B:
+      return 'Z';
+    case 0x17A:
+    case 0x17C:
+      return 'z';
+    case 0x2013:
+    case 0x2014:
+    case 0x2212:
+      return '-';
+    case 0x2018:
+    case 0x2019:
+      return '\'';
+    case 0x201C:
+    case 0x201D:
+      return '"';
+    case 0x2022:
+    case 0x25CF:
+      return '*';
+    case 0x2026:
+      return '.';
+    case 0x2190:
+    case 0x25C0:
+    case 0x25C4:
+      return '<';
+    case 0x2191:
+    case 0x25B2:
+      return '^';
+    case 0x2192:
+    case 0x25B6:
+    case 0x25BA:
+      return '>';
+    case 0x279C:
+      return '>'; // zsh/oh-my-zsh prompt arrow
+    case 0x2193:
+    case 0x25BC:
+      return 'v';
+    case 0x20AC:
+      return 'E';
+    default:
+      return '?';
     }
   }
 
@@ -905,7 +991,7 @@ private:
         console_.fill_rect(0, 0, cols, y, ' ', fg, bg);
       }
       break;
-    case 2: // entire screen
+    case 2:  // entire screen
     default: // 3 (scrollback) is treated like 2: there is no scrollback
       console_.clear(fg, bg);
       break;

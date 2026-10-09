@@ -7,12 +7,12 @@
 
 #include <string>
 
+using reloco::error;
+using reloco::span;
 using structo::hw::console_color;
 using structo::hw::console_ref;
 using structo::hypervisor::mmio_device_ref;
 using structo::hypervisor::mmio_print_device;
-using reloco::error;
-using reloco::span;
 
 namespace {
 
@@ -28,8 +28,7 @@ struct recording_console {
 } // namespace
 
 template <> struct structo::hw::console_traits<recording_console> {
-  static void put_cell(recording_console &b, std::size_t, std::size_t, char ch, console_color,
-                       console_color) noexcept {
+  static void put_cell(recording_console &b, std::size_t, std::size_t, char ch, console_color, console_color) noexcept {
     b.printed.push_back(ch);
   }
   static std::size_t columns(const recording_console &) noexcept { return kCols; }

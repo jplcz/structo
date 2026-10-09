@@ -163,11 +163,13 @@ enum class input_axis : std::uint16_t {
 /** @brief One input event. */
 struct input_event {
   input_event_type type = input_event_type::sync;
-  std::uint16_t code = 0;   ///< meaning depends on `type`, see the table in the @file docs
-  std::int32_t value = 0;   ///< meaning depends on `type`
-  std::uint64_t time = 0;   ///< backend timestamp (its own unit, typically microseconds); 0 if it has none
+  std::uint16_t code = 0; ///< meaning depends on `type`, see the table in the @file docs
+  std::int32_t value = 0; ///< meaning depends on `type`
+  std::uint64_t time = 0; ///< backend timestamp (its own unit, typically microseconds); 0 if it has none
 
-  [[nodiscard]] constexpr bool is_key(std::uint16_t c) const noexcept { return type == input_event_type::key && code == c; }
+  [[nodiscard]] constexpr bool is_key(std::uint16_t c) const noexcept {
+    return type == input_event_type::key && code == c;
+  }
   [[nodiscard]] constexpr bool is_pressed() const noexcept {
     return (type == input_event_type::key || type == input_event_type::button) && value != 0;
   }
@@ -257,7 +259,8 @@ enum class hid_key : std::uint16_t {
 
 /** @brief Whether `usage` is Left/Right Shift. */
 [[nodiscard]] constexpr bool hid_key_is_shift(std::uint16_t usage) noexcept {
-  return usage == static_cast<std::uint16_t>(hid_key::left_shift) || usage == static_cast<std::uint16_t>(hid_key::right_shift);
+  return usage == static_cast<std::uint16_t>(hid_key::left_shift) ||
+         usage == static_cast<std::uint16_t>(hid_key::right_shift);
 }
 
 /**
@@ -276,24 +279,42 @@ enum class hid_key : std::uint16_t {
   if (usage >= 0x1E && usage <= 0x26)
     return shift ? digits_shifted[usage - 0x1E] : static_cast<char>('1' + (usage - 0x1E));
   switch (usage) {
-  case 0x27: return shift ? ')' : '0';
-  case 0x28: return '\n';
-  case 0x29: return '\x1b';
-  case 0x2A: return '\b';
-  case 0x2B: return '\t';
-  case 0x2C: return ' ';
-  case 0x2D: return shift ? '_' : '-';
-  case 0x2E: return shift ? '+' : '=';
-  case 0x2F: return shift ? '{' : '[';
-  case 0x30: return shift ? '}' : ']';
-  case 0x31: return shift ? '|' : '\\';
-  case 0x33: return shift ? ':' : ';';
-  case 0x34: return shift ? '"' : '\'';
-  case 0x35: return shift ? '~' : '`';
-  case 0x36: return shift ? '<' : ',';
-  case 0x37: return shift ? '>' : '.';
-  case 0x38: return shift ? '?' : '/';
-  default: return 0;
+  case 0x27:
+    return shift ? ')' : '0';
+  case 0x28:
+    return '\n';
+  case 0x29:
+    return '\x1b';
+  case 0x2A:
+    return '\b';
+  case 0x2B:
+    return '\t';
+  case 0x2C:
+    return ' ';
+  case 0x2D:
+    return shift ? '_' : '-';
+  case 0x2E:
+    return shift ? '+' : '=';
+  case 0x2F:
+    return shift ? '{' : '[';
+  case 0x30:
+    return shift ? '}' : ']';
+  case 0x31:
+    return shift ? '|' : '\\';
+  case 0x33:
+    return shift ? ':' : ';';
+  case 0x34:
+    return shift ? '"' : '\'';
+  case 0x35:
+    return shift ? '~' : '`';
+  case 0x36:
+    return shift ? '<' : ',';
+  case 0x37:
+    return shift ? '>' : '.';
+  case 0x38:
+    return shift ? '?' : '/';
+  default:
+    return 0;
   }
 }
 
@@ -304,8 +325,8 @@ enum class hid_key : std::uint16_t {
 /** @brief Device classes a device can belong to; combined in @ref input_capabilities::classes. */
 enum class input_class : std::uint32_t {
   keyboard = 1u << 0,
-  mouse = 1u << 1,    ///< relative pointer
-  tablet = 1u << 2,   ///< absolute pointer (tablet, touchscreen, touchpad)
+  mouse = 1u << 1,  ///< relative pointer
+  tablet = 1u << 2, ///< absolute pointer (tablet, touchscreen, touchpad)
   gamepad = 1u << 3,
   hid_reports = 1u << 4, ///< raw HID reports are available through `try_read_report`
 };
@@ -322,13 +343,15 @@ enum class input_led : std::uint8_t { num_lock = 1u << 0, caps_lock = 1u << 1, s
 
 /** @brief What a device is. */
 struct input_capabilities {
-  std::uint32_t classes = 0; ///< bitwise OR of @ref input_class
-  std::uint16_t vendor_id = 0;  ///< USB-style identification; 0 if unknown
+  std::uint32_t classes = 0;   ///< bitwise OR of @ref input_class
+  std::uint16_t vendor_id = 0; ///< USB-style identification; 0 if unknown
   std::uint16_t product_id = 0;
   /// Whether the backend supplies `input_traits::set_callback`/`clear_callback` (interrupt-driven notification).
   bool supports_callback = false;
 
-  [[nodiscard]] constexpr bool has(input_class c) const noexcept { return (classes & static_cast<std::uint32_t>(c)) != 0; }
+  [[nodiscard]] constexpr bool has(input_class c) const noexcept {
+    return (classes & static_cast<std::uint32_t>(c)) != 0;
+  }
 };
 
 /** @brief Range of an absolute axis, for scaling to a screen. */
@@ -355,15 +378,17 @@ namespace detail {
 template <typename Backend, typename = void> struct has_input_traits : std::false_type {};
 
 template <typename Backend>
-struct has_input_traits<Backend, std::void_t<decltype(input_traits<Backend>::capabilities),
-                                             decltype(input_traits<Backend>::event_ready),
-                                             decltype(input_traits<Backend>::try_read_event)>> : std::true_type {};
+struct has_input_traits<
+    Backend, std::void_t<decltype(input_traits<Backend>::capabilities), decltype(input_traits<Backend>::event_ready),
+                         decltype(input_traits<Backend>::try_read_event)>> : std::true_type {};
 
 template <typename Traits, typename = void> struct input_has_set_leds : std::false_type {};
-template <typename Traits> struct input_has_set_leds<Traits, std::void_t<decltype(Traits::set_leds)>> : std::true_type {};
+template <typename Traits>
+struct input_has_set_leds<Traits, std::void_t<decltype(Traits::set_leds)>> : std::true_type {};
 
 template <typename Traits, typename = void> struct input_has_abs_info : std::false_type {};
-template <typename Traits> struct input_has_abs_info<Traits, std::void_t<decltype(Traits::abs_info)>> : std::true_type {};
+template <typename Traits>
+struct input_has_abs_info<Traits, std::void_t<decltype(Traits::abs_info)>> : std::true_type {};
 
 template <typename Traits, typename = void> struct input_has_report : std::false_type {};
 template <typename Traits>
@@ -591,7 +616,8 @@ private:
     }
   }
 
-  template <typename Backend> static result<std::size_t> try_read_report_entry(void *ctx, span<std::uint8_t> dst) noexcept {
+  template <typename Backend>
+  static result<std::size_t> try_read_report_entry(void *ctx, span<std::uint8_t> dst) noexcept {
     if constexpr (detail::input_has_report<input_traits<Backend>>::value) {
       return input_traits<Backend>::try_read_report(*static_cast<Backend *>(ctx), dst);
     } else {
@@ -639,11 +665,10 @@ private:
   }
 
   template <typename Backend>
-  static constexpr vtable s_vtbl{&capabilities_entry<Backend>, &event_ready_entry<Backend>,
-                                 &try_read_event_entry<Backend>, &set_leds_entry<Backend>,
-                                 &abs_info_entry<Backend>,       &try_read_report_entry<Backend>,
-                                 &flush_entry<Backend>,          &set_callback_entry<Backend>,
-                                 &clear_callback_entry<Backend>};
+  static constexpr vtable s_vtbl{
+      &capabilities_entry<Backend>, &event_ready_entry<Backend>,  &try_read_event_entry<Backend>,
+      &set_leds_entry<Backend>,     &abs_info_entry<Backend>,     &try_read_report_entry<Backend>,
+      &flush_entry<Backend>,        &set_callback_entry<Backend>, &clear_callback_entry<Backend>};
 
   void *ctx_ = nullptr;
   const vtable *vtbl_ = nullptr;

@@ -9,6 +9,10 @@
  * running as two tasks of a `bootldr::scheduler` ("semi-active": it only
  * does work when the scheduler gives it a turn). C++20 only.
  *
+ * @warning Not meant for production devices: no authentication/encryption or
+ * hardening against hostile peers. For controlled test environments, CI and
+ * development only.
+ *
  * What it does today: owns an `ipv4_node` over a `hw::net_device_ref`,
  * applies a static address or runs a DHCP client, answers ICMP echo (ping),
  * and queues UDP datagrams on bound `udp_socket`s (see `udp_socket.hpp`;
@@ -53,6 +57,7 @@
 #include "scheduler.hpp"
 #include "udp_socket.hpp"
 
+#include "../hw/ethernet_device.hpp"
 #include "../hw/polled_net_device.hpp"
 #include "../net/dhcp_client.hpp"
 #include "../net/ipv4_node.hpp"
@@ -64,20 +69,20 @@ namespace structo::bootldr {
 
 /** @brief Static configuration of a `netstack`. */
 struct netstack_config {
-  net::ipv4_config static_ip{};            ///< Applied at construction when it has an address.
-  bool dhcp = false;                       ///< Run a DHCP client (it overrides `static_ip` once bound).
-  hw::net_mac_address mac{};               ///< Used by DHCP; all zero = ask the device, else a built-in local one.
-  std::uint32_t xid_seed = 1;              ///< DHCP transaction id seed.
-  std::uint32_t tick_ms = 100;             ///< Period of the timer task.
-  std::uint32_t error_backoff_ms = 50;     ///< Pause after a failed receive.
+  net::ipv4_config static_ip{};        ///< Applied at construction when it has an address.
+  bool dhcp = false;                   ///< Run a DHCP client (it overrides `static_ip` once bound).
+  hw::net_mac_address mac{};           ///< Used by DHCP; all zero = ask the device, else a built-in local one.
+  std::uint32_t xid_seed = 1;          ///< DHCP transaction id seed.
+  std::uint32_t tick_ms = 100;         ///< Period of the timer task.
+  std::uint32_t error_backoff_ms = 50; ///< Pause after a failed receive.
 };
 
 /** @brief Counters kept by `netstack`. */
 struct netstack_stats {
-  std::uint32_t rx_dropped = 0;  ///< Datagrams nobody handled.
-  std::uint32_t rx_handled = 0;  ///< Datagrams consumed by DHCP or the packet handler.
-  std::uint32_t rx_errors = 0;   ///< Failed receives.
-  std::uint32_t tx_errors = 0;   ///< Failed DHCP transmissions.
+  std::uint32_t rx_dropped = 0; ///< Datagrams nobody handled.
+  std::uint32_t rx_handled = 0; ///< Datagrams consumed by DHCP or the packet handler.
+  std::uint32_t rx_errors = 0;  ///< Failed receives.
+  std::uint32_t tx_errors = 0;  ///< Failed DHCP transmissions.
 };
 
 template <std::size_t Mtu = 1006> class netstack : public udp_demux {
@@ -93,9 +98,9 @@ public:
   ~netstack() { stop(); }
 
   /** @brief Registers `pnd.poll()` as a scheduler poller; `pnd` must outlive the scheduler's use of it. */
-  template <typename Backend> [[nodiscard]] reloco::result<void> poll_with(hw::polled_net_device<Backend> &pnd) noexcept {
-    return sched_->add_poller(
-        [](void *p) noexcept { static_cast<hw::polled_net_device<Backend> *>(p)->poll(); }, &pnd);
+  template <typename Backend>
+  [[nodiscard]] reloco::result<void> poll_with(hw::polled_net_device<Backend> &pnd) noexcept {
+    return sched_->add_poller([](void *p) noexcept { static_cast<hw::polled_net_device<Backend> *>(p)->poll(); }, &pnd);
   }
 
   /** @brief Spawns the rx and timer tasks. `error::invalid_state` if already started. */
@@ -132,6 +137,22 @@ public:
    */
   void use_ppp(net::ppp_link &link) noexcept { ppp_ = &link; }
 
+  /**
+   * @brief Runs over an Ethernet layer: each timer tick the current IPv4 configuration (static or DHCP) is
+   * pushed into `eth` when it changed, and its ARP service (replies, announcements, retries, parked datagram)
+   * is run. `eth` must be the device the netstack was constructed with (`net_device_ref{eth}`) and outlive it.
+   */
+  template <std::size_t EMtu, std::size_t Slots> void use_ethernet(hw::ethernet_device<EMtu, Slots> &eth) noexcept {
+    eth_ = &eth;
+    eth_sync_ = [](void *e, const net::ipv4_config &c) noexcept {
+      auto &d = *static_cast<hw::ethernet_device<EMtu, Slots> *>(e);
+      const auto &cur = d.config();
+      if (cur.address != c.address || cur.netmask != c.netmask || cur.gateway != c.gateway)
+        d.configure(c);
+    };
+    eth_service_ = [](void *e) noexcept { return static_cast<hw::ethernet_device<EMtu, Slots> *>(e)->service(); };
+  }
+
   [[nodiscard]] bool running() const noexcept { return running_; }
   /** @brief True once the node has an address (static or leased). */
   [[nodiscard]] bool ready() const noexcept { return ip_.configured(); }
@@ -141,7 +162,8 @@ public:
   /** @brief The IPv4 endpoint, for future protocol layers. */
   [[nodiscard]] net::ipv4_node<Mtu> &ip() noexcept { return ip_; }
 
-  /** @brief Receives every datagram that is not DHCP, ICMP echo or UDP for a bound `udp_socket` (`nullptr` = drop them). */
+  /** @brief Receives every datagram that is not DHCP, ICMP echo or UDP for a bound `udp_socket` (`nullptr` = drop
+   * them). */
   void set_packet_handler(packet_fn fn, void *ctx) noexcept {
     handler_ = fn;
     handler_ctx_ = ctx;
@@ -160,8 +182,7 @@ private:
   }
 
   // udp_demux hooks: transmit a UDP datagram as IPv4, and report our address.
-  static reloco::task<void> send_udp(void *self, net::ipv4_address dst,
-                                     reloco::span<const std::uint8_t> udp) noexcept {
+  static reloco::task<void> send_udp(void *self, net::ipv4_address dst, reloco::span<const std::uint8_t> udp) noexcept {
     auto sent = co_await static_cast<netstack *>(self)->ip_.send(net::ip_proto_udp, dst, udp);
     co_await std::move(sent);
   }
@@ -192,6 +213,10 @@ private:
   static reloco::task<void> timer_loop(netstack &n) noexcept {
     for (;;) {
       n.sync_ppp();
+      if (n.eth_) {
+        n.eth_sync_(n.eth_, n.ip_.config());
+        (void)co_await n.eth_service_(n.eth_);
+      }
       if (n.cfg_.dhcp) {
         auto sent = co_await net::dhcp_send_due(n.ip_, n.dhcp_, n.sched_->now_ms());
         if (!sent)
@@ -232,6 +257,9 @@ private:
   task_id rx_id_{};
   task_id timer_id_{};
   net::ppp_link *ppp_ = nullptr;
+  void *eth_ = nullptr;
+  void (*eth_sync_)(void *, const net::ipv4_config &) noexcept = nullptr;
+  reloco::task<void> (*eth_service_)(void *) noexcept = nullptr;
   bool ppp_applied_ = false;
   bool running_ = false;
 };

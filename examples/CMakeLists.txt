@@ -57,6 +57,25 @@ if(UNIX)
     target_compile_features(netstack_linux_demo PRIVATE cxx_std_20)
     add_dependencies(jplcz_structo_examples netstack_linux_demo)
 
+    # C++20-only Linux demo of bootldr::netstack as an Ethernet host on a TAP interface (Linux only).
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        add_executable(netstack_tap_demo netstack_tap_demo.cpp)
+        target_link_libraries(netstack_tap_demo PRIVATE jplcz_structo jplcz_structo_warnings)
+        target_compile_features(netstack_tap_demo PRIVATE cxx_std_20)
+        add_dependencies(jplcz_structo_examples netstack_tap_demo)
+    endif()
+
+    # C++20-only Linux demos of bootldr::usb_stack on simulated USB devices bridged to a TAP/pty:
+    # netstack over CDC-ECM or CDC-ACM+PPP, and a CDC-ACM log console.
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        foreach(usb_demo netstack_usb_demo usb_serial_log_demo)
+            add_executable(${usb_demo} ${usb_demo}.cpp)
+            target_link_libraries(${usb_demo} PRIVATE jplcz_structo jplcz_structo_warnings)
+            target_compile_features(${usb_demo} PRIVATE cxx_std_20)
+            add_dependencies(jplcz_structo_examples ${usb_demo})
+        endforeach()
+    endif()
+
     # C++20-only terminal demo of bootldr::edit_text.
     add_executable(text_editor_linux_demo text_editor_linux_demo.cpp)
     target_link_libraries(text_editor_linux_demo PRIVATE jplcz_structo jplcz_structo_warnings)

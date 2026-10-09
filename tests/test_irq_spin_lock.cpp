@@ -73,7 +73,8 @@ struct fake_spinlock_entry_traits {
 using irq_guard_lock = irq_spin_lock<kernel_spin_lock<fake_owner_traits>, irq_guard<fake_irq_traits>>;
 using ticket_irq_guard_lock = irq_spin_lock<ticket_spin_lock<fake_owner_traits>, irq_guard<fake_irq_traits>>;
 using queue_irq_guard_lock = irq_spin_lock<queue_spin_lock<fake_owner_traits>, irq_guard<fake_irq_traits>>;
-using entry_guard_lock = irq_spin_lock<kernel_spin_lock<fake_owner_traits>, spinlock_entry_guard<fake_spinlock_entry_traits>>;
+using entry_guard_lock =
+    irq_spin_lock<kernel_spin_lock<fake_owner_traits>, spinlock_entry_guard<fake_spinlock_entry_traits>>;
 
 /** @brief Fixture for `irq_spin_lock` tests; resets both fake backends' mutable static state before each test. */
 class IrqSpinLockTest : public ::testing::Test {

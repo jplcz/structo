@@ -54,7 +54,7 @@ inline constexpr std::uint16_t used_f_no_notify = 1u << 0;
 /** @brief Packed ring: event-suppression `flags` field values (§2.8.10). */
 inline constexpr std::uint16_t event_flags_enable = 0x0;  ///< Always send notifications.
 inline constexpr std::uint16_t event_flags_disable = 0x1; ///< Never send notifications.
-inline constexpr std::uint16_t event_flags_desc = 0x2;    ///< Notify only at the specified descriptor (needs EVENT_IDX).
+inline constexpr std::uint16_t event_flags_desc = 0x2; ///< Notify only at the specified descriptor (needs EVENT_IDX).
 
 // ============================================================================
 // Feature bits relevant to the ring itself
@@ -98,7 +98,8 @@ struct virtq_desc {
   std::uint16_t next;  ///< Next descriptor index when `desc_f_next` is set.
 };
 
-/** @brief Split-ring available-ring header; `ring[queue_size]` of `std::uint16_t` follows (then `used_event` if EVENT_IDX). */
+/** @brief Split-ring available-ring header; `ring[queue_size]` of `std::uint16_t` follows (then `used_event` if
+ * EVENT_IDX). */
 struct virtq_avail_header {
   std::uint16_t flags;
   std::uint16_t idx;
@@ -110,7 +111,8 @@ struct virtq_used_elem {
   std::uint32_t len; ///< Total bytes the device wrote into the chain's writable buffers.
 };
 
-/** @brief Split-ring used-ring header; `ring[queue_size]` of `virtq_used_elem` follows (then `avail_event` if EVENT_IDX). */
+/** @brief Split-ring used-ring header; `ring[queue_size]` of `virtq_used_elem` follows (then `avail_event` if
+ * EVENT_IDX). */
 struct virtq_used_header {
   std::uint16_t flags;
   std::uint16_t idx;
@@ -163,7 +165,8 @@ static_assert(std::is_trivially_copyable_v<virtq_packed_event> && std::is_standa
  * whether the peer asked to be notified for this update. All arithmetic is
  * modulo 2^16, so index wrap-around is handled.
  */
-[[nodiscard]] constexpr bool need_event(std::uint16_t event_idx, std::uint16_t new_idx, std::uint16_t old_idx) noexcept {
+[[nodiscard]] constexpr bool need_event(std::uint16_t event_idx, std::uint16_t new_idx,
+                                        std::uint16_t old_idx) noexcept {
   return static_cast<std::uint16_t>(new_idx - event_idx - 1u) < static_cast<std::uint16_t>(new_idx - old_idx);
 }
 

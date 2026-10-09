@@ -70,7 +70,8 @@ inline void tftp_put16(span<std::uint8_t> out, std::size_t at, std::uint16_t v) 
   return at;
 }
 
-/** @brief Builds DATA(`block`, `data`); `data` is at most 512 bytes (`error::out_of_range` otherwise or if `out` is small). */
+/** @brief Builds DATA(`block`, `data`); `data` is at most 512 bytes (`error::out_of_range` otherwise or if `out` is
+ * small). */
 [[nodiscard]] inline result<std::size_t> build_tftp_data(std::uint16_t block, span<const std::uint8_t> data,
                                                          span<std::uint8_t> out) noexcept {
   if (data.size() > tftp_block_size || out.size() < 4 + data.size())

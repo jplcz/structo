@@ -265,8 +265,8 @@ template <std::size_t Mtu>
   if (!msg)
     co_return;
   reloco::array<std::uint8_t, udp_header_size + tftp_max_packet> datagram{};
-  std::size_t n = co_await build_udp(client.local_port(), client.remote_port(), *msg, node.address(),
-                                     client.server(), span<std::uint8_t>(datagram));
+  std::size_t n = co_await build_udp(client.local_port(), client.remote_port(), *msg, node.address(), client.server(),
+                                     span<std::uint8_t>(datagram));
   auto sent = co_await node.send(ip_proto_udp, client.server(), span<const std::uint8_t>(datagram.data(), n));
   co_await std::move(sent);
 }

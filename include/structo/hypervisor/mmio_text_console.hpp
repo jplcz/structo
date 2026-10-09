@@ -82,8 +82,8 @@
 #include <reloco/allocator.hpp>
 #include <reloco/default_allocator.hpp>
 #include <reloco/error.hpp>
-#include <reloco/lifetime.hpp>
 #include <reloco/expected.hpp>
+#include <reloco/lifetime.hpp>
 #include <reloco/span.hpp>
 #include <utility>
 
@@ -168,8 +168,8 @@ public:
    * backing storage.
    */
   [[nodiscard]] static result<mmio_text_console> try_allocate(allocator_ref alloc, std::size_t columns,
-                                                               std::size_t rows,
-                                                               std::size_t page_size = default_page_size) noexcept {
+                                                              std::size_t rows,
+                                                              std::size_t page_size = default_page_size) noexcept {
     if (columns == 0 || rows == 0 || page_size == 0 || (page_size & (page_size - 1)) != 0) {
       return unexpected(error::invalid_argument);
     }
@@ -192,8 +192,8 @@ public:
     // of double-free/use-after-free hazard an owning type must not create for itself.
     console.owned_base_ = static_cast<std::byte *>(res->ptr);
     console.owned_size_ = res->size; // the allocator's own *absorbed* size, not `aligned_bytes` -- see
-                                      // reloco/docs/allocator-capacity-absorption.md: `deallocate()` must be
-                                      // called back with this exact size, not the originally requested one.
+                                     // reloco/docs/allocator-capacity-absorption.md: `deallocate()` must be
+                                     // called back with this exact size, not the originally requested one.
     for (std::byte &b : span<std::byte>(console.owned_base_, console.owned_size_)) {
       b = std::byte{0}; // no stale allocator memory leaks into the guest-mapped padding
     }
@@ -207,7 +207,7 @@ public:
 
   /** @brief `try_allocate()` using `reloco::default_allocator()`. */
   [[nodiscard]] static result<mmio_text_console> try_create(std::size_t columns, std::size_t rows,
-                                                             std::size_t page_size = default_page_size) noexcept {
+                                                            std::size_t page_size = default_page_size) noexcept {
     return try_allocate(default_allocator(), columns, rows, page_size);
   }
 

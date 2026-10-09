@@ -153,7 +153,7 @@ template <typename Backend, typename = void> struct has_time_source_traits : std
 
 template <typename Backend>
 struct has_time_source_traits<Backend, std::void_t<decltype(time_source_traits<Backend>::try_now),
-                                                    decltype(time_source_traits<Backend>::capabilities)>>
+                                                   decltype(time_source_traits<Backend>::capabilities)>>
     : std::true_type {};
 
 } // namespace detail

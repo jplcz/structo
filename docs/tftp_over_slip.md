@@ -6,6 +6,8 @@ SPDX-License-Identifier: BSD-2-Clause
 
 # Guide: a basic TFTP client over a serial SLIP link
 
+> **Warning:** the network code (`net/*`, `bootldr/netstack.hpp`, `hw/*_device.hpp`, TFTP, DHCP, ARP, PPP/SLIP) is **not meant for production devices**. It has no authentication, encryption or hardening against hostile peers; use it only in controlled test environments, CI and development.
+
 C++20 only (the network stack is built on `reloco` coroutines). This guide
 wires the layers together, bottom to top, so a board with just a polled UART
 can download (or upload) a file from a host over a serial cable:

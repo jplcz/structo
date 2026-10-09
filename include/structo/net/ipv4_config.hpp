@@ -25,10 +25,10 @@
 namespace structo::net {
 
 struct ipv4_config {
-  ipv4_address address{};  ///< Unspecified (0.0.0.0) means "not configured".
+  ipv4_address address{}; ///< Unspecified (0.0.0.0) means "not configured".
   ipv4_address netmask{};
-  ipv4_address gateway{};  ///< Unspecified if there is no default route.
-  ipv4_address dns{};      ///< Unspecified if unknown.
+  ipv4_address gateway{};          ///< Unspecified if there is no default route.
+  ipv4_address dns{};              ///< Unspecified if unknown.
   std::uint32_t lease_seconds = 0; ///< 0 for a static (never expiring) configuration.
 
   [[nodiscard]] constexpr bool configured() const noexcept { return !address.is_unspecified(); }

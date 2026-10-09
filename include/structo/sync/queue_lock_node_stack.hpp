@@ -128,9 +128,8 @@ public:
    * is already on loan to a still-live guard.
    */
   [[nodiscard]] node_imp *pop() & noexcept {
-    if (!initialized_) RELOCO_UNLIKELY {
-      do_init();
-    }
+    if (!initialized_)
+      RELOCO_UNLIKELY { do_init(); }
     RELOCO_ASSERT(top_ != nullptr, "queue_lock_node_stack: exhausted (too many nested lock acquisitions)");
     node_imp *n = top_;
     top_ = n->next;

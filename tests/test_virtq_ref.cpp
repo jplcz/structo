@@ -12,7 +12,7 @@ namespace {
 using namespace structo;
 using namespace structo::virtio;
 
-struct ring_space {}; // host window the ring really lives in
+struct ring_space {};  // host window the ring really lives in
 struct guest_space {}; // address space the guest (peer) uses for ring + buffers
 struct buf_space {};
 
@@ -52,7 +52,8 @@ TEST(VirtqMemoryRefTest, ForwardsToBackend) {
 
   ASSERT_TRUE(ref.try_store16(ring_addr{kHostBase + 4}, 0xBEEF).has_value());
   EXPECT_EQ(get(ref.try_load16(ring_addr{kHostBase + 4})), 0xBEEF);
-  EXPECT_EQ(get(ref.try_load16(ring_addr{kHostBase + 4})), get(virtq_memory_traits<ring_mem, ring_space>::try_load16(mem, ring_addr{kHostBase + 4})));
+  EXPECT_EQ(get(ref.try_load16(ring_addr{kHostBase + 4})),
+            get(virtq_memory_traits<ring_mem, ring_space>::try_load16(mem, ring_addr{kHostBase + 4})));
 
   auto oob = ref.try_load16(ring_addr{kHostBase + 4096});
   ASSERT_FALSE(oob.has_value());
@@ -99,7 +100,8 @@ TEST_F(VirtqTranslatedTest, AccessesLandAtTranslatedAddress) {
 
 TEST_F(VirtqTranslatedTest, TranslationFailureNeverReachesInner) {
   EXPECT_EQ(traits::try_load16(mem_, guest_addr{kGuestBase - 2}).error(), reloco::error::out_of_range);
-  EXPECT_EQ(traits::try_load16(mem_, guest_addr{kGuestBase + 4095}).error(), reloco::error::out_of_range); // 2-byte access straddles the end
+  EXPECT_EQ(traits::try_load16(mem_, guest_addr{kGuestBase + 4095}).error(),
+            reloco::error::out_of_range); // 2-byte access straddles the end
   std::byte big[16] = {};
   EXPECT_EQ(traits::try_read(mem_, guest_addr{kGuestBase + 4090}, reloco::span<std::byte>(big, 16)).error(),
             reloco::error::out_of_range);
@@ -178,8 +180,8 @@ void round_trip(virtq_driver_ref<buf_space> drv, virtq_device_ref<buf_space> dev
   reloco::array<sg_t, 1> out{{sg_t{buf_addr{kBufBase}, 8}}};
   reloco::array<sg_t, 2> in{{sg_t{buf_addr{kBufBase + 64}, 8}, sg_t{buf_addr{kBufBase + 128}, 8}}};
   for (std::uintptr_t i = 0; i < 1000; ++i) {
-    ASSERT_TRUE(drv.try_add(reloco::span<const sg_t>(out.data(), 1), reloco::span<const sg_t>(in.data(), 2), i)
-                    .has_value());
+    ASSERT_TRUE(
+        drv.try_add(reloco::span<const sg_t>(out.data(), 1), reloco::span<const sg_t>(in.data(), 2), i).has_value());
     ASSERT_TRUE(drv.try_publish().has_value());
     ASSERT_TRUE(get(drv.needs_notify()));
 

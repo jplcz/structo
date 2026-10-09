@@ -132,7 +132,8 @@ TEST_F(UartInputTest, XtermModifierParameters) {
 }
 
 TEST_F(UartInputTest, AltCharacter) {
-  send("\x1b" "x");
+  send("\x1b"
+       "x");
   EXPECT_EQ(presses(), (std::vector<std::uint16_t>{K(hid_key::left_alt), L('x')}));
 }
 

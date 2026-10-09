@@ -66,7 +66,9 @@ protected:
     return *f;
   }
   std::uint16_t flags_of(std::uint32_t pos) { return get(rt::try_load16(ring_mem_, field(pos, 14))); }
-  void set_flags(std::uint32_t pos, std::uint16_t f) { ASSERT_TRUE(rt::try_store16(ring_mem_, field(pos, 14), f).has_value()); }
+  void set_flags(std::uint32_t pos, std::uint16_t f) {
+    ASSERT_TRUE(rt::try_store16(ring_mem_, field(pos, 14), f).has_value());
+  }
 
   alignas(4096) reloco::array<std::byte, 4096> ring_bytes_{};
   alignas(16) reloco::array<std::byte, 4096> buf_bytes_{};
@@ -81,7 +83,8 @@ protected:
 
 TEST_F(PackedRingTest, CreateValidation) {
   EXPECT_FALSE(driver_t::try_create(ring_mem_, addrs_, 0, slots_.as_span()).has_value());
-  EXPECT_FALSE(driver_t::try_create(ring_mem_, addrs_, kQ, reloco::span<packed_driver_slot>(slots_.data(), 2)).has_value());
+  EXPECT_FALSE(
+      driver_t::try_create(ring_mem_, addrs_, kQ, reloco::span<packed_driver_slot>(slots_.data(), 2)).has_value());
   packed_ring_addrs<ring_space> bad = addrs_;
   bad.desc = ring_addr{kRingBase + 8}; // not 16-aligned
   EXPECT_FALSE(device_t::try_create(ring_mem_, bad, kQ).has_value());
@@ -130,8 +133,9 @@ TEST_F(PackedRingTest, DataTravelsThroughChain) {
   auto p = pop();
   ASSERT_TRUE(p.has_value() && p->has_value());
   char got[8] = {};
-  ASSERT_TRUE(try_read_chain(buf_mem_, (*p)->readable, 0, reloco::span<std::byte>(reinterpret_cast<std::byte *>(got), 5))
-                  .has_value());
+  ASSERT_TRUE(
+      try_read_chain(buf_mem_, (*p)->readable, 0, reloco::span<std::byte>(reinterpret_cast<std::byte *>(got), 5))
+          .has_value());
   EXPECT_STREQ(got, "ping");
 }
 

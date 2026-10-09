@@ -32,10 +32,10 @@
 
 #include <SDL3/SDL.h>
 
+#include <atomic>
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
-#include <atomic>
 #include <deque>
 #include <string>
 #include <vector>
@@ -69,7 +69,7 @@ constexpr std::size_t window_height = 768;
 struct sdl_keyboard {
   std::deque<hw::input_event> queue;
   bool quit = false;
-  float cell_width = 8;   // glyph size in pixels, set by main() from the selected font
+  float cell_width = 8; // glyph size in pixels, set by main() from the selected font
   float cell_height = 16;
 
   // Translates one SDL event; keyboard, mouse and window-close are handled, everything else is ignored.
@@ -91,10 +91,17 @@ struct sdl_keyboard {
     } else if (ev.type == SDL_EVENT_MOUSE_BUTTON_DOWN || ev.type == SDL_EVENT_MOUSE_BUTTON_UP) {
       hw::input_button button;
       switch (ev.button.button) {
-      case SDL_BUTTON_LEFT: button = hw::input_button::left; break;
-      case SDL_BUTTON_MIDDLE: button = hw::input_button::middle; break;
-      case SDL_BUTTON_RIGHT: button = hw::input_button::right; break;
-      default: return;
+      case SDL_BUTTON_LEFT:
+        button = hw::input_button::left;
+        break;
+      case SDL_BUTTON_MIDDLE:
+        button = hw::input_button::middle;
+        break;
+      case SDL_BUTTON_RIGHT:
+        button = hw::input_button::right;
+        break;
+      default:
+        return;
       }
       point_at(ev.button.x, ev.button.y);
       queue.push_back(hw::make_button_event(button, ev.type == SDL_EVENT_MOUSE_BUTTON_DOWN));
@@ -164,8 +171,8 @@ template <typename Font> int run() {
     std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
     return 1;
   }
-  SDL_Window *window = SDL_CreateWindow("structo terminal", static_cast<int>(window_width),
-                                        static_cast<int>(window_height), 0);
+  SDL_Window *window =
+      SDL_CreateWindow("structo terminal", static_cast<int>(window_width), static_cast<int>(window_height), 0);
   SDL_Renderer *renderer = window != nullptr ? SDL_CreateRenderer(window, nullptr) : nullptr;
   SDL_Texture *texture = renderer != nullptr
                              ? SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING,
@@ -338,8 +345,8 @@ template <typename Font> int run() {
 int main(int argc, char **argv) {
   // Fonts are compile-time types, so the demo is instantiated once per font and `--font NAME`/`STRUCTO_FONT`
   // (default: terminus) picks one at start-up; `--list-fonts` shows them.
-  return structo::examples::fonts::select_font(
-      argc, argv, [](auto tag) { return run<typename decltype(tag)::type>(); });
+  return structo::examples::fonts::select_font(argc, argv,
+                                               [](auto tag) { return run<typename decltype(tag)::type>(); });
 }
 
 RELOCO_END_UNSAFE_BUFFER_USAGE

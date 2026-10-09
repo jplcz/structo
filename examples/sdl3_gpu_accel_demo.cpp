@@ -40,8 +40,8 @@ RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
 namespace {
 
 using structo::hw::gpu_accel_ref;
-using structo::hw::rgba8888;
 using structo::hw::rgb_color;
+using structo::hw::rgba8888;
 using structo::hypervisor::encode_gpu_command;
 using structo::hypervisor::gpu_command;
 using structo::hypervisor::gpu_command_opcode;
@@ -69,15 +69,17 @@ gpu_command make_command(gpu_command_opcode op, std::int32_t x0, std::int32_t y0
 void stage_command(mmio_gpu_command_buffer_device &accel, std::size_t index, const gpu_command &cmd) noexcept {
   auto buffer = accel.command_buffer();
   encode_gpu_command(cmd, buffer.subspan(index * mmio_gpu_command_buffer_device::command_slot_size,
-                                        mmio_gpu_command_buffer_device::command_slot_size));
+                                         mmio_gpu_command_buffer_device::command_slot_size));
 }
 
 void fill_frame_commands(mmio_gpu_command_buffer_device &accel, double t) noexcept {
   const auto margin = ball_radius + 8;
-  const auto cx = static_cast<std::int32_t>(window_width / 2)
-      + static_cast<std::int32_t>(std::lround((static_cast<double>(window_width) / 2 - margin) * std::sin(t)));
-  const auto cy = static_cast<std::int32_t>(window_height / 2)
-      + static_cast<std::int32_t>(std::lround((static_cast<double>(window_height) / 2 - margin) * std::cos(t * 1.3)));
+  const auto cx =
+      static_cast<std::int32_t>(window_width / 2) +
+      static_cast<std::int32_t>(std::lround((static_cast<double>(window_width) / 2 - margin) * std::sin(t)));
+  const auto cy =
+      static_cast<std::int32_t>(window_height / 2) +
+      static_cast<std::int32_t>(std::lround((static_cast<double>(window_height) / 2 - margin) * std::cos(t * 1.3)));
 
   std::size_t n = 0;
   const std::size_t capacity = accel.capacity();
@@ -88,15 +90,15 @@ void fill_frame_commands(mmio_gpu_command_buffer_device &accel, double t) noexce
   if (n < capacity) {
     stage_command(accel, n++,
                   make_command(gpu_command_opcode::draw_rect, 4, 4, static_cast<std::int32_t>(window_width) - 8,
-                              static_cast<std::int32_t>(window_height) - 8, {80, 80, 100}));
+                               static_cast<std::int32_t>(window_height) - 8, {80, 80, 100}));
   }
 
   // A small filled "ball" drawn as a stack of horizontal fill_rects approximating a disc -- the command
   // buffer only exposes rectangles/lines/pixels, no native circle primitive, same constraint a guest GPU
   // driver would face.
   for (std::int32_t dy = -ball_radius; dy <= ball_radius && n < capacity; ++dy) {
-    const auto dx = static_cast<std::int32_t>(
-        std::lround(std::sqrt(static_cast<double>(ball_radius * ball_radius - dy * dy))));
+    const auto dx =
+        static_cast<std::int32_t>(std::lround(std::sqrt(static_cast<double>(ball_radius * ball_radius - dy * dy))));
     stage_command(accel, n++,
                   make_command(gpu_command_opcode::fill_rect, cx - dx, cy + dy, 2 * dx + 1, 1, {255, 200, 60}));
   }
@@ -160,8 +162,7 @@ int main() {
   while (running) {
     SDL_Event ev;
     while (SDL_PollEvent(&ev)) {
-      if (ev.type == SDL_EVENT_QUIT
-          || (ev.type == SDL_EVENT_KEY_DOWN && ev.key.key == SDLK_ESCAPE)) {
+      if (ev.type == SDL_EVENT_QUIT || (ev.type == SDL_EVENT_KEY_DOWN && ev.key.key == SDLK_ESCAPE)) {
         running = false;
       }
     }

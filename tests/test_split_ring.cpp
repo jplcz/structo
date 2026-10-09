@@ -73,7 +73,8 @@ protected:
 
 TEST_F(SplitRingTest, CreateValidation) {
   EXPECT_FALSE(driver_t::try_create(ring_mem_, addrs_, 6, slots_.as_span()).has_value());
-  EXPECT_FALSE(driver_t::try_create(ring_mem_, addrs_, kQ, reloco::span<split_driver_slot>(slots_.data(), 4)).has_value());
+  EXPECT_FALSE(
+      driver_t::try_create(ring_mem_, addrs_, kQ, reloco::span<split_driver_slot>(slots_.data(), 4)).has_value());
   EXPECT_FALSE(device_t::try_create(ring_mem_, addrs_, 0).has_value());
 
   split_ring_addrs<ring_space> bad = addrs_;
@@ -131,7 +132,8 @@ TEST_F(SplitRingTest, LoopbackRoundTrip) {
   EXPECT_STREQ(got, request);
 
   // The response spans both writable segments (8 + 8 bytes).
-  const reloco::array<char, 16> response{{'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','\0'}}; // 16 bytes with NUL
+  const reloco::array<char, 16> response{
+      {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', '\0'}}; // 16 bytes with NUL
   ASSERT_TRUE(try_write_chain(buf_mem_, chain.writable, 0,
                               reloco::span<const std::byte>(reinterpret_cast<const std::byte *>(response.data()), 16))
                   .has_value());
@@ -149,12 +151,8 @@ TEST_F(SplitRingTest, LoopbackRoundTrip) {
   reloco::array<std::byte, 16> back{};
   const reloco::span<std::byte> back_span(back.data(), back.size());
   using buf_traits = virtq_memory_traits<buf_mem, buf_space>;
-  ASSERT_TRUE(buf_traits::try_read(buf_mem_, buf_addr{kBufBase + 256},
-                                   back_span.first(8))
-                  .has_value());
-  ASSERT_TRUE(buf_traits::try_read(buf_mem_, buf_addr{kBufBase + 512},
-                                   back_span.subspan(8, 8))
-                  .has_value());
+  ASSERT_TRUE(buf_traits::try_read(buf_mem_, buf_addr{kBufBase + 256}, back_span.first(8)).has_value());
+  ASSERT_TRUE(buf_traits::try_read(buf_mem_, buf_addr{kBufBase + 512}, back_span.subspan(8, 8)).has_value());
   std::size_t idx = 0;
   for (const char expected : response) {
     const auto one = back_span.subspan(idx, 1);
@@ -263,8 +261,8 @@ TEST_F(SplitRingTest, ChainHelpersCrossSegmentBoundaries) {
   reloco::span<const chain_segment<buf_space>> view_segs(segs, 2);
 
   const char data[] = "ABCDEFG";
-  ASSERT_TRUE(try_write_chain(buf_mem_, view_segs, 1, reloco::span<const std::byte>(
-                                                          reinterpret_cast<const std::byte *>(data), 6))
+  ASSERT_TRUE(try_write_chain(buf_mem_, view_segs, 1,
+                              reloco::span<const std::byte>(reinterpret_cast<const std::byte *>(data), 6))
                   .has_value());
   char out[7] = {};
   ASSERT_TRUE(try_read_chain(buf_mem_, view_segs, 1, reloco::span<std::byte>(reinterpret_cast<std::byte *>(out), 6))

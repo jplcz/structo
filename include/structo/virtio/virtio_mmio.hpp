@@ -141,8 +141,7 @@ private:
  * @tparam Function Device function (see the file comment for requirements).
  * @tparam MaxQueues Capacity of the queue table; `Function::queue_count` must not exceed it.
  */
-template <typename GuestSpace, typename Mem, typename Function, std::size_t MaxQueues = 4>
-class virtio_mmio_device {
+template <typename GuestSpace, typename Mem, typename Function, std::size_t MaxQueues = 4> class virtio_mmio_device {
 public:
   using queue = split_virtq_device<GuestSpace, GuestSpace, Mem>;
   using packed_queue = packed_virtq_device<GuestSpace, GuestSpace, Mem>;
@@ -255,9 +254,7 @@ private:
       (std::uint64_t{1} << feature_version_1) | (std::uint64_t{1} << feature_ring_event_idx) |
       (std::uint64_t{1} << feature_ring_packed) | (std::uint64_t{1} << feature_ring_indirect_desc);
 
-  [[nodiscard]] std::uint64_t offered() const noexcept {
-    return fn_->device_features() | transport_features;
-  }
+  [[nodiscard]] std::uint64_t offered() const noexcept { return fn_->device_features() | transport_features; }
 
   [[nodiscard]] queue_state *selected() noexcept {
     return queue_sel_ < Function::queue_count ? &queues_[queue_sel_] : nullptr;

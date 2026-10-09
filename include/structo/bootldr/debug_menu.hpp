@@ -69,7 +69,8 @@ public:
   /** @brief Handler coroutine. Fail with `co_await reloco::unexpected(err)` to make the menu print the error. */
   using handler_fn = reloco::task<void> (*)(menu_context &) noexcept;
 
-  /** @param label text shown in the list. @param help one-line description shown after it. @param ctx returned by `menu_context::ctx()`. */
+  /** @param label text shown in the list. @param help one-line description shown after it. @param ctx returned by
+   * `menu_context::ctx()`. */
   menu_item(reloco::string_view label, reloco::string_view help, handler_fn handler, void *ctx = nullptr) noexcept
       : label_(label), help_(help), handler_(handler), ctx_(ctx) {}
   menu_item(const menu_item &) = delete;
@@ -339,9 +340,7 @@ private:
     m.running_ = false;
   }
 
-  [[nodiscard]] reloco::result<void> write(reloco::string_view text) const noexcept {
-    return uart_.write_string(text);
-  }
+  [[nodiscard]] reloco::result<void> write(reloco::string_view text) const noexcept { return uart_.write_string(text); }
 
   template <std::size_t PrintMax = 128, typename... Args>
   [[nodiscard]] reloco::result<void> print(microfmt::string_view fmt, const Args &...args) const noexcept {

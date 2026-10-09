@@ -24,6 +24,8 @@ MMU exists.
 
 ## What's here
 
+> **Warning:** the network code (`net/*`, `bootldr/netstack.hpp`, `hw/*_device.hpp`, TFTP, DHCP, ARP, PPP/SLIP) is **not meant for production devices**. It has no authentication, encryption or hardening against hostile peers; use it only in controlled test environments, CI and development.
+
 See [docs/reference.md](docs/reference.md) for the full per-header
 reference (one page per header, linked from there) covering every public
 type, [docs/coding-guide.md](docs/coding-guide.md) for contribution
@@ -43,6 +45,37 @@ demonstrated in [examples/](examples):
   DTB into a caller-owned-storage `structo::device_tree` and reads its
   `/chosen` node's `bootargs`/`stdout-path` properties, the first two
   things almost every kernel/hypervisor boot path looks for.
+- **[`docs/clock_ref.md`](docs/clock_ref.md)** -- `hw::clock_ref` reads a
+  hardware counter (wrap-aware, `reloco::duration`/`instant` based);
+  `clock_reader`/`atomic_clock_reader` give glitch-tolerant feed-forward
+  time, the latter lock-free across CPUs (C++17; the C++20-only
+  `bootldr::scheduler`/`hw::ppp_device` consumers need C++20), and plug straight into
+  `bootldr::scheduler::set_clock`, `bootldr::boot_prompt` and
+  `hw::ppp_device`.
+- **[`docs/ethernet_device.md`](docs/ethernet_device.md)** -- C++20-only
+  `hw::ethernet_device` puts the net stack on a raw Ethernet NIC: ARP,
+  gateway next-hop and MAC filtering, so `ipv4_node`/DHCP/UDP run unchanged
+  (`bootldr::netstack::use_ethernet`).
+  [`examples/netstack_tap_demo.cpp`](examples/netstack_tap_demo.cpp) runs it
+  as a host on a Linux TAP interface.
+- **[`docs/ethernet_nic.md`](docs/ethernet_nic.md)** -- C++20-only
+  `hw::ethernet_nic`: the small driver contract (descriptor-ring primitives)
+  for writing real Ethernet MAC drivers; the TAP demo is its reference driver.
+- **[`docs/mii_phy.md`](docs/mii_phy.md)** -- `hw::mii_phy` generic
+  Clause 22 PHY driver over an `mdio_bus_ref` (autonegotiation, debounced
+  link/speed/duplex, quirk hooks) for MAC drivers; C++17.
+- **[`docs/usb_host.md`](docs/usb_host.md)** -- C++20-only USB host stack:
+  controller driver contract (interrupt-completed coroutine transfers),
+  root-port enumeration, and class drivers for CDC-ACM (`uart_ref`), CDC-ECM
+  (`net_device_ref`) and mass storage (`block_device_ref`), plus `bootldr::usb_stack`
+  for scheduler-based hot-plug with a coroutine per device. No hubs, no RNDIS.
+  Generic OHCI, EHCI, xHCI and DWC2 (DesignWare USB 2.0 OTG, host mode) host controller drivers
+  ([`ohci_hcd`](docs/ohci_hcd.md), [`ehci_hcd`](docs/ehci_hcd.md), [`xhci_hcd`](docs/xhci_hcd.md),
+  [`dwc2_hcd`](docs/dwc2_hcd.md))
+  cover control/bulk/interrupt transfers on root ports; see
+  [`docs/usb_host_raspberry_pi.md`](docs/usb_host_raspberry_pi.md) for wiring it on a Raspberry Pi and
+  [`docs/usb_ethernet.md`](docs/usb_ethernet.md) for IPv4 over a USB Ethernet adapter, and
+  [`docs/usb_serial_ip.md`](docs/usb_serial_ip.md) for PPP/SLIP over a USB serial adapter.
 - **[`callout_scheduler_demo.cpp`](examples/callout_scheduler_demo.cpp)**
   -- a toy, single-core `callout` subsystem built on
   `reloco::c_tailq`/`structo::callout`'s `hook_type` customization point,

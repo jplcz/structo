@@ -55,9 +55,7 @@ reloco::task<void> item_hello(menu_context &c) noexcept {
   co_return;
 }
 
-reloco::task<void> item_fail(menu_context &) noexcept {
-  co_await reloco::unexpected(reloco::error::invalid_argument);
-}
+reloco::task<void> item_fail(menu_context &) noexcept { co_await reloco::unexpected(reloco::error::invalid_argument); }
 
 class DebugMenu : public ::testing::Test {
 protected:
@@ -147,3 +145,26 @@ TEST(DebugMenuWait, KeyArrivesBeforeTimeout) {
 }
 
 RELOCO_END_UNSAFE_BUFFER_USAGE
+
+namespace {
+struct sched_counter {
+  std::uint64_t value = 0;
+};
+} // namespace
+
+template <> struct structo::hw::clock_traits<sched_counter> {
+  static reloco::result<std::uint64_t> read_counter(sched_counter &c) noexcept { return c.value; }
+  static std::uint64_t frequency_hz(sched_counter &) noexcept { return 1000; }
+};
+
+TEST(SchedulerClock, ReaderBackedNowMs) {
+  sched_counter c;
+  hw::clock_reader reader{hw::clock_ref{c}};
+  ASSERT_TRUE(reader.reset().has_value());
+  scheduler sched;
+  sched.set_clock(reader);
+  c.value = 250;
+  EXPECT_EQ(sched.now_ms(), 250u);
+  c.value = 400;
+  EXPECT_EQ(sched.now_ms(), 400u);
+}

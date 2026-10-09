@@ -6,6 +6,8 @@ SPDX-License-Identifier: BSD-2-Clause
 
 # Guide: running the bootloader netstack over a serial port
 
+> **Warning:** the network code (`net/*`, `bootldr/netstack.hpp`, `hw/*_device.hpp`, TFTP, DHCP, ARP, PPP/SLIP) is **not meant for production devices**. It has no authentication, encryption or hardening against hostile peers; use it only in controlled test environments, CI and development.
+
 C++20 only. `bootldr::netstack` (`bootldr/netstack.hpp`) runs the network
 stack as two tasks of a `bootldr::scheduler`, over a SLIP link on a polled
 UART. Today it provides a static or DHCP-assigned IPv4 address and answers
@@ -61,6 +63,8 @@ constexpr std::size_t mtu = 1006; // largest IP datagram; keep equal to the host
 // Monotonic millisecond clock (timer register, SysTick counter ...).
 // The scheduler uses it for sleeps; the stack uses it for DHCP timeouts.
 std::uint64_t now_ms(void *) noexcept;
+// Alternatively, read a hardware counter through hw::clock_ref and call
+// sched.set_clock(reader) with a hw::clock_reader (see clock_ref.md).
 
 int main() {
   my_uart hw_uart;
@@ -233,6 +237,10 @@ for (;;) {
   sched.run_once();                                     // net.ready() becomes true once IPCP is open
 }
 ```
+
+For a raw Ethernet NIC instead of a serial link, wrap it in
+`hw::ethernet_device` and call `net.use_ethernet(eth)`; see
+[`ethernet_device.md`](ethernet_device.md) (C++20 only).
 
 After `net.ready()` the board answers ping at the address
 `ppp.link().local_address()`; `ppp.link().dns()` holds the DNS server the peer

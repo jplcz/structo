@@ -63,8 +63,8 @@ struct ppp_config {
   bool request_dns = true;      ///< Ask the peer for its primary DNS server.
   std::uint16_t mru = 0;        ///< MRU to announce in LCP (what we can receive); 0 = don't send (peer assumes 1500).
   std::uint32_t restart_ms = 3000;
-  unsigned max_configure = 10;  ///< Configure-Requests sent before giving up.
-  unsigned max_terminate = 2;   ///< Terminate-Requests sent before giving up.
+  unsigned max_configure = 10; ///< Configure-Requests sent before giving up.
+  unsigned max_terminate = 2;  ///< Terminate-Requests sent before giving up.
 };
 
 /** @brief State of one control protocol (RFC 1661 section 4, simplified). */
@@ -442,8 +442,12 @@ private:
         if (!a.is_unspecified()) {
           pending_peer_ = a;
         } else if (!cfg_.peer_address.is_unspecified()) {
-          const std::uint8_t nk[6] = {3, 6, cfg_.peer_address.octets[0], cfg_.peer_address.octets[1],
-                                      cfg_.peer_address.octets[2], cfg_.peer_address.octets[3]};
+          const std::uint8_t nk[6] = {3,
+                                      6,
+                                      cfg_.peer_address.octets[0],
+                                      cfg_.peer_address.octets[1],
+                                      cfg_.peer_address.octets[2],
+                                      cfg_.peer_address.octets[3]};
           add(nak_, nak_len_, bytes(nk, 6));
         } else {
           add(rej_, rej_len_, o);

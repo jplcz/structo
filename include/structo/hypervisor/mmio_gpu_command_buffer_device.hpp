@@ -86,8 +86,8 @@
 #include <reloco/allocator.hpp>
 #include <reloco/default_allocator.hpp>
 #include <reloco/error.hpp>
-#include <reloco/lifetime.hpp>
 #include <reloco/expected.hpp>
+#include <reloco/lifetime.hpp>
 #include <reloco/span.hpp>
 #include <utility>
 
@@ -245,8 +245,7 @@ public:
 
   mmio_gpu_command_buffer_device(mmio_gpu_command_buffer_device &&other) noexcept
       : alloc_(other.alloc_), owned_base_(other.owned_base_), owned_size_(other.owned_size_),
-        capacity_(other.capacity_), count_(other.count_), last_executed_(other.last_executed_),
-        target_(other.target_) {
+        capacity_(other.capacity_), count_(other.count_), last_executed_(other.last_executed_), target_(other.target_) {
     other.owned_base_ = nullptr;
     other.owned_size_ = 0;
     other.capacity_ = 0;
@@ -296,7 +295,7 @@ public:
    */
   [[nodiscard]] static result<mmio_gpu_command_buffer_device>
   try_allocate(allocator_ref alloc, hw::gpu_accel_ref target, std::size_t capacity,
-              std::size_t page_size = default_page_size) noexcept {
+               std::size_t page_size = default_page_size) noexcept {
     if (capacity == 0 || page_size == 0 || (page_size & (page_size - 1)) != 0) {
       return unexpected(error::invalid_argument);
     }

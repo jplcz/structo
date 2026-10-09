@@ -83,7 +83,8 @@ public:
   /** @brief Awaitable returned by `receive()`; resumes with `result<size_t>` (frame length). */
   class [[nodiscard]] receive_awaiter : op_base {
   public:
-    receive_awaiter(polled_net_device &d, span<std::uint8_t> buf) noexcept : buf_(buf), res_(unexpected(error::try_again)) {
+    receive_awaiter(polled_net_device &d, span<std::uint8_t> buf) noexcept
+        : buf_(buf), res_(unexpected(error::try_again)) {
       this->dev = &d;
     }
     receive_awaiter(const receive_awaiter &) = delete;
@@ -122,7 +123,8 @@ public:
   /** @brief Awaitable returned by `send()`; resumes with `result<void>`. */
   class [[nodiscard]] send_awaiter : op_base {
   public:
-    send_awaiter(polled_net_device &d, span<const std::uint8_t> frame) noexcept : frame_(frame), res_(unexpected(error::try_again)) {
+    send_awaiter(polled_net_device &d, span<const std::uint8_t> frame) noexcept
+        : frame_(frame), res_(unexpected(error::try_again)) {
       this->dev = &d;
     }
     send_awaiter(const send_awaiter &) = delete;

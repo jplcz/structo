@@ -125,8 +125,7 @@ private:
 class shell_base {
 public:
   shell_base(scheduler &sched, hw::uart_ref uart) noexcept
-      : sched_(&sched), uart_(uart), ctx_(sched.allocator()), expanded_(sched.allocator()),
-        argv_(sched.allocator()),
+      : sched_(&sched), uart_(uart), ctx_(sched.allocator()), expanded_(sched.allocator()), argv_(sched.allocator()),
         help_("help", "help [command]: list the commands or show one", &help_handler, this),
         set_("set", "set [-g] [name [value]]: list variables, show or assign one (-g: global); $name, $((expr)) expand",
              &set_handler, this),
@@ -270,9 +269,9 @@ protected:
   scheduler *sched_;
   hw::uart_ref uart_;
   shell_context ctx_;
-  reloco::sso_string expanded_;         // the statement after substitution; argv_ points into it
-  reloco::sso_vector<char *, 8> argv_;  // words of the current statement
-  bool reported_ = false;               // the failure of the current line is already on the console
+  reloco::sso_string expanded_;        // the statement after substitution; argv_ points into it
+  reloco::sso_vector<char *, 8> argv_; // words of the current statement
+  bool reported_ = false;              // the failure of the current line is already on the console
 
 private:
   // Runs the function named argv_[0] with the words argv_[0..argc) as $0..: in its own dynamic scope, so its
@@ -406,7 +405,8 @@ inline reloco::task<void> shell_base::set_handler(command_call &call) noexcept {
   const std::size_t argc = call.argc() - (global ? 1 : 0); // words without "-g"
   const std::size_t first = global ? 2 : 1;                // index of the name
   if (argc == 1) {
-    self.ctx_.for_each_variable([&](reloco::string_view k, reloco::string_view v) { (void)call.print("{}={}\n", k, v); });
+    self.ctx_.for_each_variable(
+        [&](reloco::string_view k, reloco::string_view v) { (void)call.print("{}={}\n", k, v); });
     co_return;
   }
   if (argc == 2 && !global) {

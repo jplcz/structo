@@ -125,8 +125,8 @@ struct has_virtq_driver_traits<Driver, std::void_t<typename virtq_driver_traits<
     : std::true_type {};
 template <typename Device, typename = void> struct has_virtq_device_traits : std::false_type {};
 template <typename Device>
-struct has_virtq_device_traits<Device, std::void_t<typename virtq_device_traits<Device>::chain,
-                                                   decltype(virtq_device_traits<Device>::try_pop)>>
+struct has_virtq_device_traits<
+    Device, std::void_t<typename virtq_device_traits<Device>::chain, decltype(virtq_device_traits<Device>::try_pop)>>
     : std::true_type {};
 } // namespace detail
 
@@ -203,7 +203,8 @@ public:
   [[nodiscard]] bool is_broken() const noexcept { return vtbl_ ? vtbl_->is_broken(ctx_) : true; }
 
 private:
-  template <typename Driver> static constexpr vtable s_vtbl = {
+  template <typename Driver>
+  static constexpr vtable s_vtbl = {
       [](void *c, reloco::span<const sg_type> o, reloco::span<const sg_type> i, std::uintptr_t t) noexcept {
         return virtq_driver_traits<Driver>::try_add(*static_cast<Driver *>(c), o, i, t);
       },
@@ -213,7 +214,9 @@ private:
       [](void *c, bool on) noexcept {
         return virtq_driver_traits<Driver>::try_set_interrupts_enabled(*static_cast<Driver *>(c), on);
       },
-      [](const void *c) noexcept { return virtq_driver_traits<Driver>::free_descriptors(*static_cast<const Driver *>(c)); },
+      [](const void *c) noexcept {
+        return virtq_driver_traits<Driver>::free_descriptors(*static_cast<const Driver *>(c));
+      },
       [](const void *c) noexcept { return virtq_driver_traits<Driver>::queue_size(*static_cast<const Driver *>(c)); },
       [](const void *c) noexcept { return virtq_driver_traits<Driver>::is_broken(*static_cast<const Driver *>(c)); },
   };
@@ -243,11 +246,10 @@ public:
 
   constexpr virtq_device_ref() noexcept = default;
 
-  template <typename Device,
-            std::enable_if_t<!std::is_same_v<std::remove_cv_t<Device>, virtq_device_ref> &&
-                                 detail::has_virtq_device_traits<Device>::value &&
-                                 std::is_same_v<typename virtq_device_traits<Device>::chain, chain>,
-                             int> = 0>
+  template <typename Device, std::enable_if_t<!std::is_same_v<std::remove_cv_t<Device>, virtq_device_ref> &&
+                                                  detail::has_virtq_device_traits<Device>::value &&
+                                                  std::is_same_v<typename virtq_device_traits<Device>::chain, chain>,
+                                              int> = 0>
   constexpr explicit virtq_device_ref(Device &d RELOCO_LIFETIMEBOUND RELOCO_LIFETIME_CAPTURE_BY_THIS) noexcept
       : ctx_(std::addressof(d)), vtbl_(&s_vtbl<Device>) {}
 
@@ -282,8 +284,11 @@ public:
   [[nodiscard]] bool is_broken() const noexcept { return vtbl_ ? vtbl_->is_broken(ctx_) : true; }
 
 private:
-  template <typename Device> static constexpr vtable s_vtbl = {
-      [](void *c, reloco::span<segment> s) noexcept { return virtq_device_traits<Device>::try_pop(*static_cast<Device *>(c), s); },
+  template <typename Device>
+  static constexpr vtable s_vtbl = {
+      [](void *c, reloco::span<segment> s) noexcept {
+        return virtq_device_traits<Device>::try_pop(*static_cast<Device *>(c), s);
+      },
       [](void *c, const chain &ch, std::uint32_t w) noexcept {
         return virtq_device_traits<Device>::try_push_used(*static_cast<Device *>(c), ch, w);
       },

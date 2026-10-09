@@ -60,7 +60,9 @@ TEST_F(Vt100Test, PlainTextAdvancesCursorAndWritesGlyphs) {
 }
 
 TEST_F(Vt100Test, NulBelAndDelAreIgnoredAndUtf8ArrowIsOneCell) {
-  term.feed(std::string_view("A\0\a\x7f\xe2\x9e\x9c" "B", 8)); // U+279C (zsh prompt arrow) is one cell
+  term.feed(std::string_view("A\0\a\x7f\xe2\x9e\x9c"
+                             "B",
+                             8)); // U+279C (zsh prompt arrow) is one cell
   EXPECT_EQ(term.console().cursor_x(), 3u);
   EXPECT_EQ(cell_at(term.console(), 0, 0).ch, 'A');
   EXPECT_EQ(cell_at(term.console(), 1, 0).ch, '>');
@@ -277,7 +279,9 @@ vt100_callbacks make_callbacks(event_log &log) {
   };
   cb.mode = [](void *c, vt100_mode m, bool on) noexcept { static_cast<event_log *>(c)->modes.emplace_back(m, on); };
   cb.cursor_style = [](void *c, std::uint32_t s) noexcept { static_cast<event_log *>(c)->styles.push_back(s); };
-  cb.reply = [](void *c, reloco::string_view s) noexcept { static_cast<event_log *>(c)->replies.append(s.data(), s.size()); };
+  cb.reply = [](void *c, reloco::string_view s) noexcept {
+    static_cast<event_log *>(c)->replies.append(s.data(), s.size());
+  };
   cb.reset = [](void *c) noexcept { ++static_cast<event_log *>(c)->resets; };
   return cb;
 }
@@ -306,7 +310,7 @@ TEST_F(Vt100Test, AutowrapCanBeDisabled) {
 
 TEST_F(Vt100Test, ScrollRegionScrollsOnlyInsideMargins) {
   fill_rows(term);
-  term.feed("\x1b[2;4r"); // rows 2..4 (1-based), cursor homes
+  term.feed("\x1b[2;4r");   // rows 2..4 (1-based), cursor homes
   term.feed("\x1b[4;1H\n"); // LF on the region's bottom row
   EXPECT_EQ(row_text(term.console(), 0), "A");
   EXPECT_EQ(row_text(term.console(), 1), "C");
@@ -346,9 +350,11 @@ TEST_F(Vt100Test, InsertDeleteEraseCharacters) {
 }
 
 TEST_F(Vt100Test, CursorSaveRestoreIncludesColors) {
-  term.feed("\x1b[2;5H\x1b[31m\x1b" "7");
+  term.feed("\x1b[2;5H\x1b[31m\x1b"
+            "7");
   term.feed("\x1b[1;1H\x1b[0m");
-  term.feed("\x1b" "8");
+  term.feed("\x1b"
+            "8");
   EXPECT_EQ(term.console().cursor_x(), 4u);
   EXPECT_EQ(term.console().cursor_y(), 1u);
   EXPECT_EQ(term.console().foreground(), console_color::red);
@@ -380,7 +386,9 @@ TEST_F(Vt100Test, RelativeAndAbsoluteCursorForms) {
 TEST_F(Vt100Test, OscIsConsumedAndReportedWithEitherTerminator) {
   event_log log;
   term.set_callbacks(make_callbacks(log));
-  term.feed("A\x1b]0;my title\x07" "B\x1b]2;second\x1b\\" "C\x1b]7;file:///tmp\x07");
+  term.feed("A\x1b]0;my title\x07"
+            "B\x1b]2;second\x1b\\"
+            "C\x1b]7;file:///tmp\x07");
   EXPECT_EQ(row_text(term.console(), 0), "ABC"); // no payload leaked onto the screen
   EXPECT_EQ(log.title, "second");
   ASSERT_EQ(log.oscs.size(), 1u);
@@ -404,7 +412,8 @@ TEST_F(Vt100Test, BellAndResetCallbacks) {
   term.feed("a\x07\x07");
   EXPECT_EQ(log.bells, 2);
   EXPECT_EQ(term.console().cursor_x(), 1u); // BEL draws nothing
-  term.feed("\x1b[31m\x1b[3;3H\x1b" "c");
+  term.feed("\x1b[31m\x1b[3;3H\x1b"
+            "c");
   EXPECT_EQ(log.resets, 1);
   EXPECT_EQ(row_text(term.console(), 0), "");
   EXPECT_EQ(term.console().cursor_x(), 0u);
@@ -448,7 +457,9 @@ TEST_F(Vt100Test, EventsWithoutCallbacksAreHarmless) {
 TEST_F(Vt100Test, DecSpecialGraphicsDrawsAsciiLookalikesViaG0AndShift) {
   term.feed("\x1b(0lqqk\x1b(B|"); // G0 = graphics: box corner/line/corner, then back to ASCII
   EXPECT_EQ(row_text(term.console(), 0), "+--+|");
-  term.feed("\r\n\x1b)0\x0e" "x\x0f" "x"); // G1 = graphics, SO selects it, SI returns to G0 (ASCII)
+  term.feed("\r\n\x1b)0\x0e"
+            "x\x0f"
+            "x"); // G1 = graphics, SO selects it, SI returns to G0 (ASCII)
   EXPECT_EQ(row_text(term.console(), 1), "|x");
 }
 
@@ -462,7 +473,8 @@ TEST_F(Vt100Test, ModeGettersTrackProgramRequests) {
   EXPECT_FALSE(term.application_cursor_keys());
   EXPECT_FALSE(term.application_keypad());
   EXPECT_FALSE(term.bracketed_paste());
-  term.feed("\x1b[?1h\x1b" "c"); // RIS clears them
+  term.feed("\x1b[?1h\x1b"
+            "c"); // RIS clears them
   EXPECT_FALSE(term.application_cursor_keys());
 }
 
@@ -504,22 +516,31 @@ TEST_F(Vt100Test, MouseModesAreTracked) {
   term.feed("\x1b[?1002l\x1b[?1006l");
   EXPECT_EQ(term.mouse_tracking(), vt100_mouse_tracking::off);
   EXPECT_FALSE(term.mouse_sgr());
-  term.feed("\x1b[?1003h\x1b" "c");
+  term.feed("\x1b[?1003h\x1b"
+            "c");
   EXPECT_EQ(term.mouse_tracking(), vt100_mouse_tracking::off);
 }
 
 TEST_F(Vt100Test, Utf8SequencesDrawOneCellEach) {
   // mc/ncurses borders in a UTF-8 locale: one cell per character keeps later cursor-addressed redraws aligned.
-  term.feed("\xe2\x94\x82" "ab" "\xe2\x94\x8c\xe2\x94\x80\xe2\x94\x90"); // │ab┌─┐
+  term.feed("\xe2\x94\x82"
+            "ab"
+            "\xe2\x94\x8c\xe2\x94\x80\xe2\x94\x90"); // │ab┌─┐
   EXPECT_EQ(row_text(term.console(), 0), "|ab+-+");
   EXPECT_EQ(term.console().cursor_x(), 6u);
-  term.feed("\x1b[2;1H" "Nadrz\xc4\x99" "d" "\xc5\x82" "\xc3\xb3"); // Nadrzędłó -> accents dropped
+  term.feed("\x1b[2;1H"
+            "Nadrz\xc4\x99"
+            "d"
+            "\xc5\x82"
+            "\xc3\xb3"); // Nadrzędłó -> accents dropped
   EXPECT_EQ(row_text(term.console(), 1), "Nadrzedlo");
 }
 
 TEST_F(Vt100Test, MalformedUtf8IsDroppedWithoutDesync) {
-  term.feed("a\xc4" "b");    // truncated sequence: 'b' is printed as ASCII
-  term.feed("\x80" "c");     // stray continuation byte is ignored
+  term.feed("a\xc4"
+            "b"); // truncated sequence: 'b' is printed as ASCII
+  term.feed("\x80"
+            "c");                  // stray continuation byte is ignored
   term.feed("\xe2\x94\x1b[1;1HX"); // sequence broken by ESC: the escape still works
   EXPECT_EQ(row_text(term.console(), 0), "Xbc");
 }

@@ -32,11 +32,13 @@
 
 #include <reloco/error.hpp>
 #include <reloco/string_view.hpp>
+#include <structo/hw/clock_ref.hpp>
 #include <structo/hw/uart_ref.hpp>
 
 #include <microfmt/microfmt.hpp>
 
 #include <cstdint>
+#include <type_traits>
 
 namespace structo::bootldr {
 
@@ -51,12 +53,12 @@ using prompt_clock_fn = std::uint64_t (*)(void *ctx) noexcept;
 
 /** @brief What to ask for and how long to wait. */
 struct boot_prompt_options {
-  std::uint8_t key = ' ';                         ///< the approving key
-  std::uint32_t timeout_ms = 3000;                ///< how long to wait for it
+  std::uint8_t key = ' ';                              ///< the approving key
+  std::uint32_t timeout_ms = 3000;                     ///< how long to wait for it
   reloco::string_view message = "Press SPACE to boot"; ///< prompt text (no trailing newline)
-  bool ignore_case = true;                        ///< 'b' also matches 'B'
-  bool flush_input = true;                        ///< drop bytes already received before the prompt
-  bool countdown = true;                          ///< redraw "(N)" once per second
+  bool ignore_case = true;                             ///< 'b' also matches 'B'
+  bool flush_input = true;                             ///< drop bytes already received before the prompt
+  bool countdown = true;                               ///< redraw "(N)" once per second
 };
 
 namespace detail {
@@ -66,7 +68,8 @@ inline std::uint8_t prompt_fold(std::uint8_t c) noexcept {
 }
 
 // Redraws the countdown line "\r<message> (N) ".
-inline reloco::result<void> prompt_draw(const hw::uart_ref &uart, reloco::string_view msg, std::uint32_t secs) noexcept {
+inline reloco::result<void> prompt_draw(const hw::uart_ref &uart, reloco::string_view msg,
+                                        std::uint32_t secs) noexcept {
   const auto line = microfmt::format<128>("\r{} ({}) ", msg, secs);
   return uart.write_string(line.view());
 }
@@ -83,8 +86,8 @@ inline reloco::result<void> prompt_draw(const hw::uart_ref &uart, reloco::string
  * @return `key_pressed` or `timed_out`; a UART error (other than "no byte yet") is returned as is,
  *         `error::invalid_argument` if `clock` is null.
  */
-[[nodiscard]] inline reloco::result<prompt_result> boot_prompt(const hw::uart_ref &uart, prompt_clock_fn clock,
-                                                               void *ctx, const boot_prompt_options &opt = {}) noexcept {
+[[nodiscard]] inline reloco::result<prompt_result>
+boot_prompt(const hw::uart_ref &uart, prompt_clock_fn clock, void *ctx, const boot_prompt_options &opt = {}) noexcept {
   if (!clock)
     return reloco::unexpected(reloco::error::invalid_argument);
 
@@ -148,6 +151,16 @@ inline reloco::result<void> prompt_draw(const hw::uart_ref &uart, reloco::string
   if (auto r = uart.write_string("\n"); !r)
     return reloco::unexpected(r.error());
   return outcome;
+}
+
+/** @brief `boot_prompt` timed by a hardware clock reader (`hw::clock_reader`/`hw::atomic_clock_reader`, already
+ * `reset()`). */
+template <typename Reader,
+          std::enable_if_t<std::is_same_v<Reader, hw::clock_reader> || std::is_same_v<Reader, hw::atomic_clock_reader>,
+                           int> = 0>
+[[nodiscard]] inline reloco::result<prompt_result> boot_prompt(const hw::uart_ref &uart, Reader &reader,
+                                                               const boot_prompt_options &opt = {}) noexcept {
+  return boot_prompt(uart, &hw::reader_now_ms<Reader>, &reader, opt);
 }
 
 } // namespace structo::bootldr

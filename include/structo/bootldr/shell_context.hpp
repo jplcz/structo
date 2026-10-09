@@ -28,8 +28,8 @@
  * // A native function usable as $((crc(a, b))): receives the evaluated arguments, returns the value.
  * // `user` is the pointer given at registration.
  * (void)ctx.add_function("crc", +[](void *user, reloco::span<const std::uint64_t> args) noexcept
- *                                   -> reloco::result<std::uint64_t> { return args.size() == 2 ? args[0] ^ args[1] : 0; },
- *                        nullptr);
+ *                                   -> reloco::result<std::uint64_t> { return args.size() == 2 ? args[0] ^ args[1] : 0;
+ * }, nullptr);
  *
  * {
  *   structo::bootldr::shell_context::scope call{ctx}; // a function call's own variables; left on destruction
@@ -45,9 +45,9 @@
 #include <reloco/error.hpp>
 #include <reloco/flat_map.hpp>
 #include <reloco/span.hpp>
+#include <reloco/sso_string.hpp>
 #include <reloco/string.hpp>
 #include <reloco/string_view.hpp>
-#include <reloco/sso_string.hpp>
 #include <reloco/vector.hpp>
 
 #include <cstddef>
@@ -158,7 +158,9 @@ public:
   }
 
   /** @brief Removes `name` from the innermost scope only; `error::not_found` if that scope does not define it. */
-  [[nodiscard]] reloco::result<void> unset(reloco::string_view name) noexcept { return current_->vars_.try_remove(name); }
+  [[nodiscard]] reloco::result<void> unset(reloco::string_view name) noexcept {
+    return current_->vars_.try_remove(name);
+  }
 
   /**
    * @brief The value of `name` searched from the innermost scope outwards, or `error::not_found`. A name made of
@@ -220,7 +222,8 @@ public:
   // ---- native expression functions ----
 
   /** @brief Registers `fn` as `name(...)` for expressions, replacing an earlier one with the same name. */
-  [[nodiscard]] reloco::result<void> add_function(reloco::string_view name, native_fn fn, void *user = nullptr) noexcept {
+  [[nodiscard]] reloco::result<void> add_function(reloco::string_view name, native_fn fn,
+                                                  void *user = nullptr) noexcept {
     if (!valid_name(name))
       return reloco::unexpected(reloco::error::invalid_argument);
     if (auto existing = natives_.try_at(name)) {
@@ -236,7 +239,9 @@ public:
     return {};
   }
   /** @brief Unregisters native function `name`; `error::not_found` if unknown. */
-  [[nodiscard]] reloco::result<void> remove_function(reloco::string_view name) noexcept { return natives_.try_remove(name); }
+  [[nodiscard]] reloco::result<void> remove_function(reloco::string_view name) noexcept {
+    return natives_.try_remove(name);
+  }
 
   /**
    * @brief Calls expression function `name`: registered natives first, then the built-ins `min(a,b)`, `max(a,b)`,
@@ -353,13 +358,16 @@ private:
   }
 
   [[nodiscard]] static reloco::result<void> append_number(std::uint64_t v, reloco::sso_string &out) noexcept {
-    char digits[20];
-    std::size_t d = sizeof digits;
+    reloco::array<char, 20> digits;
+    std::size_t d = digits.size();
     do {
       digits[--d] = static_cast<char>('0' + v % 10);
       v /= 10;
     } while (v != 0);
-    return out.try_append(reloco::string_view(digits + d, sizeof digits - d));
+    const auto all_digits = digits.as_span();
+    const auto sub_digits = all_digits.subspan(d);
+    RELOCO_ASSERT(!sub_digits.empty(), "Digits are empty");
+    return out.try_append(reloco::string_view(sub_digits.data(), sub_digits.size()));
   }
 
   [[nodiscard]] reloco::result<void> append_value(reloco::string_view name, char quote,

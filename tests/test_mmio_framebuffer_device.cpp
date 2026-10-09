@@ -15,13 +15,13 @@
 // Test fixtures index raw buffers freely; bounds are checked by the assertions.
 RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
 
+using reloco::error;
+using reloco::span;
 using structo::hw::rgb_color;
 using structo::hw::xrgb8888;
 using structo::hypervisor::mmio_device_ref;
 using structo::hypervisor::mmio_framebuffer_device;
 using structo::hypervisor::pixel_format_id;
-using reloco::error;
-using reloco::span;
 
 namespace {
 
@@ -79,8 +79,8 @@ TEST(MmioFramebufferDeviceAllocation, MoveTransfersOwnershipAndLeavesSourceEmpty
   EXPECT_EQ(b_raw.data(), buffer_ptr);
   EXPECT_EQ(b.width(), 64u);
   EXPECT_TRUE(b.owns_allocation());
-  EXPECT_EQ(a.width(), 0u);             // NOLINT(bugprone-use-after-move)
-  EXPECT_FALSE(a.owns_allocation());    // NOLINT(bugprone-use-after-move)
+  EXPECT_EQ(a.width(), 0u);          // NOLINT(bugprone-use-after-move)
+  EXPECT_FALSE(a.owns_allocation()); // NOLINT(bugprone-use-after-move)
 }
 
 TEST_F(MmioFramebufferDeviceTest, OwnedFramebufferIsPageAlignedAndAtLeastTightlyPacked) {

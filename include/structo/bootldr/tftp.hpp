@@ -13,8 +13,8 @@
  * on the scheduler, or `co_await` it from another task. One transfer at a time per client object;
  * use several clients for parallel transfers.
  *
- * Timing uses the scheduler clock (`scheduler::set_clock`, via the timed `udp_socket::receive_from`): the last packet is retransmitted after
- * `tftp_options::timeout_ms` of silence, `max_retries` times, then the transfer fails with
+ * Timing uses the scheduler clock (`scheduler::set_clock`, via the timed `udp_socket::receive_from`): the last packet
+ * is retransmitted after `tftp_options::timeout_ms` of silence, `max_retries` times, then the transfer fails with
  * `error::timed_out`. Received data is handed over per block, so a bootloader can write it to flash
  * as it arrives, or use the `span` overloads to read into / send from a memory region.
  *
@@ -28,8 +28,8 @@
  *
  * reloco::task<void> load_kernel(structo::bootldr::tftp_client &tftp, std::uint8_t *dst, std::size_t cap) {
  *   // Download "boot.bin" from the server 192.168.7.1 (port 69) straight into memory at `dst`.
- *   // Inner co_await: run the transfer and get a result; outer co_await: unwrap it (the task ends with the error otherwise).
- *   std::size_t size = co_await co_await tftp.get({192, 168, 7, 1}, "boot.bin", {dst, cap});
+ *   // Inner co_await: run the transfer and get a result; outer co_await: unwrap it (the task ends with the error
+ * otherwise). std::size_t size = co_await co_await tftp.get({192, 168, 7, 1}, "boot.bin", {dst, cap});
  *   // ... `size` bytes were stored; verify and jump ...
  * }
  *
@@ -52,10 +52,10 @@ namespace structo::bootldr {
 
 /** @brief Tunables of a `tftp_client`. */
 struct tftp_options {
-  std::uint32_t timeout_ms = 1000;           ///< Silence before the last packet is retransmitted.
-  unsigned max_retries = 5;                  ///< Retransmissions before the transfer fails with `timed_out`.
+  std::uint32_t timeout_ms = 1000;                   ///< Silence before the last packet is retransmitted.
+  unsigned max_retries = 5;                          ///< Retransmissions before the transfer fails with `timed_out`.
   std::uint16_t server_port = net::tftp_server_port; ///< Port of the server's request listener.
-  std::size_t max_queue = 4;                 ///< Datagrams the socket may buffer (lock-step needs few).
+  std::size_t max_queue = 4;                         ///< Datagrams the socket may buffer (lock-step needs few).
 };
 
 class tftp_client {

@@ -342,6 +342,8 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_dejavu_font.cpp
         tests/test_clock_cycles.cpp
         tests/test_time_source_ref.cpp
+        tests/test_clock_ref.cpp
+        tests/test_mii_phy.cpp
         tests/test_vdso_clock_page.cpp
         tests/test_vdso_clock_writer.cpp
         tests/test_vdso_clock_reader.cpp
@@ -459,6 +461,13 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_dhcp.cpp
         tests/test_tftp.cpp
         tests/test_arp.cpp
+        tests/test_ethernet_device.cpp
+        tests/test_ethernet_nic.cpp
+        tests/test_usb_host.cpp
+        tests/test_ohci_hcd.cpp
+        tests/test_ehci_hcd.cpp
+        tests/test_xhci_hcd.cpp
+        tests/test_dwc2_hcd.cpp
         tests/test_scheduler.cpp
         tests/test_netstack.cpp
         tests/test_ppp.cpp
@@ -511,6 +520,7 @@ if(JPLCZ_STRUCTO_BUILD_HEADER_CHECKS)
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/virtio/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/bootldr/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/net/*.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/usb/*.hpp"
     )
     list(APPEND JPLCZ_STRUCTO_PUBLIC_HEADERS ${JPLCZ_STRUCTO_ARCH_HEADERS})
 

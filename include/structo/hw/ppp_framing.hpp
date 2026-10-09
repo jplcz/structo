@@ -86,9 +86,8 @@ constexpr void ppp_put(reloco::span<std::uint8_t> out, std::size_t &n, std::uint
  * @brief Encodes one PPP frame (`protocol` + `payload`) into `out`.
  * @return Bytes written, or `error::out_of_range` if `out` is smaller than `ppp_max_encoded_size(payload.size())`.
  */
-[[nodiscard]] inline reloco::result<std::size_t> ppp_encode(std::uint16_t protocol,
-                                                            reloco::span<const std::uint8_t> payload,
-                                                            reloco::span<std::uint8_t> out) noexcept {
+[[nodiscard]] inline reloco::result<std::size_t>
+ppp_encode(std::uint16_t protocol, reloco::span<const std::uint8_t> payload, reloco::span<std::uint8_t> out) noexcept {
   if (out.size() < ppp_max_encoded_size(payload.size()))
     return reloco::unexpected(reloco::error::out_of_range);
   const std::uint8_t head[4] = {ppp_address, ppp_control, static_cast<std::uint8_t>(protocol >> 8),

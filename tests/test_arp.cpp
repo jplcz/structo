@@ -8,9 +8,9 @@
 #include "net_test_support.hpp"
 
 using namespace structo::net;
-using structo::hw::net_mac_address;
 using net_test::bytes;
 using net_test::make_bytes;
+using structo::hw::net_mac_address;
 
 namespace {
 

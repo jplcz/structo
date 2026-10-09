@@ -117,28 +117,50 @@ enum class psci_function : std::uint16_t {
     return reloco::unexpected(reloco::error::invalid_argument);
   }
   switch (id.function_number) {
-  case 0: return psci_function::version;
-  case 1: return psci_function::cpu_suspend;
-  case 2: return psci_function::cpu_off;
-  case 3: return psci_function::cpu_on;
-  case 4: return psci_function::affinity_info;
-  case 5: return psci_function::migrate;
-  case 6: return psci_function::migrate_info_type;
-  case 7: return psci_function::migrate_info_up_cpu;
-  case 8: return psci_function::system_off;
-  case 9: return psci_function::system_reset;
-  case 10: return psci_function::features;
-  case 11: return psci_function::cpu_freeze;
-  case 12: return psci_function::cpu_default_suspend;
-  case 13: return psci_function::node_hw_state;
-  case 14: return psci_function::system_suspend;
-  case 15: return psci_function::set_suspend_mode;
-  case 16: return psci_function::stat_residency;
-  case 17: return psci_function::stat_count;
-  case 18: return psci_function::system_reset2;
-  case 19: return psci_function::mem_protect;
-  case 20: return psci_function::mem_protect_check_range;
-  default: return reloco::unexpected(reloco::error::unsupported_operation);
+  case 0:
+    return psci_function::version;
+  case 1:
+    return psci_function::cpu_suspend;
+  case 2:
+    return psci_function::cpu_off;
+  case 3:
+    return psci_function::cpu_on;
+  case 4:
+    return psci_function::affinity_info;
+  case 5:
+    return psci_function::migrate;
+  case 6:
+    return psci_function::migrate_info_type;
+  case 7:
+    return psci_function::migrate_info_up_cpu;
+  case 8:
+    return psci_function::system_off;
+  case 9:
+    return psci_function::system_reset;
+  case 10:
+    return psci_function::features;
+  case 11:
+    return psci_function::cpu_freeze;
+  case 12:
+    return psci_function::cpu_default_suspend;
+  case 13:
+    return psci_function::node_hw_state;
+  case 14:
+    return psci_function::system_suspend;
+  case 15:
+    return psci_function::set_suspend_mode;
+  case 16:
+    return psci_function::stat_residency;
+  case 17:
+    return psci_function::stat_count;
+  case 18:
+    return psci_function::system_reset2;
+  case 19:
+    return psci_function::mem_protect;
+  case 20:
+    return psci_function::mem_protect_check_range;
+  default:
+    return reloco::unexpected(reloco::error::unsupported_operation);
   }
 }
 
@@ -147,11 +169,10 @@ enum class psci_function : std::uint16_t {
  * `smccc_call_type::fast` call and `smccc_owner::standard`-owned, since every standard PSCI function is
  * both (the convention is the only thing a caller ever needs to choose).
  */
-[[nodiscard]] constexpr std::uint32_t encode_psci_function_id(psci_function function,
-                                                               smccc_convention convention =
-                                                                   smccc_convention::smc32) noexcept {
+[[nodiscard]] constexpr std::uint32_t
+encode_psci_function_id(psci_function function, smccc_convention convention = smccc_convention::smc32) noexcept {
   return encode_smccc_function_id(smccc_call_type::fast, convention, static_cast<std::uint8_t>(smccc_owner::standard),
-                                   static_cast<std::uint16_t>(function));
+                                  static_cast<std::uint16_t>(function));
 }
 
 /**
@@ -177,8 +198,10 @@ enum class psci_function : std::uint16_t {
   case psci_function::stat_residency:
   case psci_function::stat_count:
   case psci_function::system_reset2:
-  case psci_function::mem_protect_check_range: return true;
-  default: return false;
+  case psci_function::mem_protect_check_range:
+    return true;
+  default:
+    return false;
   }
 }
 
@@ -219,7 +242,7 @@ struct psci_version {
 /** @brief Decodes a raw `PSCI_VERSION` result register value (bits [31:16] major, [15:0] minor). */
 [[nodiscard]] constexpr psci_version decode_psci_version(std::uint32_t version_register) noexcept {
   return psci_version{static_cast<std::uint16_t>(version_register >> 16),
-                       static_cast<std::uint16_t>(version_register & 0xFFFFU)};
+                      static_cast<std::uint16_t>(version_register & 0xFFFFU)};
 }
 
 /** @brief Inverse of `decode_psci_version()`: packs a major/minor pair back into the raw result register

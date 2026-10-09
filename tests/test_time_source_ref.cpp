@@ -5,13 +5,13 @@
 #include <gtest/gtest.h>
 #include <structo/hw/time_source_ref.hpp>
 
+using reloco::error;
+using reloco::result;
+using reloco::unexpected;
 using structo::hw::cycles;
 using structo::hw::time_source_capabilities;
 using structo::hw::time_source_ref;
 using structo::hw::time_source_traits;
-using reloco::error;
-using reloco::result;
-using reloco::unexpected;
 
 namespace {
 

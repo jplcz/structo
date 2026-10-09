@@ -44,25 +44,55 @@ struct cr0 {
   };
 
   [[nodiscard]] constexpr bool pe() const noexcept { return bits::pe::test(raw); }
-  constexpr auto &set_pe(bool value) noexcept { raw = bits::pe::set_bit(raw, value); return *this; }
+  constexpr auto &set_pe(bool value) noexcept {
+    raw = bits::pe::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool mp() const noexcept { return bits::mp::test(raw); }
-  constexpr auto &set_mp(bool value) noexcept { raw = bits::mp::set_bit(raw, value); return *this; }
+  constexpr auto &set_mp(bool value) noexcept {
+    raw = bits::mp::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool em() const noexcept { return bits::em::test(raw); }
-  constexpr auto &set_em(bool value) noexcept { raw = bits::em::set_bit(raw, value); return *this; }
+  constexpr auto &set_em(bool value) noexcept {
+    raw = bits::em::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool ts() const noexcept { return bits::ts::test(raw); }
-  constexpr auto &set_ts(bool value) noexcept { raw = bits::ts::set_bit(raw, value); return *this; }
+  constexpr auto &set_ts(bool value) noexcept {
+    raw = bits::ts::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool ne() const noexcept { return bits::ne::test(raw); }
-  constexpr auto &set_ne(bool value) noexcept { raw = bits::ne::set_bit(raw, value); return *this; }
+  constexpr auto &set_ne(bool value) noexcept {
+    raw = bits::ne::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool wp() const noexcept { return bits::wp::test(raw); }
-  constexpr auto &set_wp(bool value) noexcept { raw = bits::wp::set_bit(raw, value); return *this; }
+  constexpr auto &set_wp(bool value) noexcept {
+    raw = bits::wp::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool am() const noexcept { return bits::am::test(raw); }
-  constexpr auto &set_am(bool value) noexcept { raw = bits::am::set_bit(raw, value); return *this; }
+  constexpr auto &set_am(bool value) noexcept {
+    raw = bits::am::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool nw() const noexcept { return bits::nw::test(raw); }
-  constexpr auto &set_nw(bool value) noexcept { raw = bits::nw::set_bit(raw, value); return *this; }
+  constexpr auto &set_nw(bool value) noexcept {
+    raw = bits::nw::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool cd() const noexcept { return bits::cd::test(raw); }
-  constexpr auto &set_cd(bool value) noexcept { raw = bits::cd::set_bit(raw, value); return *this; }
+  constexpr auto &set_cd(bool value) noexcept {
+    raw = bits::cd::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool pg() const noexcept { return bits::pg::test(raw); }
-  constexpr auto &set_pg(bool value) noexcept { raw = bits::pg::set_bit(raw, value); return *this; }
+  constexpr auto &set_pg(bool value) noexcept {
+    raw = bits::pg::set_bit(raw, value);
+    return *this;
+  }
 #else
   struct bits {
     using pe = ::structo::arch::pte_bit_field<0, 1, std::uint32_t>;
@@ -78,25 +108,55 @@ struct cr0 {
   };
 
   [[nodiscard]] constexpr bool pe() const noexcept { return bits::pe::test(raw); }
-  constexpr auto &set_pe(bool value) noexcept { raw = bits::pe::set_bit(raw, value); return *this; }
+  constexpr auto &set_pe(bool value) noexcept {
+    raw = bits::pe::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool mp() const noexcept { return bits::mp::test(raw); }
-  constexpr auto &set_mp(bool value) noexcept { raw = bits::mp::set_bit(raw, value); return *this; }
+  constexpr auto &set_mp(bool value) noexcept {
+    raw = bits::mp::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool em() const noexcept { return bits::em::test(raw); }
-  constexpr auto &set_em(bool value) noexcept { raw = bits::em::set_bit(raw, value); return *this; }
+  constexpr auto &set_em(bool value) noexcept {
+    raw = bits::em::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool ts() const noexcept { return bits::ts::test(raw); }
-  constexpr auto &set_ts(bool value) noexcept { raw = bits::ts::set_bit(raw, value); return *this; }
+  constexpr auto &set_ts(bool value) noexcept {
+    raw = bits::ts::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool ne() const noexcept { return bits::ne::test(raw); }
-  constexpr auto &set_ne(bool value) noexcept { raw = bits::ne::set_bit(raw, value); return *this; }
+  constexpr auto &set_ne(bool value) noexcept {
+    raw = bits::ne::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool wp() const noexcept { return bits::wp::test(raw); }
-  constexpr auto &set_wp(bool value) noexcept { raw = bits::wp::set_bit(raw, value); return *this; }
+  constexpr auto &set_wp(bool value) noexcept {
+    raw = bits::wp::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool am() const noexcept { return bits::am::test(raw); }
-  constexpr auto &set_am(bool value) noexcept { raw = bits::am::set_bit(raw, value); return *this; }
+  constexpr auto &set_am(bool value) noexcept {
+    raw = bits::am::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool nw() const noexcept { return bits::nw::test(raw); }
-  constexpr auto &set_nw(bool value) noexcept { raw = bits::nw::set_bit(raw, value); return *this; }
+  constexpr auto &set_nw(bool value) noexcept {
+    raw = bits::nw::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool cd() const noexcept { return bits::cd::test(raw); }
-  constexpr auto &set_cd(bool value) noexcept { raw = bits::cd::set_bit(raw, value); return *this; }
+  constexpr auto &set_cd(bool value) noexcept {
+    raw = bits::cd::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool pg() const noexcept { return bits::pg::test(raw); }
-  constexpr auto &set_pg(bool value) noexcept { raw = bits::pg::set_bit(raw, value); return *this; }
+  constexpr auto &set_pg(bool value) noexcept {
+    raw = bits::pg::set_bit(raw, value);
+    return *this;
+  }
 #endif
 
 #if defined(__i386__)
@@ -160,13 +220,25 @@ struct cr3 {
   };
 
   [[nodiscard]] constexpr bool pwt() const noexcept { return bits::pwt::test(raw); }
-  constexpr auto &set_pwt(bool value) noexcept { raw = bits::pwt::set_bit(raw, value); return *this; }
+  constexpr auto &set_pwt(bool value) noexcept {
+    raw = bits::pwt::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool pcd() const noexcept { return bits::pcd::test(raw); }
-  constexpr auto &set_pcd(bool value) noexcept { raw = bits::pcd::set_bit(raw, value); return *this; }
+  constexpr auto &set_pcd(bool value) noexcept {
+    raw = bits::pcd::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr std::uint64_t pcid() const noexcept { return bits::pcid::get(raw); }
-  constexpr auto &set_pcid(std::uint64_t value) noexcept { raw = bits::pcid::set(raw, value); return *this; }
+  constexpr auto &set_pcid(std::uint64_t value) noexcept {
+    raw = bits::pcid::set(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr std::uint64_t base_addr() const noexcept { return bits::base_addr::get(raw); }
-  constexpr auto &set_base_addr(std::uint64_t value) noexcept { raw = bits::base_addr::set(raw, value); return *this; }
+  constexpr auto &set_base_addr(std::uint64_t value) noexcept {
+    raw = bits::base_addr::set(raw, value);
+    return *this;
+  }
 #else
   struct bits {
     using pwt = ::structo::arch::pte_bit_field<3, 1, std::uint32_t>;
@@ -175,11 +247,20 @@ struct cr3 {
   };
 
   [[nodiscard]] constexpr bool pwt() const noexcept { return bits::pwt::test(raw); }
-  constexpr auto &set_pwt(bool value) noexcept { raw = bits::pwt::set_bit(raw, value); return *this; }
+  constexpr auto &set_pwt(bool value) noexcept {
+    raw = bits::pwt::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool pcd() const noexcept { return bits::pcd::test(raw); }
-  constexpr auto &set_pcd(bool value) noexcept { raw = bits::pcd::set_bit(raw, value); return *this; }
+  constexpr auto &set_pcd(bool value) noexcept {
+    raw = bits::pcd::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr std::uint32_t base_addr() const noexcept { return bits::base_addr::get(raw); }
-  constexpr auto &set_base_addr(std::uint32_t value) noexcept { raw = bits::base_addr::set(raw, value); return *this; }
+  constexpr auto &set_base_addr(std::uint32_t value) noexcept {
+    raw = bits::base_addr::set(raw, value);
+    return *this;
+  }
 #endif
 
 #if defined(__i386__)
@@ -219,17 +300,35 @@ struct cr4 {
   };
 
   [[nodiscard]] constexpr bool pae() const noexcept { return bits::pae::test(raw); }
-  constexpr auto &set_pae(bool value) noexcept { raw = bits::pae::set_bit(raw, value); return *this; }
+  constexpr auto &set_pae(bool value) noexcept {
+    raw = bits::pae::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool pge() const noexcept { return bits::pge::test(raw); }
-  constexpr auto &set_pge(bool value) noexcept { raw = bits::pge::set_bit(raw, value); return *this; }
+  constexpr auto &set_pge(bool value) noexcept {
+    raw = bits::pge::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool pcide() const noexcept { return bits::pcide::test(raw); }
-  constexpr auto &set_pcide(bool value) noexcept { raw = bits::pcide::set_bit(raw, value); return *this; }
+  constexpr auto &set_pcide(bool value) noexcept {
+    raw = bits::pcide::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool smep() const noexcept { return bits::smep::test(raw); }
-  constexpr auto &set_smep(bool value) noexcept { raw = bits::smep::set_bit(raw, value); return *this; }
+  constexpr auto &set_smep(bool value) noexcept {
+    raw = bits::smep::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool smap() const noexcept { return bits::smap::test(raw); }
-  constexpr auto &set_smap(bool value) noexcept { raw = bits::smap::set_bit(raw, value); return *this; }
+  constexpr auto &set_smap(bool value) noexcept {
+    raw = bits::smap::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool la57() const noexcept { return bits::la57::test(raw); }
-  constexpr auto &set_la57(bool value) noexcept { raw = bits::la57::set_bit(raw, value); return *this; }
+  constexpr auto &set_la57(bool value) noexcept {
+    raw = bits::la57::set_bit(raw, value);
+    return *this;
+  }
 #else
   struct bits {
     using pae = ::structo::arch::pte_bit_field<5, 1, std::uint32_t>;
@@ -241,17 +340,35 @@ struct cr4 {
   };
 
   [[nodiscard]] constexpr bool pae() const noexcept { return bits::pae::test(raw); }
-  constexpr auto &set_pae(bool value) noexcept { raw = bits::pae::set_bit(raw, value); return *this; }
+  constexpr auto &set_pae(bool value) noexcept {
+    raw = bits::pae::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool pge() const noexcept { return bits::pge::test(raw); }
-  constexpr auto &set_pge(bool value) noexcept { raw = bits::pge::set_bit(raw, value); return *this; }
+  constexpr auto &set_pge(bool value) noexcept {
+    raw = bits::pge::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool pcide() const noexcept { return bits::pcide::test(raw); }
-  constexpr auto &set_pcide(bool value) noexcept { raw = bits::pcide::set_bit(raw, value); return *this; }
+  constexpr auto &set_pcide(bool value) noexcept {
+    raw = bits::pcide::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool smep() const noexcept { return bits::smep::test(raw); }
-  constexpr auto &set_smep(bool value) noexcept { raw = bits::smep::set_bit(raw, value); return *this; }
+  constexpr auto &set_smep(bool value) noexcept {
+    raw = bits::smep::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool smap() const noexcept { return bits::smap::test(raw); }
-  constexpr auto &set_smap(bool value) noexcept { raw = bits::smap::set_bit(raw, value); return *this; }
+  constexpr auto &set_smap(bool value) noexcept {
+    raw = bits::smap::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool la57() const noexcept { return bits::la57::test(raw); }
-  constexpr auto &set_la57(bool value) noexcept { raw = bits::la57::set_bit(raw, value); return *this; }
+  constexpr auto &set_la57(bool value) noexcept {
+    raw = bits::la57::set_bit(raw, value);
+    return *this;
+  }
 #endif
 
 #if defined(__i386__)
@@ -281,7 +398,10 @@ struct cr8 {
   };
 
   [[nodiscard]] constexpr std::uint64_t tpl() const noexcept { return bits::tpl::get(raw); }
-  constexpr auto &set_tpl(std::uint64_t value) noexcept { raw = bits::tpl::set(raw, value); return *this; }
+  constexpr auto &set_tpl(std::uint64_t value) noexcept {
+    raw = bits::tpl::set(raw, value);
+    return *this;
+  }
 
 #if defined(__x86_64__)
   [[nodiscard]] static cr8 read() noexcept {
@@ -448,49 +568,98 @@ struct eflags {
   };
 
   [[nodiscard]] constexpr bool cf() const noexcept { return bits::cf::test(raw); }
-  constexpr auto &set_cf(bool value) noexcept { raw = bits::cf::set_bit(raw, value); return *this; }
+  constexpr auto &set_cf(bool value) noexcept {
+    raw = bits::cf::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool pf() const noexcept { return bits::pf::test(raw); }
-  constexpr auto &set_pf(bool value) noexcept { raw = bits::pf::set_bit(raw, value); return *this; }
+  constexpr auto &set_pf(bool value) noexcept {
+    raw = bits::pf::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool af() const noexcept { return bits::af::test(raw); }
-  constexpr auto &set_af(bool value) noexcept { raw = bits::af::set_bit(raw, value); return *this; }
+  constexpr auto &set_af(bool value) noexcept {
+    raw = bits::af::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool zf() const noexcept { return bits::zf::test(raw); }
-  constexpr auto &set_zf(bool value) noexcept { raw = bits::zf::set_bit(raw, value); return *this; }
+  constexpr auto &set_zf(bool value) noexcept {
+    raw = bits::zf::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool sf() const noexcept { return bits::sf::test(raw); }
-  constexpr auto &set_sf(bool value) noexcept { raw = bits::sf::set_bit(raw, value); return *this; }
+  constexpr auto &set_sf(bool value) noexcept {
+    raw = bits::sf::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool tf() const noexcept { return bits::tf::test(raw); }
-  constexpr auto &set_tf(bool value) noexcept { raw = bits::tf::set_bit(raw, value); return *this; }
+  constexpr auto &set_tf(bool value) noexcept {
+    raw = bits::tf::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool intf() const noexcept { return bits::intf::test(raw); }
-  constexpr auto &set_intf(bool value) noexcept { raw = bits::intf::set_bit(raw, value); return *this; }
+  constexpr auto &set_intf(bool value) noexcept {
+    raw = bits::intf::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool df() const noexcept { return bits::df::test(raw); }
-  constexpr auto &set_df(bool value) noexcept { raw = bits::df::set_bit(raw, value); return *this; }
+  constexpr auto &set_df(bool value) noexcept {
+    raw = bits::df::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool of() const noexcept { return bits::of::test(raw); }
-  constexpr auto &set_of(bool value) noexcept { raw = bits::of::set_bit(raw, value); return *this; }
+  constexpr auto &set_of(bool value) noexcept {
+    raw = bits::of::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr std::uint32_t iopl() const noexcept { return bits::iopl::get(raw); }
-  constexpr auto &set_iopl(std::uint32_t value) noexcept { raw = bits::iopl::set(raw, value); return *this; }
+  constexpr auto &set_iopl(std::uint32_t value) noexcept {
+    raw = bits::iopl::set(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool nt() const noexcept { return bits::nt::test(raw); }
-  constexpr auto &set_nt(bool value) noexcept { raw = bits::nt::set_bit(raw, value); return *this; }
+  constexpr auto &set_nt(bool value) noexcept {
+    raw = bits::nt::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool rf() const noexcept { return bits::rf::test(raw); }
-  constexpr auto &set_rf(bool value) noexcept { raw = bits::rf::set_bit(raw, value); return *this; }
+  constexpr auto &set_rf(bool value) noexcept {
+    raw = bits::rf::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool vm() const noexcept { return bits::vm::test(raw); }
-  constexpr auto &set_vm(bool value) noexcept { raw = bits::vm::set_bit(raw, value); return *this; }
+  constexpr auto &set_vm(bool value) noexcept {
+    raw = bits::vm::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool ac() const noexcept { return bits::ac::test(raw); }
-  constexpr auto &set_ac(bool value) noexcept { raw = bits::ac::set_bit(raw, value); return *this; }
+  constexpr auto &set_ac(bool value) noexcept {
+    raw = bits::ac::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool vif() const noexcept { return bits::vif::test(raw); }
-  constexpr auto &set_vif(bool value) noexcept { raw = bits::vif::set_bit(raw, value); return *this; }
+  constexpr auto &set_vif(bool value) noexcept {
+    raw = bits::vif::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool vip() const noexcept { return bits::vip::test(raw); }
-  constexpr auto &set_vip(bool value) noexcept { raw = bits::vip::set_bit(raw, value); return *this; }
+  constexpr auto &set_vip(bool value) noexcept {
+    raw = bits::vip::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool id() const noexcept { return bits::id::test(raw); }
-  constexpr auto &set_id(bool value) noexcept { raw = bits::id::set_bit(raw, value); return *this; }
+  constexpr auto &set_id(bool value) noexcept {
+    raw = bits::id::set_bit(raw, value);
+    return *this;
+  }
 
 #if defined(__i386__)
   [[nodiscard]] static eflags read() noexcept {
     std::uint32_t value;
-    asm volatile("pushfd\n\tpop %0" : "=r"(value) :: "memory");
+    asm volatile("pushfd\n\tpop %0" : "=r"(value)::"memory");
     return eflags{value};
   }
-  void write() const noexcept {
-    asm volatile("push %0\n\tpopfd" ::"r"(raw) : "cc", "memory");
-  }
+  void write() const noexcept { asm volatile("push %0\n\tpopfd" ::"r"(raw) : "cc", "memory"); }
 #endif // defined(__i386__)
 };
 
@@ -506,13 +675,25 @@ struct ia32_efer {
   };
 
   [[nodiscard]] constexpr bool sce() const noexcept { return bits::sce::test(raw); }
-  constexpr auto &set_sce(bool value) noexcept { raw = bits::sce::set_bit(raw, value); return *this; }
+  constexpr auto &set_sce(bool value) noexcept {
+    raw = bits::sce::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool lme() const noexcept { return bits::lme::test(raw); }
-  constexpr auto &set_lme(bool value) noexcept { raw = bits::lme::set_bit(raw, value); return *this; }
+  constexpr auto &set_lme(bool value) noexcept {
+    raw = bits::lme::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool lma() const noexcept { return bits::lma::test(raw); }
-  constexpr auto &set_lma(bool value) noexcept { raw = bits::lma::set_bit(raw, value); return *this; }
+  constexpr auto &set_lma(bool value) noexcept {
+    raw = bits::lma::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool nxe() const noexcept { return bits::nxe::test(raw); }
-  constexpr auto &set_nxe(bool value) noexcept { raw = bits::nxe::set_bit(raw, value); return *this; }
+  constexpr auto &set_nxe(bool value) noexcept {
+    raw = bits::nxe::set_bit(raw, value);
+    return *this;
+  }
 
 #if defined(__i386__) || defined(__x86_64__)
   [[nodiscard]] static ia32_efer read() noexcept {
@@ -607,49 +788,98 @@ struct rflags {
   };
 
   [[nodiscard]] constexpr bool cf() const noexcept { return bits::cf::test(raw); }
-  constexpr auto &set_cf(bool value) noexcept { raw = bits::cf::set_bit(raw, value); return *this; }
+  constexpr auto &set_cf(bool value) noexcept {
+    raw = bits::cf::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool pf() const noexcept { return bits::pf::test(raw); }
-  constexpr auto &set_pf(bool value) noexcept { raw = bits::pf::set_bit(raw, value); return *this; }
+  constexpr auto &set_pf(bool value) noexcept {
+    raw = bits::pf::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool af() const noexcept { return bits::af::test(raw); }
-  constexpr auto &set_af(bool value) noexcept { raw = bits::af::set_bit(raw, value); return *this; }
+  constexpr auto &set_af(bool value) noexcept {
+    raw = bits::af::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool zf() const noexcept { return bits::zf::test(raw); }
-  constexpr auto &set_zf(bool value) noexcept { raw = bits::zf::set_bit(raw, value); return *this; }
+  constexpr auto &set_zf(bool value) noexcept {
+    raw = bits::zf::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool sf() const noexcept { return bits::sf::test(raw); }
-  constexpr auto &set_sf(bool value) noexcept { raw = bits::sf::set_bit(raw, value); return *this; }
+  constexpr auto &set_sf(bool value) noexcept {
+    raw = bits::sf::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool tf() const noexcept { return bits::tf::test(raw); }
-  constexpr auto &set_tf(bool value) noexcept { raw = bits::tf::set_bit(raw, value); return *this; }
+  constexpr auto &set_tf(bool value) noexcept {
+    raw = bits::tf::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool intf() const noexcept { return bits::intf::test(raw); }
-  constexpr auto &set_intf(bool value) noexcept { raw = bits::intf::set_bit(raw, value); return *this; }
+  constexpr auto &set_intf(bool value) noexcept {
+    raw = bits::intf::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool df() const noexcept { return bits::df::test(raw); }
-  constexpr auto &set_df(bool value) noexcept { raw = bits::df::set_bit(raw, value); return *this; }
+  constexpr auto &set_df(bool value) noexcept {
+    raw = bits::df::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool of() const noexcept { return bits::of::test(raw); }
-  constexpr auto &set_of(bool value) noexcept { raw = bits::of::set_bit(raw, value); return *this; }
+  constexpr auto &set_of(bool value) noexcept {
+    raw = bits::of::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr std::uint64_t iopl() const noexcept { return bits::iopl::get(raw); }
-  constexpr auto &set_iopl(std::uint64_t value) noexcept { raw = bits::iopl::set(raw, value); return *this; }
+  constexpr auto &set_iopl(std::uint64_t value) noexcept {
+    raw = bits::iopl::set(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool nt() const noexcept { return bits::nt::test(raw); }
-  constexpr auto &set_nt(bool value) noexcept { raw = bits::nt::set_bit(raw, value); return *this; }
+  constexpr auto &set_nt(bool value) noexcept {
+    raw = bits::nt::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool rf() const noexcept { return bits::rf::test(raw); }
-  constexpr auto &set_rf(bool value) noexcept { raw = bits::rf::set_bit(raw, value); return *this; }
+  constexpr auto &set_rf(bool value) noexcept {
+    raw = bits::rf::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool vm() const noexcept { return bits::vm::test(raw); }
-  constexpr auto &set_vm(bool value) noexcept { raw = bits::vm::set_bit(raw, value); return *this; }
+  constexpr auto &set_vm(bool value) noexcept {
+    raw = bits::vm::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool ac() const noexcept { return bits::ac::test(raw); }
-  constexpr auto &set_ac(bool value) noexcept { raw = bits::ac::set_bit(raw, value); return *this; }
+  constexpr auto &set_ac(bool value) noexcept {
+    raw = bits::ac::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool vif() const noexcept { return bits::vif::test(raw); }
-  constexpr auto &set_vif(bool value) noexcept { raw = bits::vif::set_bit(raw, value); return *this; }
+  constexpr auto &set_vif(bool value) noexcept {
+    raw = bits::vif::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool vip() const noexcept { return bits::vip::test(raw); }
-  constexpr auto &set_vip(bool value) noexcept { raw = bits::vip::set_bit(raw, value); return *this; }
+  constexpr auto &set_vip(bool value) noexcept {
+    raw = bits::vip::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool id() const noexcept { return bits::id::test(raw); }
-  constexpr auto &set_id(bool value) noexcept { raw = bits::id::set_bit(raw, value); return *this; }
+  constexpr auto &set_id(bool value) noexcept {
+    raw = bits::id::set_bit(raw, value);
+    return *this;
+  }
 
 #if defined(__x86_64__)
   [[nodiscard]] static rflags read() noexcept {
     std::uint64_t value;
-    asm volatile("pushfq\n\tpop %0" : "=r"(value) :: "memory");
+    asm volatile("pushfq\n\tpop %0" : "=r"(value)::"memory");
     return rflags{value};
   }
-  void write() const noexcept {
-    asm volatile("push %0\n\tpopfq" ::"r"(raw) : "cc", "memory");
-  }
+  void write() const noexcept { asm volatile("push %0\n\tpopfq" ::"r"(raw) : "cc", "memory"); }
 #endif // defined(__x86_64__)
 };
 
@@ -670,23 +900,50 @@ struct xcr0 {
   };
 
   [[nodiscard]] constexpr bool x87() const noexcept { return bits::x87::test(raw); }
-  constexpr auto &set_x87(bool value) noexcept { raw = bits::x87::set_bit(raw, value); return *this; }
+  constexpr auto &set_x87(bool value) noexcept {
+    raw = bits::x87::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool sse() const noexcept { return bits::sse::test(raw); }
-  constexpr auto &set_sse(bool value) noexcept { raw = bits::sse::set_bit(raw, value); return *this; }
+  constexpr auto &set_sse(bool value) noexcept {
+    raw = bits::sse::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool avx() const noexcept { return bits::avx::test(raw); }
-  constexpr auto &set_avx(bool value) noexcept { raw = bits::avx::set_bit(raw, value); return *this; }
+  constexpr auto &set_avx(bool value) noexcept {
+    raw = bits::avx::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool bndreg() const noexcept { return bits::bndreg::test(raw); }
-  constexpr auto &set_bndreg(bool value) noexcept { raw = bits::bndreg::set_bit(raw, value); return *this; }
+  constexpr auto &set_bndreg(bool value) noexcept {
+    raw = bits::bndreg::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool bndcsr() const noexcept { return bits::bndcsr::test(raw); }
-  constexpr auto &set_bndcsr(bool value) noexcept { raw = bits::bndcsr::set_bit(raw, value); return *this; }
+  constexpr auto &set_bndcsr(bool value) noexcept {
+    raw = bits::bndcsr::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool opmask() const noexcept { return bits::opmask::test(raw); }
-  constexpr auto &set_opmask(bool value) noexcept { raw = bits::opmask::set_bit(raw, value); return *this; }
+  constexpr auto &set_opmask(bool value) noexcept {
+    raw = bits::opmask::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool zmm_hi256() const noexcept { return bits::zmm_hi256::test(raw); }
-  constexpr auto &set_zmm_hi256(bool value) noexcept { raw = bits::zmm_hi256::set_bit(raw, value); return *this; }
+  constexpr auto &set_zmm_hi256(bool value) noexcept {
+    raw = bits::zmm_hi256::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool hi16_zmm() const noexcept { return bits::hi16_zmm::test(raw); }
-  constexpr auto &set_hi16_zmm(bool value) noexcept { raw = bits::hi16_zmm::set_bit(raw, value); return *this; }
+  constexpr auto &set_hi16_zmm(bool value) noexcept {
+    raw = bits::hi16_zmm::set_bit(raw, value);
+    return *this;
+  }
   [[nodiscard]] constexpr bool pkru() const noexcept { return bits::pkru::test(raw); }
-  constexpr auto &set_pkru(bool value) noexcept { raw = bits::pkru::set_bit(raw, value); return *this; }
+  constexpr auto &set_pkru(bool value) noexcept {
+    raw = bits::pkru::set_bit(raw, value);
+    return *this;
+  }
 
 #if defined(__i386__) || defined(__x86_64__)
   [[nodiscard]] static xcr0 read() noexcept {

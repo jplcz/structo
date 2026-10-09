@@ -157,9 +157,10 @@ RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
  * (optionally written `$name`) is looked up with `lookup` and its value parsed the same way; an unknown name is 0.
  * `name(arg, ...)` (at most 8 arguments) calls a function through `call`.
  *
- * @param lookup  callable `reloco::result<reloco::string_view>(reloco::string_view name)`; `error::not_found` means unset.
- * @param call    callable `reloco::result<std::uint64_t>(reloco::string_view name, reloco::span<const std::uint64_t> args)`;
- *                its error (e.g. `error::not_found` for an unknown function) fails the evaluation.
+ * @param lookup  callable `reloco::result<reloco::string_view>(reloco::string_view name)`; `error::not_found` means
+ * unset.
+ * @param call    callable `reloco::result<std::uint64_t>(reloco::string_view name, reloco::span<const std::uint64_t>
+ * args)`; its error (e.g. `error::not_found` for an unknown function) fails the evaluation.
  * @return the value; `error::invalid_argument` for a syntax error, a non-numeric variable or a division by zero,
  *         `error::out_of_range` for overflowing literals, too many arguments or nesting deeper than 32.
  */
@@ -169,7 +170,8 @@ template <typename Lookup, typename Call>
 
 /** @brief `evaluate_expression` without functions: any `name(...)` fails with `error::not_found`. */
 template <typename Lookup>
-[[nodiscard]] reloco::result<std::uint64_t> evaluate_expression(reloco::string_view text, const Lookup &lookup) noexcept {
+[[nodiscard]] reloco::result<std::uint64_t> evaluate_expression(reloco::string_view text,
+                                                                const Lookup &lookup) noexcept {
   return evaluate_expression(text, lookup, [](reloco::string_view, reloco::span<const std::uint64_t>) noexcept {
     return reloco::result<std::uint64_t>(reloco::unexpected(reloco::error::not_found));
   });
@@ -239,14 +241,30 @@ private:
         return rhs;
       const std::uint64_t a = *lhs, b = *rhs;
       switch (op) {
-      case '|': lhs = a | b; break;
-      case '^': lhs = a ^ b; break;
-      case '&': lhs = a & b; break;
-      case '<': lhs = b >= 64 ? 0 : a << b; break;
-      case '>': lhs = b >= 64 ? 0 : a >> b; break;
-      case '+': lhs = a + b; break;
-      case '-': lhs = a - b; break;
-      case '*': lhs = a * b; break;
+      case '|':
+        lhs = a | b;
+        break;
+      case '^':
+        lhs = a ^ b;
+        break;
+      case '&':
+        lhs = a & b;
+        break;
+      case '<':
+        lhs = b >= 64 ? 0 : a << b;
+        break;
+      case '>':
+        lhs = b >= 64 ? 0 : a >> b;
+        break;
+      case '+':
+        lhs = a + b;
+        break;
+      case '-':
+        lhs = a - b;
+        break;
+      case '*':
+        lhs = a * b;
+        break;
       default:
         if (b == 0)
           return reloco::unexpected(reloco::error::invalid_argument);
@@ -297,8 +315,9 @@ private:
       return parse_number(word);
     auto value = lookup_(word);
     if (!value)
-      return value.error() == reloco::error::not_found ? reloco::result<std::uint64_t>(std::uint64_t{0})
-                                                       : reloco::result<std::uint64_t>(reloco::unexpected(value.error()));
+      return value.error() == reloco::error::not_found
+                 ? reloco::result<std::uint64_t>(std::uint64_t{0})
+                 : reloco::result<std::uint64_t>(reloco::unexpected(value.error()));
     if (value->empty())
       return std::uint64_t{0};
     return parse_number(*value);

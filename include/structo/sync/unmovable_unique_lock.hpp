@@ -77,8 +77,9 @@ namespace detail {
 template <typename LockT, typename = void> struct has_write_lock : std::false_type {};
 
 template <typename LockT>
-struct has_write_lock<LockT, std::void_t<decltype(std::declval<LockT &>().write_lock(
-                                  std::declval<typename LockT::node &>()))>> : std::true_type {};
+struct has_write_lock<LockT,
+                      std::void_t<decltype(std::declval<LockT &>().write_lock(std::declval<typename LockT::node &>()))>>
+    : std::true_type {};
 
 } // namespace detail
 

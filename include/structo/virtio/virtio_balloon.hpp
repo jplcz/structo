@@ -64,8 +64,8 @@ inline constexpr std::size_t max_pfns_per_message = 1024; ///< Larger messages a
 struct stats {
   std::uint64_t inflate_pages = 0; ///< Pages passed to `try_reclaim`.
   std::uint64_t deflate_pages = 0; ///< Pages passed to `try_restore`.
-  std::uint64_t bad_messages = 0; ///< Odd length, oversize, unreadable or out-of-range frames.
-  std::uint64_t host_errors = 0; ///< `Host` calls that failed.
+  std::uint64_t bad_messages = 0;  ///< Odd length, oversize, unreadable or out-of-range frames.
+  std::uint64_t host_errors = 0;   ///< `Host` calls that failed.
 };
 } // namespace balloon
 
