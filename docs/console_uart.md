@@ -64,10 +64,30 @@ input device (`rx_ready`/`try_get_byte`), so it works with or without that devic
 interrupt callback. `configure` accepts and remembers any settings (there is no baud
 rate); `tx_ready` is always true.
 
+## Mouse
+
+```cpp
+// Pointer events from the same input device become xterm mouse reports, but only while the program
+// asked for them (it sends CSI ? 1000 h / 1002 h / 1003 h; CSI ? 1006 h selects the SGR encoding).
+// Positions are CHARACTER CELLS (0-based), not pixels: a pointing backend converts before queuing.
+//   abs x / abs y   pointer position in cells        rel x / rel y   move by cells (clamped to the screen)
+//   button          left / middle / right press and release
+//   rel wheel       positive = up (report 64), negative = down (65)
+//   sync            ends a group; motion is reported here (1002: only while a button is held; 1003: always)
+queue.push_back(make_abs_event(input_axis::x, 10));  // column 10
+queue.push_back(make_abs_event(input_axis::y, 4));   // row 4
+queue.push_back(make_button_event(input_button::left, true));
+queue.push_back(make_sync_event());
+// With 1000 + 1006 enabled the program reads: ESC [ < 0 ; 11 ; 5 M   (button 0 pressed at column 11, row 5, 1-based)
+```
+
+`vt100_terminal::mouse_tracking()` / `mouse_sgr()` expose the requested mode. Shift/Ctrl held on the
+keyboard are added to the report's modifier bits; legacy (non-SGR) reports are limited to 223 columns/rows.
+
 ## Demo
 
 `examples/sdl3_shell_terminal_demo.cpp` wires an SDL3 keyboard (`input_traits`), a
-`framebuffer_console` and this bridge into a graphical terminal emulator that spawns
+`framebuffer_console` and this bridge into a graphical terminal emulator (keyboard, mouse buttons, motion and wheel) that spawns
 `$SHELL` on a pty (`TERM=xterm` unless `STRUCTO_TERM` is set). Built when SDL3 is
 found (`ninja sdl3_shell_terminal_demo`). Shell output is read by a `reloco::thread` blocked in
 `poll(2)` (reloco has no poll wrapper) and handed to the UI thread through a

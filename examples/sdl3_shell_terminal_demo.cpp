@@ -70,7 +70,7 @@ struct sdl_keyboard {
   std::deque<hw::input_event> queue;
   bool quit = false;
 
-  // Translates one SDL event; everything but keyboard and window-close is ignored.
+  // Translates one SDL event; keyboard, mouse and window-close are handled, everything else is ignored.
   void feed(const SDL_Event &ev) {
     if (ev.type == SDL_EVENT_QUIT) {
       quit = true;
@@ -83,7 +83,34 @@ struct sdl_keyboard {
         queue.push_back(hw::make_key_event(sc, state));
         queue.push_back({hw::input_event_type::sync, 0, 0, 0});
       }
+    } else if (ev.type == SDL_EVENT_MOUSE_MOTION) {
+      point_at(ev.motion.x, ev.motion.y);
+      queue.push_back(hw::make_sync_event());
+    } else if (ev.type == SDL_EVENT_MOUSE_BUTTON_DOWN || ev.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+      hw::input_button button;
+      switch (ev.button.button) {
+      case SDL_BUTTON_LEFT: button = hw::input_button::left; break;
+      case SDL_BUTTON_MIDDLE: button = hw::input_button::middle; break;
+      case SDL_BUTTON_RIGHT: button = hw::input_button::right; break;
+      default: return;
+      }
+      point_at(ev.button.x, ev.button.y);
+      queue.push_back(hw::make_button_event(button, ev.type == SDL_EVENT_MOUSE_BUTTON_DOWN));
+      queue.push_back(hw::make_sync_event());
+    } else if (ev.type == SDL_EVENT_MOUSE_WHEEL && ev.wheel.y != 0.0f) {
+      point_at(ev.wheel.mouse_x, ev.wheel.mouse_y);
+      // Positive = scrolled up/away from the user, one notch per event whatever its size.
+      queue.push_back(hw::make_rel_event(hw::input_axis::wheel, ev.wheel.y > 0 ? 1 : -1));
+      queue.push_back(hw::make_sync_event());
     }
+  }
+
+  // Pointer positions go to the input framework in character cells (what `console_uart` reports to programs).
+  void point_at(float px, float py) {
+    const auto cx = static_cast<std::int32_t>(px / static_cast<float>(dejavu_sans_mono_8x16::glyph_width));
+    const auto cy = static_cast<std::int32_t>(py / static_cast<float>(dejavu_sans_mono_8x16::glyph_height));
+    queue.push_back(hw::make_abs_event(hw::input_axis::x, cx));
+    queue.push_back(hw::make_abs_event(hw::input_axis::y, cy));
   }
 };
 
@@ -91,7 +118,7 @@ struct sdl_keyboard {
 
 template <> struct structo::hw::input_traits<sdl_keyboard> {
   static input_capabilities capabilities(const sdl_keyboard &) noexcept {
-    return {static_cast<std::uint32_t>(input_class::keyboard)};
+    return {input_class::keyboard | input_class::tablet};
   }
   static reloco::result<bool> event_ready(sdl_keyboard &b) noexcept { return !b.queue.empty(); }
   static reloco::result<input_event> try_read_event(sdl_keyboard &b) noexcept {

@@ -490,3 +490,19 @@ TEST_F(Vt100Test, AlternateScreenWithoutStorageIsOnlyReported) {
   ASSERT_EQ(log.modes.size(), 1u);
   EXPECT_EQ(log.modes[0], std::make_pair(vt100_mode::alt_screen_save, true));
 }
+
+TEST_F(Vt100Test, MouseModesAreTracked) {
+  EXPECT_EQ(term.mouse_tracking(), vt100_mouse_tracking::off);
+  term.feed("\x1b[?1000h");
+  EXPECT_EQ(term.mouse_tracking(), vt100_mouse_tracking::normal);
+  term.feed("\x1b[?1002h\x1b[?1006h");
+  EXPECT_EQ(term.mouse_tracking(), vt100_mouse_tracking::button);
+  EXPECT_TRUE(term.mouse_sgr());
+  term.feed("\x1b[?1000l"); // disabling a level that is not current leaves the active one alone
+  EXPECT_EQ(term.mouse_tracking(), vt100_mouse_tracking::button);
+  term.feed("\x1b[?1002l\x1b[?1006l");
+  EXPECT_EQ(term.mouse_tracking(), vt100_mouse_tracking::off);
+  EXPECT_FALSE(term.mouse_sgr());
+  term.feed("\x1b[?1003h\x1b" "c");
+  EXPECT_EQ(term.mouse_tracking(), vt100_mouse_tracking::off);
+}

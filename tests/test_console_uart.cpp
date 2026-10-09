@@ -207,3 +207,65 @@ TEST_F(ConsoleUartTest, ApplicationCursorKeysSendSs3) {
   tap(K(hid_key::up));
   EXPECT_EQ(drain(), "\x1b[A");
 }
+
+namespace {
+void move_to(ConsoleUartTest &t, std::int32_t x, std::int32_t y) {
+  t.kbd.events.push_back(make_abs_event(input_axis::x, x));
+  t.kbd.events.push_back(make_abs_event(input_axis::y, y));
+  t.kbd.events.push_back(make_sync_event());
+}
+} // namespace
+
+TEST_F(ConsoleUartTest, PointerIsSilentUntilProgramEnablesMouseReporting) {
+  move_to(*this, 3, 2);
+  kbd.events.push_back(make_button_event(input_button::left, true));
+  EXPECT_EQ(drain(), "");
+}
+
+TEST_F(ConsoleUartTest, SgrMouseReportsButtonsAndWheel) {
+  ASSERT_TRUE(uart.write_string("\x1b[?1000h\x1b[?1006h"));
+  move_to(*this, 3, 2); // no button held: normal tracking reports no motion
+  kbd.events.push_back(make_button_event(input_button::left, true));
+  kbd.events.push_back(make_button_event(input_button::left, false));
+  kbd.events.push_back(make_button_event(input_button::right, true));
+  kbd.events.push_back(make_rel_event(input_axis::wheel, 1));
+  kbd.events.push_back(make_rel_event(input_axis::wheel, -1));
+  EXPECT_EQ(drain(), "\x1b[<0;4;3M\x1b[<0;4;3m\x1b[<2;4;3M\x1b[<64;4;3M\x1b[<65;4;3M");
+}
+
+TEST_F(ConsoleUartTest, LegacyMouseEncodingAndModifiers) {
+  ASSERT_TRUE(uart.write_string("\x1b[?1000h"));
+  move_to(*this, 0, 0);
+  kbd.events.push_back(make_button_event(input_button::middle, true));
+  kbd.events.push_back(make_button_event(input_button::middle, false));
+  EXPECT_EQ(drain(), "\x1b[M!!!\x1b[M#!!"); // 32+1 / release = 32+3, coords 1,1 -> 33
+  press(hid_key::left_ctrl);
+  kbd.events.push_back(make_button_event(input_button::left, true));
+  EXPECT_EQ(drain(), "\x1b[M0!!"); // 32 + 0 + 16 (ctrl)
+}
+
+TEST_F(ConsoleUartTest, DragMotionReportedOnlyInButtonOrAnyMode) {
+  ASSERT_TRUE(uart.write_string("\x1b[?1002h\x1b[?1006h"));
+  move_to(*this, 1, 1);
+  EXPECT_EQ(drain(), ""); // button mode: hovering is not reported
+  kbd.events.push_back(make_button_event(input_button::left, true));
+  EXPECT_EQ(drain(), "\x1b[<0;2;2M");
+  move_to(*this, 2, 1);
+  EXPECT_EQ(drain(), "\x1b[<32;3;2M"); // motion bit 32 + held left button
+  ASSERT_TRUE(uart.write_string("\x1b[?1003h"));
+  kbd.events.push_back(make_button_event(input_button::left, false));
+  (void)drain();
+  move_to(*this, 3, 1);
+  EXPECT_EQ(drain(), "\x1b[<35;4;2M"); // any-motion with nothing held
+  ASSERT_TRUE(uart.write_string("\x1b[?1003l"));
+  move_to(*this, 4, 1);
+  EXPECT_EQ(drain(), "");
+}
+
+TEST_F(ConsoleUartTest, RelativePointerMotionIsClampedToTheScreen) {
+  ASSERT_TRUE(uart.write_string("\x1b[?1003h\x1b[?1006h"));
+  kbd.events.push_back(make_rel_event(input_axis::x, 1000));
+  kbd.events.push_back(make_rel_event(input_axis::y, -5));
+  kbd.events.push_back(make_sync_event());
+  EXPECT_EQ(drain(), "\x1b[<35;" + std::to_string(kCols) + ";1M");
+}

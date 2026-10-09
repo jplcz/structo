@@ -54,8 +54,13 @@
  * | F5..F12                     | `ESC [ 15~`, `17~`, `18~`, `19~`, `20~`, `21~`, `23~`, `24~` |
  *
  * (xterm/VT220 numbering; modifier combinations with F-keys are not encoded.) Other keys (modifiers alone,
- * keypad, ...) produce nothing. Pointer
- * and other non-key events are discarded.
+ * keypad, ...) produce nothing.
+ *
+ * Pointer events become xterm mouse reports while the program has enabled them (`CSI ? 9/1000/1002/1003 h`,
+ * encoding `CSI ? 1006 h` = SGR, otherwise legacy X10 bytes): left/middle/right buttons, the vertical wheel
+ * (positive = up) and motion (reported at the next `sync` event, only while a button is held for 1002, always
+ * for 1003). `abs`/`rel` x and y are in character cells, not pixels; a pointing backend converts. Other
+ * non-key events are discarded.
  *
  * The bridge is polled: `rx_ready` pulls pending events from the input
  * device (via its polled interface, so it works whether or not that device
@@ -128,7 +133,7 @@ public:
   void set_config(const uart_config &cfg) noexcept { cfg_ = cfg; }
 
 private:
-  static constexpr std::size_t pending_capacity = 8; // longest sequence is 5 bytes; refilled only when empty
+  static constexpr std::size_t pending_capacity = 24; // longest sequence is an SGR mouse report (~14 bytes); refilled only when empty
 
   void push(std::uint8_t b) noexcept { pending_[tail_++] = b; }
   void push_csi(char final_byte, char prefix_digit = 0) noexcept {
@@ -189,9 +194,115 @@ private:
     return {};
   }
 
+  void push_decimal(std::uint32_t v) noexcept {
+    char digits[10];
+    std::size_t n = 0;
+    do {
+      digits[n++] = static_cast<char>('0' + v % 10);
+      v /= 10;
+    } while (v != 0);
+    while (n != 0)
+      push(static_cast<std::uint8_t>(digits[--n]));
+  }
+
+  // Emits one xterm mouse report for the current pointer cell. `button` is the xterm button code (0 left,
+  // 1 middle, 2 right, 3 none/release in legacy encoding, 64/65 wheel up/down), `release` selects the
+  // SGR 'm' final / legacy "button 3" form.
+  void push_mouse_report(unsigned button, bool release, bool motion) noexcept {
+    const bool x10 = term_.mouse_tracking() == vt100_mouse_tracking::x10;
+    unsigned code = button;
+    if (motion)
+      code += 32;
+    if (!x10) {
+      if (lshift_ || rshift_)
+        code += 4;
+      if (lctrl_ || rctrl_)
+        code += 16;
+    }
+    const std::uint32_t cx = static_cast<std::uint32_t>(ptr_x_) + 1;
+    const std::uint32_t cy = static_cast<std::uint32_t>(ptr_y_) + 1;
+    push(0x1B);
+    push('[');
+    if (term_.mouse_sgr()) {
+      push('<');
+      push_decimal(code);
+      push(';');
+      push_decimal(cx);
+      push(';');
+      push_decimal(cy);
+      push(release ? 'm' : 'M');
+    } else {
+      // Legacy encoding: one byte per value, offset by 32, so coordinates top out at 223.
+      push('M');
+      push(static_cast<std::uint8_t>(32 + (release ? 3u + (code & ~3u) : code)));
+      push(static_cast<std::uint8_t>(32 + (cx > 223 ? 223 : cx)));
+      push(static_cast<std::uint8_t>(32 + (cy > 223 ? 223 : cy)));
+    }
+    last_x_ = ptr_x_;
+    last_y_ = ptr_y_;
+  }
+
+  void move_pointer(bool x_axis, std::int32_t v, bool absolute) noexcept {
+    const std::int32_t limit = static_cast<std::int32_t>(x_axis ? term_.console().columns() : term_.console().rows());
+    std::int32_t &pos = x_axis ? ptr_x_ : ptr_y_;
+    pos = absolute ? v : pos + v;
+    if (pos >= limit)
+      pos = limit - 1;
+    if (pos < 0)
+      pos = 0;
+  }
+
+  // Pointer events -> xterm mouse reports, but only while the program asked for them (`CSI ? 1000 h` etc.).
+  // Positions are tracked in character cells (abs x/y are cell coordinates, rel x/y are cell deltas); the
+  // position is kept up to date even when reporting is off. Motion is reported at the next `sync` event.
+  void translate_pointer(const input_event &ev) noexcept {
+    const auto tracking = term_.mouse_tracking();
+    const bool on = tracking != vt100_mouse_tracking::off;
+    const std::uint16_t code = ev.code;
+    if (ev.type == input_event_type::abs || ev.type == input_event_type::rel) {
+      const bool absolute = ev.type == input_event_type::abs;
+      if (code == static_cast<std::uint16_t>(input_axis::x) || code == static_cast<std::uint16_t>(input_axis::y)) {
+        move_pointer(code == static_cast<std::uint16_t>(input_axis::x), ev.value, absolute);
+      } else if (!absolute && code == static_cast<std::uint16_t>(input_axis::wheel) && ev.value != 0 && on &&
+                 tracking != vt100_mouse_tracking::x10) {
+        push_mouse_report(ev.value > 0 ? 64u : 65u, false, false);
+      }
+    } else if (ev.type == input_event_type::button) {
+      unsigned bit;
+      if (code == static_cast<std::uint16_t>(input_button::left))
+        bit = 0;
+      else if (code == static_cast<std::uint16_t>(input_button::middle))
+        bit = 1;
+      else if (code == static_cast<std::uint16_t>(input_button::right))
+        bit = 2;
+      else
+        return;
+      const bool down = ev.value != 0;
+      buttons_ = static_cast<std::uint8_t>(down ? (buttons_ | (1u << bit)) : (buttons_ & ~(1u << bit)));
+      if (on && (down || tracking != vt100_mouse_tracking::x10))
+        push_mouse_report(bit, !down, false);
+    } else if (ev.type == input_event_type::sync) {
+      const bool moved = ptr_x_ != last_x_ || ptr_y_ != last_y_;
+      const bool wants_motion = tracking == vt100_mouse_tracking::any ||
+                                (tracking == vt100_mouse_tracking::button && buttons_ != 0);
+      if (moved && wants_motion) {
+        unsigned held = 3;
+        for (unsigned b = 3; b-- > 0;) {
+          if (buttons_ & (1u << b))
+            held = b;
+        }
+        push_mouse_report(held, false, true);
+      }
+      last_x_ = ptr_x_;
+      last_y_ = ptr_y_;
+    }
+  }
+
   void translate(const input_event &ev) noexcept {
-    if (ev.type != input_event_type::key)
+    if (ev.type != input_event_type::key) {
+      translate_pointer(ev);
       return;
+    }
     const std::uint16_t code = ev.code;
     const bool down = ev.value != 0;
     const bool is_press = ev.value == static_cast<std::int32_t>(input_key_state::pressed);
@@ -254,6 +365,9 @@ private:
   std::size_t head_ = 0;
   std::size_t tail_ = 0;
   char last_tx_ = 0;
+  std::int32_t ptr_x_ = 0, ptr_y_ = 0;   // pointer position in cells
+  std::int32_t last_x_ = 0, last_y_ = 0; // cell of the last report / sync
+  std::uint8_t buttons_ = 0;             // held buttons: bit0 left, bit1 middle, bit2 right
   bool lshift_ = false, rshift_ = false, lctrl_ = false, rctrl_ = false, caps_ = false;
 };
 
