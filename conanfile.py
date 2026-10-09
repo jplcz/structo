@@ -10,7 +10,7 @@ from conan.tools.files import copy
 
 class JplczStructoConan(ConanFile):
     name = "jplcz_structo"
-    version = "0.2.1"
+    version = "0.3.0"
     package_type = "header-library"
     license = "BSD-2-Clause"
     url = "https://github.com/jplcz/structo"
