@@ -22,6 +22,7 @@
  * a first arena/buddy allocator before the rest of `free` is folded in.
  */
 
+#include <structo/boot/memory_kind.hpp>
 #include <structo/fdt_memory.hpp>
 #include <structo/fdt_reader.hpp>
 #include <structo/region_set.hpp>
@@ -59,6 +60,23 @@ template <std::size_t Capacity, typename PhysInt = std::uint64_t> struct boot_me
       return reloco::unexpected(extracted.error());
 
     return out;
+  }
+
+  /** @brief Folds one range of a non-devicetree boot protocol's memory map
+   * (Limine, UEFI, Linux `e820`, ...) into the map, per
+   * `structo::boot::is_ram`/`is_free`: RAM kinds are added to `full`,
+   * `memory_kind::usable` additionally to `free`; everything else is
+   * accepted and ignored. Fails with whatever `region_set::try_add`
+   * reports (`Capacity` exhausted). A protocol map already excludes its
+   * own reservations by kind, so no further subtraction is needed. */
+  [[nodiscard]] reloco::result<void> try_add(structo::boot::memory_kind kind, PhysInt base, PhysInt size) noexcept {
+    if (!structo::boot::is_ram(kind))
+      return {};
+    if (auto r = full.try_add(base, size); !r)
+      return r;
+    if (structo::boot::is_free(kind))
+      return free.try_add(base, size);
+    return {};
   }
 
   /** @brief The single largest region in `free`, i.e. the best candidate

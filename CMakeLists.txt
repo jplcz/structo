@@ -324,6 +324,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_io_space_ref.cpp
         tests/test_mmio_space.cpp
         tests/test_multiboot2.cpp
+        tests/test_boot_protocols.cpp
         tests/test_uart_ref.cpp
         tests/test_uart_input.cpp
         tests/test_input_device_ref.cpp
@@ -518,6 +519,7 @@ if(JPLCZ_STRUCTO_BUILD_HEADER_CHECKS)
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/hw/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/hypervisor/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/virtio/*.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/boot/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/bootldr/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/net/*.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/structo/usb/*.hpp"

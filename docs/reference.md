@@ -42,6 +42,15 @@ have a linked, standalone page going into more depth.
 | [`fdt_index.hpp`](fdt_index.md) | `fdt_index<Container>`, `fdt_index_node`, `fdt_index_phandle_entry`, `fdt_index_child_iterator<NodeContainer>`, `fdt_index_property_iterator` | Random-access index over an `fdt_reader` blob, built once (iteratively, never recursively) into caller-supplied `Container<T>` buffers, giving `O(1)` parent lookup and child iteration without descending into subtrees, plus `O(log n)` phandle-to-node lookup |
 | [`fdt_memory.hpp`](fdt_memory.md) | `try_extract_memory` | Extracts a devicetree's physical memory description straight off `fdt_reader`'s single-pass streaming API (no `fdt_index`, safe to call very early in boot) into caller-provided `region_set`s |
 | [`arch/fdt_cpu_map.hpp`](fdt_cpu_map.md) | `try_populate_hw_id_lut_from_fdt` | Decodes a devicetree's `/cpus` node straight off `fdt_reader`'s single-pass streaming API (no `fdt_index`, safe to call before any CPU index exists) into a caller-provided `hw_id_lut`, assigning sequential logical CPU indices in devicetree order |
+| [`boot/limine.hpp`](boot-protocols.md) | `limine::reader<Resolver>`, `make_request<T>`, `make_base_revision` | Limine boot protocol: request records plus a bounds-checked, pointer-free (integer-address + resolver) decoder for every response, including memmap, framebuffers, modules and MP |
+| [`boot/uefi.hpp`](boot-protocols.md) | `uefi::memory_map_reader`, `uefi::config_table_reader`, `uefi::guid`, `uefi::try_decode_system_table64` | UEFI memory map (descriptor-size aware), system/configuration tables and GOP mode info |
+| [`boot/linux_x86.hpp`](boot-protocols.md) | `linux_x86::setup_header`, `boot_params_reader`, `boot_params_writer` | Linux x86/x86_64 boot protocol: setup header, zero page (e820, cmdline, initrd, EFI info, screen info) for kernels and loaders |
+| [`boot/linux_arm.hpp`](boot-protocols.md) | `linux_arm::zimage_header`, `atag_reader`, `atag_writer` | 32-bit ARM `zImage` header and ATAGS list reader/writer |
+| [`boot/linux_image_header.hpp`](boot-protocols.md) | `linux_arm64::image_header`, `linux_riscv::image_header` | arm64 and RISC-V Linux `Image` header decoders (load offset, size, flags, version) |
+| [`arch/riscv/sbi.hpp`](boot-protocols.md) | `riscv::sbi::client<Backend>`, `sbiret`, `status` | RISC-V SBI client (Base/TIME/IPI/RFENCE/HSM/SRST/DBCN) over a pluggable `ecall` backend |
+| [`boot/uboot.hpp`](boot-protocols.md) | `uboot::try_parse_image`, `try_write_header`, `env_reader` | U-Boot legacy `uImage` parse/verify/build with CRC-32, FIT detection and environment lookups |
+| [`boot/arm_tf_fip.hpp`](boot-protocols.md) | `arm_tf_fip::fip_reader`, `toc_writer`, `uuid`, `uuids::*` | Arm Trusted Firmware FIP parser: ToC validation, bounds-checked entry iteration/lookup by UUID, plus a ToC writer |
+| [`boot/memory_kind.hpp`](boot-protocols.md) | `boot::memory_kind` | Protocol-neutral memory classification feeding `boot_memory_map::try_add` |
 
 ## Physical/virtual addressing & scatter-gather
 
