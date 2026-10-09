@@ -106,6 +106,119 @@ read through the `read_memory` hook; `out_of_bounds` on a fault), `bit(n)` and `
 
 Failing commands print `error: <name>` (microfmt formats `reloco::error` by name).
 
+## Guide: an `xmodem` command and sending files from a PC
+
+The shell and XMODEM ([`xmodem.md`](xmodem.md)) share one UART. This works because the shell has already
+consumed the typed line before the handler runs, and the handler then owns the UART until it returns.
+
+### 1. The command
+
+```cpp
+#include <structo/bootldr/shell.hpp>
+#include <structo/bootldr/xmodem.hpp>
+
+// State the command needs; passed to the handler through call.ctx().
+struct xmodem_ctx {
+  structo::hw::uart_ref uart;   // the same UART the shell console uses
+  std::uint8_t *load_base;      // where images may be loaded (RAM region reserved for them)
+  std::size_t load_capacity;    // size of that region in bytes
+};
+
+// usage: xmodem <load address> [max length]
+// The handler is a noexcept coroutine; the transfer itself is a blocking call, so no other
+// scheduler task runs until the transfer ends (the UART is polled).
+reloco::task<void> cmd_xmodem(structo::bootldr::command_call &call) noexcept {
+  auto &ctx = *static_cast<xmodem_ctx *>(call.ctx());   // the pointer given at registration
+  if (call.argc() < 2 || call.argc() > 3) {
+    (void)call.print("usage: xmodem <addr> [max length]\n");
+    co_await reloco::unexpected(reloco::error::invalid_argument);
+  }
+  auto addr = structo::bootldr::parse_number(call.arg(1)); // 4096, 0x1000, 0b1, 017
+  if (!addr)
+    co_await reloco::unexpected(addr.error());
+  std::uint64_t cap = ctx.load_capacity;                   // optional 2nd argument lowers the limit
+  if (call.argc() == 3) {
+    auto len = structo::bootldr::parse_number(call.arg(2));
+    if (!len)
+      co_await reloco::unexpected(len.error());
+    cap = *len < cap ? *len : cap;
+  }
+
+  auto *dst = reinterpret_cast<std::uint8_t *>(*addr);
+  std::size_t used = 0;
+  // Called once per in-order 128/1024-byte packet. Returning false aborts the transfer (CAN sent).
+  auto sink = [&](reloco::span<const std::uint8_t> payload) {
+    if (used + payload.size() > cap)
+      return false;                                        // image larger than the buffer
+    std::memcpy(dst + used, payload.data(), payload.size());
+    used += payload.size();
+    return true;
+  };
+
+  (void)call.print("waiting for XMODEM sender (Ctrl-C x2 to abort)...\n");
+  structo::bootldr::xmodem_config cfg;                     // defaults: CRC-16, 10 retries, 1K packets
+  auto r = structo::bootldr::receive(
+      ctx.uart, reloco::function_ref<bool(reloco::span<const std::uint8_t>)>(sink), cfg);
+  if (!r)
+    co_await reloco::unexpected(r.error());                // the shell prints "error: <name>"
+
+  // XMODEM has no length field: the last packet is padded with 0x1A (SUB), so `used` is
+  // rounded up to 128 bytes. Keep the exact size yourself if the format needs it.
+  (void)call.print("received {} bytes at {:#x}\n", used, *addr);
+  // Publish the size as $filesize for scripts; format() renders the number as decimal text.
+  auto size = microfmt::format<24>("{}", used);
+  (void)call.sh().context().set("filesize", size.view());
+}
+```
+
+Register it like any command:
+
+```cpp
+static xmodem_ctx xctx{uart, reinterpret_cast<std::uint8_t *>(0x80000000), 64u << 20};
+static structo::bootldr::shell_command xmodem_cmd{
+    "xmodem",                                    // name typed by the user
+    "xmodem <addr> [max]: receive a file over XMODEM into memory",
+    cmd_xmodem,                                  // handler above
+    &xctx};                                      // call.ctx()
+(void)sh.add(xmodem_cmd);
+```
+
+### 2. Sending a file from the PC
+
+Run `xmodem 0x80000000` on the target. The target then sends `C` every few seconds; start the sender within that time. The terminal program must be **disconnected from the
+keyboard** while sending (it must stop echoing and pass bytes through), so use its built-in transfer:
+
+| Tool | How |
+|------|-----|
+| minicom | `Ctrl-A S`, choose `xmodem`, pick the file (minicom runs `sx`; edit the protocol in `Ctrl-A O` → *File transfer protocols* to add `-k`) |
+| picocom | `picocom -b 115200 --send-cmd "sx -k" /dev/ttyUSB0`, then type `Ctrl-A Ctrl-S` and the file name |
+| lrzsz | `sx -k --xmodem kernel.bin < /dev/ttyUSB0 > /dev/ttyUSB0` (after `stty -F /dev/ttyUSB0 115200 raw -echo`, with the terminal program closed) |
+| screen | `Ctrl-A :exec !! sx -k kernel.bin` |
+| Windows | Tera Term: *File → Transfer → XMODEM → Send* (choose *CRC* or *1K*); PuTTY has no XMODEM, use Tera Term |
+
+`sx -k` sends 1024-byte packets (XMODEM-1K); without `-k` it sends 128-byte packets. Both work with the
+default configuration. The receiver asks for CRC-16 first and falls back to the 8-bit checksum after a few
+unanswered requests, so very old senders work too.
+
+### 3. Using the result
+
+```
+> xmodem 0x80000000
+waiting for XMODEM sender (Ctrl-C x2 to abort)...
+received 4096 bytes at 0x80000000
+> crc32 0x80000000 4096                  # compare with `crc32 kernel.bin` / `cksum` on the PC
+> go 0x80000000
+```
+
+Verify the transfer with `crc32` on both sides (the padding bytes are included in the target-side
+length, so compare with the file size rounded up to 128, or pass the real size if you know it).
+`xmodem` also composes with scripts, e.g. `function load 'xmodem $1; crc32 $1 $filesize'`.
+
+If a transfer fails with `timed_out` or `io_error`, raise the UART get-byte spin budget for your CPU, check
+that nothing else (a logger, another task) writes to the same UART during the transfer, and lower the
+baud rate. A PC-side `sx` that reports "Retry 0: NAK on sector" repeatedly means line noise or a wrong
+baud rate.
+
 ## Text editor
 
 ```cpp

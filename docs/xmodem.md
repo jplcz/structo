@@ -45,6 +45,9 @@ auto r = bootldr::receive(uart, reloco::function_ref<bool(reloco::span<const std
 if (!r) { /* io_error, operation_canceled, capacity_exceeded, or a UART error */ }
 ```
 
+To expose this as a shell command and send files from a PC, see
+[the shell guide](bootloader_shell.md#guide-an-xmodem-command-and-sending-files-from-a-pc).
+
 ## Driving the engines yourself
 
 Use `xmodem_receiver` / `xmodem_sender` directly when you have a real
