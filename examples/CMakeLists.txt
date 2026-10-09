@@ -68,4 +68,10 @@ if(UNIX)
     target_link_libraries(debug_menu_linux_demo PRIVATE jplcz_structo jplcz_structo_warnings)
     target_compile_features(debug_menu_linux_demo PRIVATE cxx_std_20)
     add_dependencies(jplcz_structo_examples debug_menu_linux_demo)
+
+    # C++20-only terminal demo of the bootldr::shell with the generic command set.
+    add_executable(shell_linux_demo shell_linux_demo.cpp)
+    target_link_libraries(shell_linux_demo PRIVATE jplcz_structo jplcz_structo_warnings)
+    target_compile_features(shell_linux_demo PRIVATE cxx_std_20)
+    add_dependencies(jplcz_structo_examples shell_linux_demo)
 endif()

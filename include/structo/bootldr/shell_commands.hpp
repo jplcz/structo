@@ -17,6 +17,12 @@
  * | `cp <dst> <src> <len>` | copy memory (overlap-safe) |
  * | `cmp <a> <b> <len>` | compare memory; on a mismatch prints a `microfmt::mem_diff` of the differing rows |
  * | `fill <addr> <len> <byte>` | fill memory |
+ * | `crc32 <addr> <len> [var]` | CRC-32 (IEEE, as in zlib) of memory; prints it and optionally stores it in variable `var` |
+ * | `find <addr> <len> <value> [width]` | print every address in the range holding `value` (width 1/2/4/8, default 1; scanned at `width` steps) |
+ * | `mtest <addr> <len>` | destructive RAM test of word-aligned memory (walking patterns and address-as-data); fails with `io_error` on a mismatch |
+ * | `env [name]` | list the visible variables, or print one |
+ * | `if <a> <op> <b> 'then' ['else']` | run `then` (or `else`) as a script; `op` is `== != < <= > >=`, numbers compare unsigned, otherwise `==`/`!=` compare text |
+ * | `repeat <n> 'script'` | run `script` `n` times with variable `i` = 0..n-1 in the current scope |
  * | `source <addr> [len]` | run the script stored in memory (one line per `\n`, `;` separates statements); without `len` it ends at the first NUL |
  * | `go <addr>` | jump to an address (only if a `go` hook is provided) |
  * | `reset` | restart the board (only if a `reset` hook is provided) |
@@ -98,6 +104,12 @@ public:
         fill_("fill", "fill <addr> <len> <byte>: fill memory", &fill_cmd),
         source_("source", "source <addr> [len]: run the script (lines, ';'-separated statements) stored in memory",
                 &source_cmd, this),
+        crc32_("crc32", "crc32 <addr> <len> [var]: CRC-32 of memory, optionally stored in a variable", &crc32_cmd, this),
+        find_("find", "find <addr> <len> <value> [width=1]: search memory for a value", &find_cmd, this),
+        mtest_("mtest", "mtest <addr> <len>: destructive RAM test (word aligned)", &mtest_cmd),
+        env_("env", "env [name]: list variables, or print one", &env_cmd),
+        if_("if", "if <a> <op> <b> 'then' ['else']: op is == != < <= > >=", &if_cmd),
+        repeat_("repeat", "repeat <n> 'script': run script n times, $i = 0..n-1", &repeat_cmd),
         go_("go", "go <addr>: jump to an address", &go_cmd, this),
         reset_("reset", "reset: restart the board", &reset_cmd, this) {}
 
@@ -126,7 +138,7 @@ public:
   [[nodiscard]] reloco::result<void> add_all() noexcept {
     if (auto r = add_functions(); !r)
       return r;
-    shell_command *all[] = {&echo_, &sleep_, &uptime_, &md_, &mw_, &cp_, &cmp_, &fill_, &source_};
+    shell_command *all[] = {&echo_, &sleep_, &uptime_, &md_, &mw_, &cp_, &cmp_, &fill_, &source_, &crc32_, &find_, &mtest_, &env_, &if_, &repeat_};
     for (shell_command *c : all)
       if (auto r = sh_->add(*c); !r)
         return r;
@@ -388,6 +400,185 @@ private:
     co_await co_await call.sh().run_script(text.view());
   }
 
+  // CRC-32 (reflected, polynomial 0xEDB88320, init/xorout 0xFFFFFFFF), bitwise: no table, so no flash/RAM cost.
+  static std::uint32_t crc32_update(std::uint32_t crc, const std::uint8_t *data, std::size_t n) noexcept {
+    for (std::size_t i = 0; i < n; ++i) {
+      crc ^= data[i];
+      for (int b = 0; b < 8; ++b)
+        crc = (crc >> 1) ^ (0xEDB88320u & (~(crc & 1u) + 1u));
+    }
+    return crc;
+  }
+
+  // crc32 <addr> <len> [var]
+  static reloco::task<void> crc32_cmd(command_call &call) noexcept {
+    auto &self = *static_cast<generic_commands *>(call.ctx());
+    if (call.argc() < 3 || call.argc() > 4)
+      co_await reloco::unexpected(usage(call));
+    auto addr = parse_number(call.arg(1));
+    auto len = parse_number(call.arg(2));
+    if (!addr || !len)
+      co_await reloco::unexpected(usage(call));
+    std::uint32_t crc = 0xFFFFFFFFu;
+    std::uint8_t part[64];
+    for (std::uint64_t off = 0; off < *len;) {
+      const std::size_t want = *len - off < sizeof part ? static_cast<std::size_t>(*len - off) : sizeof part;
+      if (self.reader()(self.hooks_.ctx, static_cast<std::uintptr_t>(*addr + off), part, want) != want)
+        co_await reloco::unexpected(reloco::error::out_of_bounds);
+      crc = crc32_update(crc, part, want);
+      off += want;
+      if (off % chunk == 0)
+        co_await call.sh().sched().yield();
+    }
+    crc = ~crc;
+    (void)call.print("{:#010x}\n", crc);
+    if (call.argc() == 4) {
+      const auto text = microfmt::format<24>("{:#x}", crc);
+      if (auto r = call.sh().context().set(call.arg(3), text.view()); !r)
+        co_await reloco::unexpected(r.error());
+    }
+  }
+
+  // find <addr> <len> <value> [width]
+  static reloco::task<void> find_cmd(command_call &call) noexcept {
+    auto &self = *static_cast<generic_commands *>(call.ctx());
+    if (call.argc() < 4 || call.argc() > 5)
+      co_await reloco::unexpected(usage(call));
+    auto addr = parse_number(call.arg(1));
+    auto len = parse_number(call.arg(2));
+    auto value = parse_number(call.arg(3));
+    auto width = call.argc() == 5 ? parse_number(call.arg(4)) : reloco::result<std::uint64_t>(std::uint64_t{1});
+    if (!addr || !len || !value || !width || (*width != 1 && *width != 2 && *width != 4 && *width != 8))
+      co_await reloco::unexpected(usage(call));
+    const std::size_t w = static_cast<std::size_t>(*width);
+    for (std::uint64_t off = 0; off + w <= *len; off += w) {
+      std::uint8_t bytes[8]{};
+      if (self.reader()(self.hooks_.ctx, static_cast<std::uintptr_t>(*addr + off), bytes, w) != w)
+        co_await reloco::unexpected(reloco::error::out_of_bounds);
+      std::uint64_t got = 0;
+      std::memcpy(&got, bytes, w);
+      if constexpr (std::endian::native == std::endian::big)
+        got >>= (8 - w) * 8;
+      if (got == *value)
+        (void)call.print("{:#x}\n", *addr + off);
+      if ((off / w) % chunk == chunk - 1)
+        co_await call.sh().sched().yield();
+    }
+  }
+
+  RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
+
+  // mtest <addr> <len>: destroys the contents. Passes: all-zero, all-ones, 0x55../0xAA.. and address-as-data,
+  // each written over the whole range and then verified (the last one catches address-line aliasing).
+  static reloco::task<void> mtest_cmd(command_call &call) noexcept {
+    if (call.argc() != 3)
+      co_await reloco::unexpected(usage(call));
+    auto addr = parse_number(call.arg(1));
+    auto len = parse_number(call.arg(2));
+    if (!addr || !len || *addr % 4 != 0)
+      co_await reloco::unexpected(usage(call));
+    const std::uint64_t words = *len / 4;
+    auto *mem = reinterpret_cast<volatile std::uint32_t *>(static_cast<std::uintptr_t>(*addr));
+    constexpr std::uint32_t fixed[] = {0u, 0xFFFFFFFFu, 0x55555555u, 0xAAAAAAAAu};
+    std::uint64_t errors = 0;
+    for (std::size_t pass = 0; pass < 5; ++pass) {
+      const auto expected = [&](std::uint64_t i) noexcept {
+        return pass < 4 ? fixed[pass] : static_cast<std::uint32_t>(*addr + i * 4);
+      };
+      for (std::uint64_t i = 0; i < words; ++i) {
+        mem[i] = expected(i);
+        if (i % (chunk / 4) == chunk / 4 - 1)
+          co_await call.sh().sched().yield();
+      }
+      for (std::uint64_t i = 0; i < words; ++i) {
+        const std::uint32_t got = mem[i];
+        if (got != expected(i)) {
+          if (++errors <= 8)
+            (void)call.print("{:#x}: wrote {:#010x}, read {:#010x}\n", *addr + i * 4, expected(i), got);
+        }
+        if (i % (chunk / 4) == chunk / 4 - 1)
+          co_await call.sh().sched().yield();
+      }
+    }
+    if (errors == 0) {
+      (void)call.write("ok\n");
+    } else {
+      (void)call.print("{} error(s)\n", errors);
+      co_await reloco::unexpected(reloco::error::io_error);
+    }
+  }
+
+  RELOCO_END_UNSAFE_BUFFER_USAGE
+
+  // env [name]
+  static reloco::task<void> env_cmd(command_call &call) noexcept {
+    const shell_context &ctx = call.sh().context();
+    if (call.argc() > 2)
+      co_await reloco::unexpected(usage(call));
+    if (call.argc() == 2) {
+      auto v = ctx.get(call.arg(1));
+      if (!v)
+        co_await reloco::unexpected(v.error());
+      (void)call.print("{}\n", *v);
+      co_return;
+    }
+    ctx.for_each_variable([&](reloco::string_view name, reloco::string_view value) {
+      (void)call.print("{}={}\n", name, value);
+    });
+  }
+
+  // `a op b`: numbers compare unsigned; otherwise only == and != are allowed and compare the text.
+  static reloco::result<bool> compare(reloco::string_view a, reloco::string_view op, reloco::string_view b) noexcept {
+    const auto x = parse_number(a);
+    const auto y = parse_number(b);
+    if (x && y) {
+      if (op == "==") return *x == *y;
+      if (op == "!=") return *x != *y;
+      if (op == "<") return *x < *y;
+      if (op == "<=") return *x <= *y;
+      if (op == ">") return *x > *y;
+      if (op == ">=") return *x >= *y;
+    } else {
+      if (op == "==") return a == b;
+      if (op == "!=") return a != b;
+    }
+    return reloco::unexpected(reloco::error::invalid_argument);
+  }
+
+  // if <a> <op> <b> 'then' ['else']: the script is copied first because running it reuses the argument storage.
+  static reloco::task<void> if_cmd(command_call &call) noexcept {
+    if (call.argc() < 5 || call.argc() > 6)
+      co_await reloco::unexpected(usage(call));
+    auto cond = compare(call.arg(1), call.arg(2), call.arg(3));
+    if (!cond)
+      co_await reloco::unexpected(usage(call));
+    const reloco::string_view chosen = *cond ? call.arg(4) : call.arg(5);
+    reloco::sso_string text(call.sh().sched().allocator());
+    if (auto r = text.try_assign(chosen); !r)
+      co_await reloco::unexpected(r.error());
+    if (!text.empty())
+      co_await co_await call.sh().run_script(text.view());
+  }
+
+  // repeat <n> 'script'
+  static reloco::task<void> repeat_cmd(command_call &call) noexcept {
+    if (call.argc() != 3)
+      co_await reloco::unexpected(usage(call));
+    auto n = parse_number(call.arg(1));
+    if (!n)
+      co_await reloco::unexpected(usage(call));
+    reloco::sso_string text(call.sh().sched().allocator());
+    if (auto r = text.try_assign(call.arg(2)); !r)
+      co_await reloco::unexpected(r.error());
+    for (std::uint64_t i = 0; i < *n; ++i) {
+      const auto num = microfmt::format<24>("{}", i);
+      if (auto r = call.sh().context().set("i", num.view()); !r)
+        co_await reloco::unexpected(r.error());
+      co_await co_await call.sh().run_script(text.view());
+      co_await call.sh().sched().yield();
+    }
+  }
+
   static reloco::task<void> go_cmd(command_call &call) noexcept {
     auto &self = *static_cast<generic_commands *>(call.ctx());
     auto addr = call.argc() == 2 ? parse_number(call.arg(1)) : reloco::result<std::uint64_t>(reloco::unexpected(reloco::error::invalid_argument));
@@ -406,7 +597,7 @@ private:
 
   shell_base *sh_;
   generic_commands_hooks hooks_;
-  shell_command echo_, sleep_, uptime_, md_, mw_, cp_, cmp_, fill_, source_, go_, reset_;
+  shell_command echo_, sleep_, uptime_, md_, mw_, cp_, cmp_, fill_, source_, crc32_, find_, mtest_, env_, if_, repeat_, go_, reset_;
 };
 
 } // namespace structo::bootldr

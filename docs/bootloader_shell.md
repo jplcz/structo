@@ -91,6 +91,12 @@ structo::bootldr::generic_commands cmds{sh, hooks}; // owns the command objects;
 | `md <addr> [len]` | hex dump (microfmt `hexdump_checked`) |
 | `mw <addr> <value> [width]` | write 1/2/4/8 bytes |
 | `cp <dst> <src> <len>`, `fill <addr> <len> <byte>` | overlap-safe copy, fill; yield every 4 KiB |
+| `crc32 <addr> <len> [var]` | CRC-32 (IEEE, as zlib) of memory; prints it, optionally stores it in `var` |
+| `find <addr> <len> <value> [width]` | prints each address (stepping by `width` 1/2/4/8, default 1) holding `value` |
+| `mtest <addr> <len>` | destructive word-aligned RAM test (0, ones, 0x55/0xAA, address-as-data); `io_error` on mismatch |
+| `env [name]` | lists the visible variables, or prints one |
+| `if <a> <op> <b> 'then' ['else']` | runs `then` or `else` as a script; `op` is `== != < <= > >=` (numbers unsigned, else `==`/`!=` compare text) |
+| `repeat <n> 'script'` | runs `script` `n` times with `i` = 0..n-1 set in the current scope |
 | `source <addr> [len]` | runs the script stored in memory (copied first); without `len` it ends at the first NUL |
 | `cmp <a> <b> <len>` | prints a microfmt `mem_diff` at the first difference and fails |
 

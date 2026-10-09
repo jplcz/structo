@@ -425,6 +425,56 @@ TEST_F(ShellCmds, EchoUptimeSleep) {
   EXPECT_FALSE(out_has("error"));
 }
 
+TEST_F(ShellCmds, Crc32OfMemory) {
+  std::memcpy(mem, "123456789", 9);
+  cmd("crc32 {} 9 sum", addr(mem));
+  EXPECT_TRUE(out_has("0xcbf43926\r\n"));
+  EXPECT_EQ(sh.context().get("sum").value(), "0xcbf43926");
+}
+
+TEST_F(ShellCmds, FindListsMatches) {
+  mem[3] = 0x7e;
+  mem[40] = 0x7e;
+  cmd("find {} 64 0x7e", addr(mem));
+  EXPECT_TRUE(out_has(microfmt::format<32>("{:#x}\r\n", addr(mem) + 3).view()));
+  EXPECT_TRUE(out_has(microfmt::format<32>("{:#x}\r\n", addr(mem) + 40).view()));
+  EXPECT_FALSE(out_has(microfmt::format<32>("{:#x}\r\n", addr(mem) + 4).view()));
+}
+
+TEST_F(ShellCmds, MtestPassesOnGoodMemory) {
+  cmd("mtest {} 128", addr(mem));
+  EXPECT_TRUE(out_has("ok\r\n"));
+  EXPECT_FALSE(out_has("error"));
+}
+
+TEST_F(ShellCmds, EnvListsVariables) {
+  cmd("set colour blue");
+  cmd("env");
+  EXPECT_TRUE(out_has("colour=blue\r\n"));
+  cmd("env colour");
+  EXPECT_TRUE(out_has("blue\r\n"));
+}
+
+TEST_F(ShellCmds, IfPicksABranch) {
+  cmd("if 3 < 4 'echo yes' 'echo no'");
+  EXPECT_TRUE(out_has("yes\r\n"));
+  EXPECT_FALSE(out_has("no\r\n"));
+  cmd("if abc == abd 'echo same' 'echo differ'");
+  EXPECT_TRUE(out_has("differ\r\n"));
+  cmd("if 1 == 2 'set z 1'");
+  EXPECT_FALSE(sh.context().get("z").has_value());
+  cmd("if abc < abd 'echo x'");
+  EXPECT_TRUE(out_has("error"));
+}
+
+TEST_F(ShellCmds, RepeatRunsWithCounter) {
+  cmd("repeat 3 'echo n$i'");
+  EXPECT_TRUE(out_has("n0\r\n"));
+  EXPECT_TRUE(out_has("n1\r\n"));
+  EXPECT_TRUE(out_has("n2\r\n"));
+  EXPECT_FALSE(out_has("n3"));
+}
+
 TEST_F(ShellCmds, SourceRunsAScriptFromMemory) {
   const reloco::string_view script = "set a 5\r\necho first; echo $a\n\n# comment\nfunction two 'echo $1 $1'\ntwo x";
   for (std::size_t i = 0; i < script.size(); ++i)
