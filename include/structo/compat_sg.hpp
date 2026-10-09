@@ -201,12 +201,12 @@ public:
           if (remaining < PageTraits::page_size)
             RELOCO_UNLIKELY
           return unexpected(error::invalid_argument);
-          constexpr uint64_t max_hw_pages = detail::generate_mask<Layout::length_field::bits, uint64_t>();
+          constexpr uint64_t max_hw_pages = reloco::detail::generate_mask<Layout::length_field::bits, uint64_t>();
           uint64_t pages_remaining = static_cast<uint64_t>(remaining) / PageTraits::page_size;
           uint64_t pages_chunk = std::min(pages_remaining, max_hw_pages);
           chunk = pages_chunk * PageTraits::page_size;
         } else {
-          constexpr uint64_t max_hw_len = detail::generate_mask<Layout::length_field::bits, uint64_t>();
+          constexpr uint64_t max_hw_len = reloco::detail::generate_mask<Layout::length_field::bits, uint64_t>();
           uint64_t page_remaining = PageTraits::page_size - offset;
           chunk = std::min({static_cast<uint64_t>(remaining), max_hw_len, page_remaining});
         }
@@ -573,7 +573,7 @@ public:
           return unexpected(error::invalid_argument);
           chunk = PageTraits::page_size;
         } else {
-          constexpr uint64_t max_hw_len = detail::generate_mask<Layout::length_field::bits, uint64_t>();
+          constexpr uint64_t max_hw_len = reloco::detail::generate_mask<Layout::length_field::bits, uint64_t>();
           uint64_t page_remaining = PageTraits::page_size - offset;
           chunk = std::min({static_cast<uint64_t>(remaining), max_hw_len, page_remaining});
         }
@@ -895,7 +895,7 @@ public:
           return unexpected(error::invalid_argument);
           chunk = PageTraits::page_size;
         } else {
-          constexpr uint64_t max_hw_len = detail::generate_mask<L2Layout::length_field::bits, uint64_t>();
+          constexpr uint64_t max_hw_len = reloco::detail::generate_mask<L2Layout::length_field::bits, uint64_t>();
           uint64_t page_remaining = PageTraits::page_size - offset;
           chunk = std::min({static_cast<uint64_t>(remaining), max_hw_len, page_remaining});
         }

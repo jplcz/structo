@@ -514,17 +514,34 @@ if(JPLCZ_STRUCTO_BUILD_HEADER_CHECKS)
     function(add_jplcz_structo_header_check std)
         set(check_dir "${CMAKE_CURRENT_BINARY_DIR}/header_check_cxx${std}")
         file(MAKE_DIRECTORY "${check_dir}")
+        # One translation unit per header category (directory under
+        # include/structo/, e.g. "arch/arm64", "bootldr"; "root" for the
+        # top-level headers) rather than one per header: hundreds of tiny
+        # TUs each re-parse reloco/microfmt and cost far more than they
+        # check. Headers are included in sorted order, so a header relying
+        # on an earlier sibling's includes can go unnoticed within its
+        # category.
         set(sources "")
+        set(categories "")
         foreach(header ${JPLCZ_STRUCTO_PUBLIC_HEADERS})
-            # Use the path relative to include/structo/ (e.g. "arch/cpu_index")
-            # both for the #include directive below and to build a unique
-            # generated source file name -- a flat NAME_WE would collide if
-            # two subdirectories ever ship a header with the same base name.
             file(RELATIVE_PATH rel_header "${CMAKE_CURRENT_SOURCE_DIR}/include/structo" "${header}")
-            string(REGEX REPLACE "\\.hpp$" "" rel_name "${rel_header}")
-            string(REPLACE "/" "_" flat_name "${rel_name}")
+            get_filename_component(category "${rel_header}" DIRECTORY)
+            if(category STREQUAL "")
+                set(category "root")
+            endif()
+            list(APPEND categories "${category}")
+            list(APPEND headers_of_${category} "${rel_header}")
+        endforeach()
+        list(REMOVE_DUPLICATES categories)
+        foreach(category ${categories})
+            string(REPLACE "/" "_" flat_name "${category}")
             set(src "${check_dir}/${flat_name}.cpp")
-            file(WRITE "${src}" "#include <structo/${rel_header}>\n")
+            list(SORT headers_of_${category})
+            set(content "")
+            foreach(rel_header ${headers_of_${category}})
+                string(APPEND content "#include <structo/${rel_header}>\n")
+            endforeach()
+            file(WRITE "${src}" "${content}")
             list(APPEND sources "${src}")
         endforeach()
         add_library(jplcz_structo_headers_cxx${std} OBJECT ${sources})
