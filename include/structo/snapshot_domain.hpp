@@ -31,7 +31,7 @@
  *   static constexpr std::size_t shards = 8;
  *   // Which shard the calling thread uses, typically the current CPU id.
  *   static std::size_t current_shard() noexcept { return this_cpu_id(); }
- *   // Serializes writers; may sleep.
+ *   // Serializes writers; may sleep. Use structo::no_writer_lock if the caller already serializes them.
  *   using mutex_type = my_sleep_mutex; // lock() / unlock()
  *   // Futex-style blocking used only by the writer waiting for readers to drain: block while word == seen;
  *   // returning spuriously is fine because the domain re-checks.
@@ -56,6 +56,16 @@
 #include <utility>
 
 namespace structo {
+
+/**
+ * `Traits::mutex_type` for callers that already serialize every `update()` / `synchronize()` themselves
+ * (e.g. the OS memory add/remove path always runs under one global hotplug lock). Readers never use it.
+ * The caller's lock must also cover `update_async` callers; concurrent writers without one are a data race.
+ */
+struct no_writer_lock {
+  void lock() noexcept {}
+  void unlock() noexcept {}
+};
 
 template <typename T, typename Traits> class snapshot_domain {
   static constexpr std::size_t shards = Traits::shards;

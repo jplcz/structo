@@ -167,3 +167,5 @@ void page_touched_active(page &p) {
   background balancing.
 - **Concurrency:** step results depend only on the history and one boolean, so the policy is trivially
   thread-safe; protect list membership and the flags write with the list lock or a single-writer rule.
+
+See also [hotplug_decay_integration.md](hotplug_decay_integration.md) for a queue-based, cache-centric VM.

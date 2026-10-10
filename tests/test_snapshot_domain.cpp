@@ -197,6 +197,25 @@ TEST(MemoryHotplug, RemoveMissingSegment) {
   EXPECT_FALSE(called);
 }
 
+struct caller_locked_traits : host_traits {
+  using mutex_type = no_writer_lock;
+};
+
+TEST(MemoryHotplug, CallerSerializedWithoutDomainMutex) {
+  std::mutex os_hotplug_lock; // the OS's single add/remove lock
+  memory_hotplug<seg_map, caller_locked_traits> hp;
+  std::vector<hpage> a(16), b(16);
+  {
+    std::lock_guard<std::mutex> l(os_hotplug_lock);
+    ASSERT_TRUE(hp.add({pfn_t{0x100}, 16, hnode{0}, reloco::span<hpage>(a)}).has_value());
+    ASSERT_TRUE(hp.add({pfn_t{0x200}, 16, hnode{1}, reloco::span<hpage>(b)}).has_value());
+  }
+  EXPECT_TRUE(hp.read()->find(pfn_t{0x205}).has_value());
+  std::lock_guard<std::mutex> l(os_hotplug_lock);
+  ASSERT_TRUE(hp.remove(pfn_t{0x100}, [](const seg_map::segment &) {}).has_value());
+  EXPECT_FALSE(hp.read()->find(pfn_t{0x105}).has_value());
+}
+
 TEST(MemoryHotplug, AddThenRemoveCycles) {
   memory_hotplug<seg_map, host_traits> hp;
   std::vector<hpage> a(16), b(16);

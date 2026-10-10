@@ -476,6 +476,27 @@ What changes compared to the hotplug guide:
   `MaxSections` for the highest RAM address. With few large banks, a bigger `SectionShift` shrinks it.
 - Pass a `PfnHook` if `struct page` already stores its PFN, to skip the segment scan in `page_to_pfn`.
 
+## If the OS already serializes add/remove
+
+Most kernels run memory add and remove under one global hotplug lock (it also guards the totals,
+watermarks and zone bookkeeping). The domain's own writer mutex is then redundant: set
+`using mutex_type = structo::no_writer_lock;` in the traits and take your lock around every `add()`,
+`remove()` and `synchronize()`. Readers never use the mutex, so lookups are unaffected.
+
+```cpp
+struct hotplug_traits {
+  // ...shards, current_shard(), wait(), wake_all() as before...
+  using mutex_type = structo::no_writer_lock;   // no-op: the OS lock below is the only serialization
+};
+
+status memory_add(...) {
+  hotplug_lock_guard g(g_memory_hotplug_lock);  // the single global add/remove lock
+  // init descriptors, g_hotplug.add(...), publish to the allocator, update totals
+}
+```
+
+Do not call two writers concurrently without that lock; there is no fallback.
+
 ## Things to keep in mind
 
 - **Table size:** the section table grows with the physical span between the lowest and highest
@@ -489,3 +510,5 @@ What changes compared to the hotplug guide:
   holds a read guard.
 - `buddy_allocator::init()` clears all free lists. Use it once at boot and `free_n()` for everything
   added later.
+
+See also [hotplug_decay_integration.md](hotplug_decay_integration.md) for a queue-based, cache-centric VM.
