@@ -96,6 +96,11 @@ void age_one_page(page &p) {
 }
 ```
 
+To drive `age_one_page` over a queue whose lock is dropped for every page, use
+[`page_queue_scan`](page_queue_scan.md): its marker keeps the position while pages come and go, and each
+step takes the queue lock itself. The body above then needs no queue lock for the visit (only `queue_move`
+takes it), and must recheck that the page is still on the queue under `scan.locked(...)`.
+
 Where the older usage-counter scheme incremented a counter on every access and decremented it per scan,
 the history word records *which of the last scans* saw an access. Pages with bursty use are not reclaimed
 just because the counter happened to reach zero between two bursts. If you want to keep boosting pages on

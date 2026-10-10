@@ -29,6 +29,9 @@ struct test_os_traits : os_traits_base<test_os_traits, uint32_t> {
   static os_page_type null_page() noexcept { return ~uint32_t(0); }
   static bool is_null(os_page_type p) noexcept { return p == null_page(); }
 
+  // Handles 0xF0000000..0xF0000009 (outside the mock RAM) are dummy marker descriptors (queue cursors), not physical pages.
+  static constexpr bool is_marker(os_page_type p) noexcept { return p >= 0xF0000000u && p < 0xF000000Au; }
+
   static uint64_t to_pfn(os_page_type p) noexcept { return p; }
 
   static result<os_page_type> from_pfn(uint64_t pfn) noexcept {
@@ -214,6 +217,30 @@ TEST_F(PageViewTest, EqualityComparisons) {
 
   EXPECT_TRUE(p1 != p3);
   EXPECT_FALSE(p1 == p3);
+}
+
+TEST_F(PageViewTest, MarkerCanOnlyBeProbed) {
+  // A marker is only ever probed: is_marker() is true for it, and it is a valid (non-null) handle.
+  auto m = test_page::from_os_page(0xF0000000u);
+  EXPECT_TRUE(m.is_marker());
+  EXPECT_FALSE(m.is_null());
+  EXPECT_TRUE(test_page::from_os_page(0xF0000009u).is_marker());
+
+  // Real pages, the null page and the handles just outside the marker range are not markers.
+  EXPECT_FALSE(test_page::from_os_page(0xEFFFFFFFu).is_marker());
+  EXPECT_FALSE(test_page::from_os_page(0xF000000Au).is_marker());
+  EXPECT_FALSE(test_page::from_os_page(5).is_marker());
+  EXPECT_FALSE(test_page{}.is_marker());
+
+  // Probing leaves the metadata alone and normal pages keep working.
+  EXPECT_FALSE(mock_mem_map[5].is_free);
+  EXPECT_TRUE(test_page::from_os_page(5).try_add(1).has_value());
+}
+
+TEST_F(PageViewTest, DefaultTraitsHaveNoMarkers) {
+  using base = os_traits_base<test_os_traits, uint32_t>;
+  const bool marker = base::is_marker(0);
+  EXPECT_FALSE(marker);
 }
 
 } // namespace

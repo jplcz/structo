@@ -44,6 +44,7 @@
 #include "phys_addr.hpp"
 #include <cstddef>
 #include <cstdint>
+#include <reloco/detail/assert.hpp>
 #include <reloco/error.hpp>
 #include <type_traits>
 
@@ -85,7 +86,16 @@ using page_1g = page_traits<1024 * 1024 * 1024, 30>;
 template <typename Derived, typename OsPage> struct os_traits_base {
   using os_page_type = OsPage; // Can be a pointer OR a compressed integer/handle!
 
+  /**
+   * True for a dummy *marker* descriptor (e.g. a `page_queue_scan` cursor): it sits on queues but is not a
+   * physical page. A marker is only ever *probed* with this function; every other page operation (page math,
+   * buddy metadata, `to_pfn`, physical address) is invalid on it and asserts. Derived traits hide this to
+   * recognise their markers; the default says "no page is a marker".
+   */
+  [[nodiscard]] static constexpr bool is_marker(os_page_type) noexcept { return false; }
+
   [[nodiscard]] static result<os_page_type> try_advance(os_page_type p, size_t count) noexcept {
+    RELOCO_ASSERT(!Derived::is_marker(p), "page math on a marker descriptor");
     uint64_t pfn = Derived::to_pfn(p);
 
     if (~uint64_t(0) - count < pfn)
@@ -102,6 +112,7 @@ template <typename Derived, typename OsPage> struct os_traits_base {
   }
 
   [[nodiscard]] static result<os_page_type> try_retreat(os_page_type p, size_t count) noexcept {
+    RELOCO_ASSERT(!Derived::is_marker(p), "page math on a marker descriptor");
     uint64_t pfn = Derived::to_pfn(p);
     if (pfn < count)
       return unexpected(error::out_of_range);
@@ -117,6 +128,7 @@ template <typename Derived, typename OsPage> struct os_traits_base {
   }
 
   [[nodiscard]] static result<os_page_type> try_get_buddy(os_page_type p, uint16_t order) noexcept {
+    RELOCO_ASSERT(!Derived::is_marker(p), "page math on a marker descriptor");
     uint64_t buddy_pfn = Derived::to_pfn(p) ^ (1ULL << order);
 
     auto buddy_res = Derived::from_pfn(buddy_pfn);
@@ -151,6 +163,9 @@ public:
   [[nodiscard]] static constexpr page_view from_os_page(os_page_type p) noexcept { return page_view{p}; }
 
   [[nodiscard]] constexpr bool is_null() const noexcept { return OsTraits::is_null(page_); }
+
+  /** True for a dummy marker descriptor. This probe is the only valid operation on a marker; all others assert. */
+  [[nodiscard]] constexpr bool is_marker() const noexcept { return !is_null() && OsTraits::is_marker(page_); }
   constexpr explicit operator bool() const noexcept { return !is_null(); }
 
   // Prevent unchecked arithmetic
@@ -192,12 +207,18 @@ public:
     return page_view{*res};
   }
 
-  [[nodiscard]] uint64_t pfn() const noexcept { return is_null() ? 0 : OsTraits::to_pfn(page_); }
+  [[nodiscard]] uint64_t pfn() const noexcept {
+    if (is_null())
+      return 0;
+    RELOCO_ASSERT(!is_marker(), "pfn() of a marker descriptor");
+    return OsTraits::to_pfn(page_);
+  }
 
   template <typename SpaceTag = host_phys_space, typename PhysInt = uint64_t>
   [[nodiscard]] phys_addr<void, SpaceTag, PhysInt> phys() const noexcept {
     if (is_null())
       return phys_addr<void, SpaceTag, PhysInt>{nullptr};
+    RELOCO_ASSERT(!is_marker(), "phys() of a marker descriptor");
     // `to_pfn()`/the shift are always computed in uint64_t (the pfn space is
     // platform-independent), but `PhysInt` may legitimately be narrower (e.g.
     // uint32_t on a 32-bit target, or even on a 64-bit one) -- the explicit

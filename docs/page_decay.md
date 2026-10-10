@@ -168,4 +168,5 @@ void page_touched_active(page &p) {
 - **Concurrency:** step results depend only on the history and one boolean, so the policy is trivially
   thread-safe; protect list membership and the flags write with the list lock or a single-writer rule.
 
-See also [hotplug_decay_integration.md](hotplug_decay_integration.md) for a queue-based, cache-centric VM.
+See also [hotplug_decay_integration.md](hotplug_decay_integration.md) for a queue-based, cache-centric VM, and
+[page_queue_scan.md](page_queue_scan.md) for walking the active/inactive queue with the lock dropped per page.
