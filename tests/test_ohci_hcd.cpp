@@ -1116,7 +1116,12 @@ TEST_F(OhciTest, InterruptEndpointIsPolledAtItsInterval) {
   for (const row &r : rows) {
     hc.ep2_polls = 0;
     xfer t;
-    t.pipe = usb_pipe{udev.address(), 2, usb_direction::in, usb_transfer_type::interrupt, 8, usb_speed::full,
+    t.pipe = usb_pipe{udev.address(),
+                      2,
+                      usb_direction::in,
+                      usb_transfer_type::interrupt,
+                      8,
+                      usb_speed::full,
                       static_cast<u8>(r.interval)};
     t.data = rxv.data();
     t.length = 8;

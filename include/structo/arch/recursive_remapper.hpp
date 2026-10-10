@@ -73,7 +73,8 @@
  *
  * ## Limits (it is a bootstrap tool)
  *
- *  - No demotion: `try_unmap` / `try_protect` need ranges aligned to the existing blocks (`invalid_argument` otherwise).
+ *  - No demotion: `try_unmap` / `try_protect` need ranges aligned to the existing blocks (`invalid_argument`
+ * otherwise).
  *  - Empty tables are not reclaimed.
  *  - A failed `try_map` is rolled back; `try_unmap`/`try_protect` validate first and then cannot fail.
  *  - Not thread safe.
@@ -153,8 +154,7 @@ struct tlb_binding {
 /** `Window` that treats the window address as a plain pointer (use once the MMU runs the tables). */
 struct identity_window {
   reloco::span<std::uint64_t> operator()(std::uint64_t va, std::size_t entry_count) const noexcept {
-    return reloco::span<std::uint64_t>(reinterpret_cast<std::uint64_t *>(static_cast<std::uintptr_t>(va)),
-                                       entry_count);
+    return reloco::span<std::uint64_t>(reinterpret_cast<std::uint64_t *>(static_cast<std::uintptr_t>(va)), entry_count);
   }
 };
 
@@ -428,8 +428,8 @@ private:
     return window_(window_va(level, low), entries_at(level));
   }
 
-  [[nodiscard]] reloco::result<void> check_range(std::uint64_t va, std::uint64_t size, std::uint64_t &low) const
-      noexcept {
+  [[nodiscard]] reloco::result<void> check_range(std::uint64_t va, std::uint64_t size,
+                                                 std::uint64_t &low) const noexcept {
     if (size == 0 || va % page_size != 0 || size % page_size != 0) {
       return reloco::unexpected(reloco::error::invalid_argument);
     }

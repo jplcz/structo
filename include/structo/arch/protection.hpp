@@ -75,8 +75,7 @@ enum class security_state : std::uint8_t { inherit = 0, secure, non_secure };
  * @tparam Wxn  any writable mapping (kernel or user) is never privileged-executable
  *              (AArch64 SCTLR.WXN: write-implies-XN, applied at all levels).
  * @tparam Uwxn user-writable mappings are never privileged-executable (SCTLR.UWXN). */
-template <bool Wxn = false, bool Uwxn = false>
-struct mmu_policy {
+template <bool Wxn = false, bool Uwxn = false> struct mmu_policy {
   static constexpr bool wxn = Wxn;
   static constexpr bool uwxn = Uwxn;
 };
@@ -152,8 +151,7 @@ public:
 
   /** Apply WXN / UWXN: execute permission is removed where the policy would
    * ignore it anyway, so a query reports what the hardware really enforces. */
-  template <typename Policy = default_mmu_policy>
-  [[nodiscard]] constexpr protection enforce_policy() const noexcept {
+  template <typename Policy = default_mmu_policy> [[nodiscard]] constexpr protection enforce_policy() const noexcept {
     protection r = *this;
     if constexpr (Policy::wxn) {
       if (kernel_write() || user_write()) {
@@ -169,27 +167,51 @@ public:
   }
 
   // --- presets ---
-  [[nodiscard]] static constexpr protection kernel_text() noexcept { return protection{}.with_kernel(kprot::read_exec).with_scope(scope::global); }
-  [[nodiscard]] static constexpr protection kernel_rodata() noexcept { return protection{}.with_kernel(kprot::read).with_scope(scope::global); }
-  [[nodiscard]] static constexpr protection kernel_data() noexcept { return protection{}.with_kernel(kprot::write).with_scope(scope::global); }
-  [[nodiscard]] static constexpr protection user_text() noexcept { return protection{}.with_user(uprot::read_exec).with_kernel(kprot::read); }
-  [[nodiscard]] static constexpr protection user_rodata() noexcept { return protection{}.with_user(uprot::read).with_kernel(kprot::read); }
-  [[nodiscard]] static constexpr protection user_data() noexcept { return protection{}.with_user(uprot::write).with_kernel(kprot::write); }
-  [[nodiscard]] static constexpr protection kernel_rw_user_ro() noexcept { return protection{}.with_user(uprot::read).with_kernel(kprot::write); }
-  [[nodiscard]] static constexpr protection device_mmio() noexcept { return kernel_data().with_cache(cache_mode::device); }
-  [[nodiscard]] static constexpr protection device_ordered_mmio() noexcept { return kernel_data().with_cache(cache_mode::device_ordered); }
-  [[nodiscard]] static constexpr protection dma_buffer() noexcept { return kernel_data().with_cache(cache_mode::uncached); }
-  [[nodiscard]] static constexpr protection framebuffer() noexcept { return kernel_data().with_cache(cache_mode::write_combining); }
+  [[nodiscard]] static constexpr protection kernel_text() noexcept {
+    return protection{}.with_kernel(kprot::read_exec).with_scope(scope::global);
+  }
+  [[nodiscard]] static constexpr protection kernel_rodata() noexcept {
+    return protection{}.with_kernel(kprot::read).with_scope(scope::global);
+  }
+  [[nodiscard]] static constexpr protection kernel_data() noexcept {
+    return protection{}.with_kernel(kprot::write).with_scope(scope::global);
+  }
+  [[nodiscard]] static constexpr protection user_text() noexcept {
+    return protection{}.with_user(uprot::read_exec).with_kernel(kprot::read);
+  }
+  [[nodiscard]] static constexpr protection user_rodata() noexcept {
+    return protection{}.with_user(uprot::read).with_kernel(kprot::read);
+  }
+  [[nodiscard]] static constexpr protection user_data() noexcept {
+    return protection{}.with_user(uprot::write).with_kernel(kprot::write);
+  }
+  [[nodiscard]] static constexpr protection kernel_rw_user_ro() noexcept {
+    return protection{}.with_user(uprot::read).with_kernel(kprot::write);
+  }
+  [[nodiscard]] static constexpr protection device_mmio() noexcept {
+    return kernel_data().with_cache(cache_mode::device);
+  }
+  [[nodiscard]] static constexpr protection device_ordered_mmio() noexcept {
+    return kernel_data().with_cache(cache_mode::device_ordered);
+  }
+  [[nodiscard]] static constexpr protection dma_buffer() noexcept {
+    return kernel_data().with_cache(cache_mode::uncached);
+  }
+  [[nodiscard]] static constexpr protection framebuffer() noexcept {
+    return kernel_data().with_cache(cache_mode::write_combining);
+  }
   /** Guest-physical mappings (stage 2 / EPT / G-stage): only the kernel bits are used. */
   [[nodiscard]] static constexpr protection guest_ram() noexcept { return protection{}.with_kernel(kprot::write_exec); }
   [[nodiscard]] static constexpr protection guest_rom() noexcept { return protection{}.with_kernel(kprot::read_exec); }
-  [[nodiscard]] static constexpr protection guest_mmio() noexcept { return protection{}.with_kernel(kprot::write).with_cache(cache_mode::device); }
+  [[nodiscard]] static constexpr protection guest_mmio() noexcept {
+    return protection{}.with_kernel(kprot::write).with_cache(cache_mode::device);
+  }
 
-  friend constexpr bool operator==(const protection& a, const protection& b) noexcept {
+  friend constexpr bool operator==(const protection &a, const protection &b) noexcept {
     return a.kernel_ == b.kernel_ && a.user_ == b.user_ && a.scope_ == b.scope_ && a.cache_ == b.cache_ &&
            a.security_ == b.security_;
   }
-  friend constexpr bool operator!=(const protection& a, const protection& b) noexcept { return !(a == b); }
+  friend constexpr bool operator!=(const protection &a, const protection &b) noexcept { return !(a == b); }
 
 private:
   kprot kernel_ = kprot::none;

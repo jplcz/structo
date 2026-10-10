@@ -54,7 +54,16 @@ inline constexpr std::size_t image_header_size = 64;
 inline constexpr std::size_t image_name_size = 32;
 
 /** @brief `ih_os` values. */
-enum class os : uint8_t { invalid = 0, openbsd = 1, netbsd = 2, freebsd = 3, linux_ = 5, u_boot = 17, rtems = 18, efi = 23 };
+enum class os : uint8_t {
+  invalid = 0,
+  openbsd = 1,
+  netbsd = 2,
+  freebsd = 3,
+  linux_ = 5,
+  u_boot = 17,
+  rtems = 18,
+  efi = 23
+};
 /** @brief `ih_arch` values. */
 enum class arch : uint8_t {
   invalid = 0,

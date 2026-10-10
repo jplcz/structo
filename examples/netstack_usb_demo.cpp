@@ -43,12 +43,11 @@
 
 #include "usb_linux_fake.hpp"
 
+#include <csignal>
+#include <cstdlib>
 #include <reloco/array.hpp>
 #include <reloco/span.hpp>
 #include <reloco/string_view.hpp>
-#include <csignal>
-#include <cstdlib>
-
 
 using namespace structo;
 
@@ -484,7 +483,6 @@ int main(int argc, char **argv) {
   ::close(fd);
   return 0;
 }
-
 
 #else
 

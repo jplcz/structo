@@ -65,8 +65,7 @@ public:
   /** @brief Maximum number of nested symlink resolutions in one path lookup. */
   static constexpr unsigned max_symlink_depth = 8;
 
-  [[nodiscard]] static result<ext4_filesystem> try_mount(hw::block_device_ref dev,
-                                                         span<std::byte> scratch) noexcept {
+  [[nodiscard]] static result<ext4_filesystem> try_mount(hw::block_device_ref dev, span<std::byte> scratch) noexcept {
     ext4_filesystem fs(dev, scratch);
     if (auto r = fs.parse_superblock(); !r)
       return unexpected(r.error());
@@ -117,8 +116,10 @@ private:
     [[nodiscard]] bool is_reg() const noexcept { return (mode & mode_mask) == mode_reg; }
     [[nodiscard]] bool is_symlink() const noexcept { return (mode & mode_mask) == mode_lnk; }
     [[nodiscard]] file_type type() const noexcept {
-      return is_reg() ? file_type::regular : is_dir() ? file_type::directory : is_symlink() ? file_type::symlink
-                                                                                           : file_type::other;
+      return is_reg()       ? file_type::regular
+             : is_dir()     ? file_type::directory
+             : is_symlink() ? file_type::symlink
+                            : file_type::other;
     }
   };
 
@@ -192,7 +193,8 @@ private:
       return unexpected(error::invalid_argument);
     if (blocks_count_ > dev_.size_bytes() / bs_)
       return unexpected(error::invalid_argument);
-    group_count_ = static_cast<std::uint32_t>((blocks_count_ - first_data_block_ + blocks_per_group_ - 1) / blocks_per_group_);
+    group_count_ =
+        static_cast<std::uint32_t>((blocks_count_ - first_data_block_ + blocks_per_group_ - 1) / blocks_per_group_);
     if (static_cast<std::uint64_t>(group_count_) * inodes_per_group_ < inodes_count_)
       return unexpected(error::invalid_argument);
     // The root inode must be a directory.
@@ -212,8 +214,8 @@ private:
     if (group >= group_count_)
       return unexpected(error::io_error);
     // Group descriptors follow the superblock block (no meta_bg support).
-    const std::uint64_t desc_off = static_cast<std::uint64_t>(first_data_block_ + 1) * bs_ +
-                                   static_cast<std::uint64_t>(group) * desc_size_;
+    const std::uint64_t desc_off =
+        static_cast<std::uint64_t>(first_data_block_ + 1) * bs_ + static_cast<std::uint64_t>(group) * desc_size_;
     auto gd = read_at<12>(desc_off);
     if (!gd)
       return unexpected(gd.error());
@@ -298,7 +300,8 @@ private:
             const std::uint64_t run = first + len - lb;
             if (uninit)
               return mapping{0, run}; // preallocated, reads as zeros
-            const std::uint64_t start = (static_cast<std::uint64_t>(le<std::uint16_t>(x, 6)) << 32) | le<std::uint32_t>(x, 8);
+            const std::uint64_t start =
+                (static_cast<std::uint64_t>(le<std::uint16_t>(x, 6)) << 32) | le<std::uint32_t>(x, 8);
             return checked(start + (lb - first), run);
           }
         }
@@ -464,7 +467,8 @@ private:
     }
   }
 
-  [[nodiscard]] result<std::size_t> read_symlink(const inode_info &in, array<char, symlink_buffer> &out) const noexcept {
+  [[nodiscard]] result<std::size_t> read_symlink(const inode_info &in,
+                                                 array<char, symlink_buffer> &out) const noexcept {
     if (in.size == 0 || in.size >= symlink_buffer)
       return unexpected(error::invalid_argument);
     const auto n = static_cast<std::size_t>(in.size);
@@ -489,7 +493,8 @@ private:
 
   // Resolves `path` to an inode number, following symlinks (also the last component). Absolute paths start at the
   // root, others at `start_dir`.
-  [[nodiscard]] result<std::uint32_t> resolve(string_view path, std::uint32_t start_dir, unsigned depth) const noexcept {
+  [[nodiscard]] result<std::uint32_t> resolve(string_view path, std::uint32_t start_dir,
+                                              unsigned depth) const noexcept {
     std::uint32_t cur = (!path.empty() && path[0] == '/') ? root_ino : start_dir;
     std::size_t pos = 0;
     while (pos < path.size()) {

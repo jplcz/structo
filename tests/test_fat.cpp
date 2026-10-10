@@ -21,9 +21,9 @@ RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
 namespace {
 
 using namespace structo::fs;
-using structo::hw::block_device_ref;
 using reloco::error;
 using reloco::span;
+using structo::hw::block_device_ref;
 
 struct ram_disk {
   std::vector<std::byte> mem;
@@ -88,8 +88,7 @@ struct mounted {
   fat_filesystem fat;
   filesystem_ref fs;
 
-  explicit mounted(ram_disk &d)
-      : dev(d), fat(mount_or_die(dev, span<std::byte>(scratch))), fs(fat) {}
+  explicit mounted(ram_disk &d) : dev(d), fat(mount_or_die(dev, span<std::byte>(scratch))), fs(fat) {}
 };
 
 class FatTest : public ::testing::Test {

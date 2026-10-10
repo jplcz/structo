@@ -86,8 +86,8 @@ template <typename Format> struct rig {
 
 using x86_fmt = x86::recursive_pte_format<>;
 using arm_fmt = arm64::recursive_stage1_format<>;
-using arm_hi_wxn = arm64::recursive_stage1_format<arm64::levels_4k_48bit, arm64::stage1_ns_tag<>, true, false,
-                                                  mmu_policy<true>>;
+using arm_hi_wxn =
+    arm64::recursive_stage1_format<arm64::levels_4k_48bit, arm64::stage1_ns_tag<>, true, false, mmu_policy<true>>;
 
 constexpr std::uint64_t k_kva = 0xFFFF'8000'0000'0000ull;
 
@@ -111,8 +111,8 @@ TEST_F(X86Remapper, CreateInstallsSelfEntry) {
   const std::uint64_t self = r.pool[(m.root().value - 0x1000'0000) / 8 + 510];
   EXPECT_TRUE(x86_fmt::is_present(self));
   EXPECT_EQ(x86_fmt::table_addr(self).value, m.root().value);
-  EXPECT_NE(self & (1ull << 63), 0u);  // XD
-  EXPECT_EQ(self & (1ull << 2), 0u);   // supervisor only
+  EXPECT_NE(self & (1ull << 63), 0u); // XD
+  EXPECT_EQ(self & (1ull << 2), 0u);  // supervisor only
 }
 
 TEST_F(X86Remapper, WindowAddressFormula) {
@@ -178,9 +178,9 @@ TEST_F(X86Remapper, OverlapAndReplace) {
   EXPECT_FALSE((*qq).prot.kernel_write());
   EXPECT_GE(rec_tlb::flushes, 1);
   // A block cannot be mapped over existing 4K pages.
-  EXPECT_EQ(m.try_map(k_kva, x86_fmt::phys_type{0x20'0000}, 2u << 20, protection::kernel_data(), map_flags::replace)
-                .error(),
-            error::already_exists);
+  EXPECT_EQ(
+      m.try_map(k_kva, x86_fmt::phys_type{0x20'0000}, 2u << 20, protection::kernel_data(), map_flags::replace).error(),
+      error::already_exists);
 }
 
 TEST_F(X86Remapper, UnmapAndPartialBlock) {
@@ -347,8 +347,8 @@ TEST_F(ArmHighRemapper, HighHalfAndWxn) {
   ASSERT_TRUE(q.has_value());
   EXPECT_TRUE((*q).prot.kernel_write());
   EXPECT_FALSE((*q).prot.kernel_exec());
-  EXPECT_EQ(m.try_map(0x0000'0000'0020'0000ull, arm_hi_wxn::phys_type{0x8000'0000}, 0x1000,
-                      protection::kernel_data()).error(),
+  EXPECT_EQ(m.try_map(0x0000'0000'0020'0000ull, arm_hi_wxn::phys_type{0x8000'0000}, 0x1000, protection::kernel_data())
+                .error(),
             error::invalid_argument); // TTBR0 address on a TTBR1 remapper
 }
 

@@ -68,9 +68,7 @@ public:
     return false;
   }
 
-  template <typename T> [[nodiscard]] T *at(std::uint32_t phys) noexcept {
-    return at_off<T>(phys - base, sizeof(T));
-  }
+  template <typename T> [[nodiscard]] T *at(std::uint32_t phys) noexcept { return at_off<T>(phys - base, sizeof(T)); }
 
   unsigned allocs = 0;
   unsigned frees = 0;
@@ -251,9 +249,7 @@ public:
   }
 
   [[nodiscard]] bool running() const noexcept { return (usbcmd & 1u) != 0; }
-  [[nodiscard]] bool reachable() const noexcept {
-    return ports[0].connected && ports[0].enabled && !ports[0].owner;
-  }
+  [[nodiscard]] bool reachable() const noexcept { return ports[0].connected && ports[0].enabled && !ports[0].owner; }
 
   /// Number of queue heads on the async ring (including the dummy), following the horizontal pointers.
   [[nodiscard]] std::size_t async_ring_length() noexcept {
@@ -1178,7 +1174,7 @@ TEST_F(EhciTest, BulkStallOnHaltedEndpoint) {
 TEST_F(EhciTest, ResetDataToggleRestartsAtData0) {
   r.bring_up();
   pattern(1);
-  ASSERT_TRUE(send(1)); // DATA0; the next one would be DATA1
+  ASSERT_TRUE(send(1));  // DATA0; the next one would be DATA1
   r.dev.reset_toggles(); // the device side restarts at DATA0
   r.hcd.reset_data_toggle(bulk_out());
   ASSERT_TRUE(send(1));

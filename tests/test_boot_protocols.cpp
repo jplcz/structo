@@ -56,7 +56,7 @@ TEST_F(BootProtocolsTest, UefiMemoryMapHonoursDescriptorStride) {
   buffer<stride * 2> map;
   put_le(map.rw(), 0, 7, 4); // EfiConventionalMemory
   put_le(map.rw(), 8, 0x100000, 8);
-  put_le(map.rw(), 24, 16, 8); // pages
+  put_le(map.rw(), 24, 16, 8);    // pages
   put_le(map.rw(), stride, 0, 4); // EfiReservedMemoryType
   put_le(map.rw(), stride + 8, 0x200000, 8);
   put_le(map.rw(), stride + 24, 1, 8);

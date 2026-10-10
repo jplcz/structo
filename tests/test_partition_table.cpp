@@ -147,12 +147,12 @@ TEST_F(PartitionTableTest, PartitionBecomesBlockDevice) {
   reloco::array<std::byte, kSector> buf{};
   buf[0] = std::byte{0x5A};
   ASSERT_TRUE(pdev.try_write_blocks(3, span<const std::byte>(buf)));
-  EXPECT_EQ(gpt.at((2560 + 3) * kSector), std::byte{0x5A});   // LBA is shifted by the partition start
+  EXPECT_EQ(gpt.at((2560 + 3) * kSector), std::byte{0x5A}); // LBA is shifted by the partition start
 
   reloco::array<std::byte, kSector> back{};
   ASSERT_TRUE(pdev.try_read_blocks(3, span<std::byte>(back)));
   EXPECT_EQ(back[0], std::byte{0x5A});
-  EXPECT_EQ(pdev.try_read_blocks(512, span<std::byte>(back)).error(), error::out_of_range);   // end of partition
+  EXPECT_EQ(pdev.try_read_blocks(512, span<std::byte>(back)).error(), error::out_of_range); // end of partition
 
   EXPECT_EQ(t->try_open_partition(9).error(), error::not_found);
 }
@@ -170,7 +170,7 @@ TEST_F(PartitionTableTest, PartitionDeviceValidation) {
 }
 
 TEST_F(PartitionTableTest, GptFallsBackToBackupHeader) {
-  gpt.at(kSector + 16) ^= std::byte{0xFF};   // damage the primary header's CRC field
+  gpt.at(kSector + 16) ^= std::byte{0xFF}; // damage the primary header's CRC field
   auto t = partition_table::try_open(block_device_ref(gpt));
   ASSERT_TRUE(t);
   EXPECT_TRUE(t->used_backup_header());
@@ -179,7 +179,7 @@ TEST_F(PartitionTableTest, GptFallsBackToBackupHeader) {
 }
 
 TEST_F(PartitionTableTest, GptEntryArrayCrcMismatchUsesBackup) {
-  gpt.at(2 * kSector + 3) ^= std::byte{0x01};   // primary entry array, first entry
+  gpt.at(2 * kSector + 3) ^= std::byte{0x01}; // primary entry array, first entry
   auto t = partition_table::try_open(block_device_ref(gpt));
   ASSERT_TRUE(t);
   EXPECT_TRUE(t->used_backup_header());
@@ -241,7 +241,7 @@ TEST_F(PartitionTableTest, MbrEnumeratesPrimaryAndLogical) {
   EXPECT_EQ(t->try_get(4).error(), error::not_found);
   EXPECT_EQ(t->try_get(7).error(), error::not_found);
   EXPECT_EQ(ok(t->find_by_mbr_type(mbr_types::linux_swap)).number, 6u);
-  EXPECT_EQ(t->find_by_mbr_type(mbr_types::extended_chs).error(), error::not_found);   // containers are skipped
+  EXPECT_EQ(t->find_by_mbr_type(mbr_types::extended_chs).error(), error::not_found); // containers are skipped
 }
 
 TEST_F(PartitionTableTest, MbrLogicalPartitionIsABlockDevice) {
@@ -264,7 +264,7 @@ TEST_F(PartitionTableTest, MbrEbrLoopIsRejected) {
   auto t = partition_table::try_open(block_device_ref(mbr));
   ASSERT_TRUE(t);
   EXPECT_EQ(t->try_get(5).error(), error::invalid_argument);
-  EXPECT_EQ(ok(t->try_get(1)).number, 1u);   // primaries still resolve
+  EXPECT_EQ(ok(t->try_get(1)).number, 1u); // primaries still resolve
 }
 
 TEST_F(PartitionTableTest, NonPartitionedDisksAreRejected) {

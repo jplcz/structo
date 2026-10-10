@@ -63,8 +63,7 @@ public:
   /** @brief Validates the BPB on @p dev and returns a mounted, read-only filesystem. @p scratch must hold at least
    * one device block and stay valid for the lifetime of the object.
    * Fails with `error::invalid_argument` if the volume is not a valid FAT volume. */
-  [[nodiscard]] static result<fat_filesystem> try_mount(hw::block_device_ref dev,
-                                                        span<std::byte> scratch) noexcept {
+  [[nodiscard]] static result<fat_filesystem> try_mount(hw::block_device_ref dev, span<std::byte> scratch) noexcept {
     fat_filesystem fs(dev, scratch);
     if (auto r = fs.parse_boot_sector(); !r)
       return unexpected(r.error());
@@ -161,7 +160,8 @@ private:
       return unexpected(error::invalid_argument);
 
     const std::uint32_t root_sectors = (root_entries * dirent_size + bps - 1) / bps;
-    const std::uint64_t meta = static_cast<std::uint64_t>(reserved) + static_cast<std::uint64_t>(nfats) * fat_sectors + root_sectors;
+    const std::uint64_t meta =
+        static_cast<std::uint64_t>(reserved) + static_cast<std::uint64_t>(nfats) * fat_sectors + root_sectors;
     if (meta >= total)
       return unexpected(error::invalid_argument);
 
@@ -366,8 +366,8 @@ private:
         out.cluster |= static_cast<std::uint32_t>(le<std::uint16_t>(b, 20)) << 16;
       out.size = le<std::uint32_t>(b, 28);
 
-      const bool have_lfn = lfn_expected == static_cast<std::size_t>(-1) && lfn_len != 0 &&
-                            short_name_checksum(b.first(11)) == lfn_sum;
+      const bool have_lfn =
+          lfn_expected == static_cast<std::size_t>(-1) && lfn_len != 0 && short_name_checksum(b.first(11)) == lfn_sum;
       if (have_lfn) {
         for (std::size_t i = 0; i < lfn_len && lfn[i] != 0 && lfn[i] != 0xFFFF; ++i) {
           std::uint32_t cp = lfn[i];

@@ -71,8 +71,7 @@ public:
   /** @brief Builds a cache over @p dev using @p storage. Fails with `error::unsupported_operation` if @p dev is
    * unbound or reports a zero block size, and `error::invalid_argument` if @p storage cannot hold one slot.
    * Any previous contents of @p storage are discarded. */
-  [[nodiscard]] static result<block_cache_ref> try_create(block_device_ref dev,
-                                                          span<std::byte> storage) noexcept {
+  [[nodiscard]] static result<block_cache_ref> try_create(block_device_ref dev, span<std::byte> storage) noexcept {
     const std::size_t bs = dev.block_size();
     if (!dev || bs == 0)
       return unexpected(error::unsupported_operation);
@@ -171,7 +170,8 @@ public:
     return dev_.try_flush();
   }
 
-  /** @brief Drops every cached block. Fails with `error::busy` (dropping nothing) if any block is dirty; flush first. */
+  /** @brief Drops every cached block. Fails with `error::busy` (dropping nothing) if any block is dirty; flush first.
+   */
   [[nodiscard]] result<void> try_invalidate() const noexcept {
     if (!slots_)
       return unexpected(error::unsupported_operation);
@@ -189,9 +189,7 @@ private:
 
   using bytes_t = span<std::byte>;
 
-  [[nodiscard]] std::size_t meta_offset(std::size_t slot) const noexcept {
-    return header_size + slot * slot_meta_size;
-  }
+  [[nodiscard]] std::size_t meta_offset(std::size_t slot) const noexcept { return header_size + slot * slot_meta_size; }
   [[nodiscard]] bytes_t slot_data(std::size_t slot) const noexcept {
     return storage_.subspan(header_size + slots_ * slot_meta_size + slot * block_size_, block_size_);
   }
@@ -324,7 +322,8 @@ private:
     return dev_.try_read_blocks(lba, dst);
   }
 
-  [[nodiscard]] result<void> write_bypass(std::uint64_t lba, std::uint64_t n, span<const std::byte> src) const noexcept {
+  [[nodiscard]] result<void> write_bypass(std::uint64_t lba, std::uint64_t n,
+                                          span<const std::byte> src) const noexcept {
     // Cached copies are about to be overwritten on the device, so they are dropped without write-back.
     if (auto r = sync_range(lba, n, false); !r)
       return r;
@@ -341,7 +340,8 @@ private:
 template <> struct block_device_traits<block_cache_ref> {
   static std::size_t block_size(block_cache_ref &c) noexcept { return c.block_size(); }
   static std::uint64_t block_count(block_cache_ref &c) noexcept { return c.block_count(); }
-  static reloco::result<void> try_read_blocks(block_cache_ref &c, std::uint64_t lba, reloco::span<std::byte> dst) noexcept {
+  static reloco::result<void> try_read_blocks(block_cache_ref &c, std::uint64_t lba,
+                                              reloco::span<std::byte> dst) noexcept {
     return c.try_read_blocks(lba, dst);
   }
   static reloco::result<void> try_write_blocks(block_cache_ref &c, std::uint64_t lba,

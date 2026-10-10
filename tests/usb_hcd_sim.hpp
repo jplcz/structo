@@ -263,7 +263,8 @@ private:
   }
 
   std::size_t device_descriptor() noexcept {
-    const reloco::array<std::uint8_t, 18> d{18, 1, 0x00, 0x02, 0, 0, 0, 64, 0x34, 0x12, 0x78, 0x56, 0x00, 0x01, 0, 1, 0, 1};
+    const reloco::array<std::uint8_t, 18> d{18,   1,    0x00, 0x02, 0,    0, 0, 64, 0x34,
+                                            0x12, 0x78, 0x56, 0x00, 0x01, 0, 1, 0,  1};
     return put(0, d.as_span());
   }
 

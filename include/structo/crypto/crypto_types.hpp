@@ -58,7 +58,8 @@ enum class signature_scheme : uint8_t {
 };
 
 /** @brief Compares @p a and @p b without early exit on the first mismatch (lengths are not secret). */
-[[nodiscard]] constexpr bool constant_time_equal(reloco::span<const std::byte> a, reloco::span<const std::byte> b) noexcept {
+[[nodiscard]] constexpr bool constant_time_equal(reloco::span<const std::byte> a,
+                                                 reloco::span<const std::byte> b) noexcept {
   if (a.size() != b.size())
     return false;
   unsigned diff = 0;

@@ -26,7 +26,6 @@ using net_test::bytes;
 using net_test::make_bytes;
 using net_test::push;
 
-
 namespace {
 
 // The data stage buffer of a transfer as a span.
@@ -807,19 +806,9 @@ struct msc_device : sim_device {
         return {false, usb_status::ok, n};
       }
       if (state == st::status) {
-        const reloco::array<std::uint8_t, 13> csw{{'U',
-                                      'S',
-                                      'B',
-                                      'S',
-                                      static_cast<std::uint8_t>(tag),
-                                      static_cast<std::uint8_t>(tag >> 8),
-                                      static_cast<std::uint8_t>(tag >> 16),
-                                      static_cast<std::uint8_t>(tag >> 24),
-                                      0,
-                                      0,
-                                      0,
-                                      0,
-                                      csw_status}};
+        const reloco::array<std::uint8_t, 13> csw{
+            {'U', 'S', 'B', 'S', static_cast<std::uint8_t>(tag), static_cast<std::uint8_t>(tag >> 8),
+             static_cast<std::uint8_t>(tag >> 16), static_cast<std::uint8_t>(tag >> 24), 0, 0, 0, 0, csw_status}};
         for (std::size_t i = 0; i < csw.size(); ++i)
           buf[i] = csw[i];
         state = st::idle;
@@ -1268,4 +1257,3 @@ TEST(UsbByteRing, WrapsAndReportsFullness) {
   EXPECT_EQ(all[3], 8);
   EXPECT_EQ(all[4], 1);
 }
-

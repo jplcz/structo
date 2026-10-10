@@ -56,7 +56,8 @@
  * alignas(8) inline volatile auto base_rev = structo::boot::limine::make_base_revision(3);
  *
  * // Ask for the physical memory map. Revision 0 is the only one defined.
- * alignas(8) inline volatile auto memmap_req = structo::boot::limine::make_request<structo::boot::limine::memmap_request>(0);
+ * alignas(8) inline volatile auto memmap_req =
+ * structo::boot::limine::make_request<structo::boot::limine::memmap_request>(0);
  *
  * // After entry: decode. `base_rev` proves the bootloader understood us.
  * structo::boot::limine::reader<my_resolver> rd{my_resolver{}};
@@ -99,8 +100,8 @@ inline constexpr uint64_t common_magic_1 = 0x0a82e883a194f07b;
 using request_id = array<uint64_t, 4>;
 
 /** @brief Marks the start of the request region (optional, speeds up the bootloader's scan). */
-inline constexpr array<uint64_t, 4> requests_start_marker = {0xf6b8f4b39de7d1ae, 0xfab91a6940fcb9cf,
-                                                             0x785c6ed015d3e316, 0x181e920a7852b9d9};
+inline constexpr array<uint64_t, 4> requests_start_marker = {0xf6b8f4b39de7d1ae, 0xfab91a6940fcb9cf, 0x785c6ed015d3e316,
+                                                             0x181e920a7852b9d9};
 /** @brief Marks the end of the request region. */
 inline constexpr array<uint64_t, 2> requests_end_marker = {0xadc0e0531bb10d03, 0x9572709f31764c62};
 
@@ -511,7 +512,8 @@ inline constexpr bool is_resolver_v =
  * @tparam Resolver See the file documentation: maps `(address, size)` to a readable span.
  */
 template <typename Resolver> class reader {
-  static_assert(is_resolver_v<Resolver>, "Resolver must be callable as result<span<const std::byte>>(uint64_t, size_t)");
+  static_assert(is_resolver_v<Resolver>,
+                "Resolver must be callable as result<span<const std::byte>>(uint64_t, size_t)");
 
 public:
   explicit reader(Resolver resolver) noexcept : resolve_(static_cast<Resolver &&>(resolver)) {}
@@ -547,7 +549,8 @@ public:
     string_view name;
     string_view version;
   };
-  [[nodiscard]] result<bootloader_info> try_bootloader_info(const volatile bootloader_info_request &req) const noexcept {
+  [[nodiscard]] result<bootloader_info>
+  try_bootloader_info(const volatile bootloader_info_request &req) const noexcept {
     auto r = response(req, 24);
     if (!r)
       return unexpected(r.error());
@@ -685,7 +688,8 @@ public:
   /** @brief Iterates a pointer-array response (`memmap`, `framebuffer`, `module`, `mp`): element `i` is
    * read by fetching the record address stored at `array[i]`, resolving that record and decoding it with
    * `Decoder`. Holds a copy of the resolver, never a pointer to it. */
-  template <typename Decoder> class record_iterator : public iterator_adaptor<record_iterator<Decoder>, result<typename Decoder::value_type>> {
+  template <typename Decoder>
+  class record_iterator : public iterator_adaptor<record_iterator<Decoder>, result<typename Decoder::value_type>> {
   public:
     using value_type = typename Decoder::value_type;
     using item_type = result<value_type>;
@@ -720,18 +724,22 @@ public:
     uint64_t index_ = 0;
   };
 
-  /** @brief The physical memory map as an iterator of `memmap_entry` (`limine_memmap_response`: count at +8, entries array at +16). */
-  [[nodiscard]] result<record_iterator<detail::memmap_decoder>> try_memmap(const volatile memmap_request &req) const noexcept {
+  /** @brief The physical memory map as an iterator of `memmap_entry` (`limine_memmap_response`: count at +8, entries
+   * array at +16). */
+  [[nodiscard]] result<record_iterator<detail::memmap_decoder>>
+  try_memmap(const volatile memmap_request &req) const noexcept {
     return array_response<detail::memmap_decoder>(req);
   }
 
   /** @brief Framebuffers as an iterator of `framebuffer_info`. */
-  [[nodiscard]] result<record_iterator<detail::framebuffer_decoder>> try_framebuffers(const volatile framebuffer_request &req) const noexcept {
+  [[nodiscard]] result<record_iterator<detail::framebuffer_decoder>>
+  try_framebuffers(const volatile framebuffer_request &req) const noexcept {
     return array_response<detail::framebuffer_decoder>(req);
   }
 
   /** @brief Modules as an iterator of `file_info`. */
-  [[nodiscard]] result<record_iterator<detail::file_decoder>> try_modules(const volatile module_request &req) const noexcept {
+  [[nodiscard]] result<record_iterator<detail::file_decoder>>
+  try_modules(const volatile module_request &req) const noexcept {
     return array_response<detail::file_decoder>(req);
   }
 
@@ -789,7 +797,8 @@ public:
   }
 
   /** @brief Folds the whole Limine memory map into @p map via `boot_memory_map::try_add` (RAM kinds only). */
-  template <typename Map> [[nodiscard]] result<void> try_fill_memory_map(const volatile memmap_request &req, Map &map) const noexcept {
+  template <typename Map>
+  [[nodiscard]] result<void> try_fill_memory_map(const volatile memmap_request &req, Map &map) const noexcept {
     auto it = try_memmap(req);
     if (!it)
       return unexpected(it.error());
@@ -816,7 +825,8 @@ private:
     return boot_bytes::read_le_at<uint64_t>(record, offset);
   }
 
-  template <typename Request> [[nodiscard]] result<uint64_t> single_address(const volatile Request &req) const noexcept {
+  template <typename Request>
+  [[nodiscard]] result<uint64_t> single_address(const volatile Request &req) const noexcept {
     auto r = response(req, 16);
     if (!r)
       return unexpected(r.error());

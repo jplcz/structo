@@ -48,7 +48,8 @@ template <> struct structo::hw::block_device_traits<counting_disk> {
     std::memcpy(dst.data(), d.mem.data() + lba * kBs, dst.size());
     return {};
   }
-  static reloco::result<void> try_write_blocks(counting_disk &d, std::uint64_t lba, span<const std::byte> src) noexcept {
+  static reloco::result<void> try_write_blocks(counting_disk &d, std::uint64_t lba,
+                                               span<const std::byte> src) noexcept {
     if (d.fail_writes)
       return reloco::unexpected(error::io_error);
     ++d.writes;
@@ -105,17 +106,17 @@ TEST_F(BlockCacheTest, ReadsHitTheCache) {
 TEST_F(BlockCacheTest, MultiBlockReadAndLruEviction) {
   auto c = make();
   reloco::array<std::byte, kBs * 4> big{};
-  ASSERT_TRUE(c.try_read_blocks(0, span<std::byte>(big)));   // fills all 4 slots
+  ASSERT_TRUE(c.try_read_blocks(0, span<std::byte>(big))); // fills all 4 slots
   EXPECT_EQ(big[kBs * 2], expected(2));
   EXPECT_EQ(disk.reads, 4);
 
   reloco::array<std::byte, kBs> one{};
-  ASSERT_TRUE(c.try_read_blocks(0, span<std::byte>(one)));    // touch 0: now 1 is the LRU
-  ASSERT_TRUE(c.try_read_blocks(10, span<std::byte>(one)));   // evicts 1
+  ASSERT_TRUE(c.try_read_blocks(0, span<std::byte>(one)));  // touch 0: now 1 is the LRU
+  ASSERT_TRUE(c.try_read_blocks(10, span<std::byte>(one))); // evicts 1
   EXPECT_EQ(disk.reads, 5);
-  ASSERT_TRUE(c.try_read_blocks(0, span<std::byte>(one)));    // still cached
+  ASSERT_TRUE(c.try_read_blocks(0, span<std::byte>(one))); // still cached
   EXPECT_EQ(disk.reads, 5);
-  ASSERT_TRUE(c.try_read_blocks(1, span<std::byte>(one)));    // was evicted
+  ASSERT_TRUE(c.try_read_blocks(1, span<std::byte>(one))); // was evicted
   EXPECT_EQ(disk.reads, 6);
 }
 
@@ -126,7 +127,7 @@ TEST_F(BlockCacheTest, WritesAreDeferredUntilFlush) {
     b = std::byte{0xAB};
   ASSERT_TRUE(c.try_write_blocks(7, span<const std::byte>(src)));
   EXPECT_EQ(disk.writes, 0);
-  EXPECT_EQ(disk.reads, 0);   // a whole-block write needs no fill
+  EXPECT_EQ(disk.reads, 0); // a whole-block write needs no fill
   EXPECT_EQ(c.dirty_count(), 1u);
 
   reloco::array<std::byte, kBs> back{};
@@ -149,7 +150,7 @@ TEST_F(BlockCacheTest, EvictingDirtyBlockWritesItBack) {
   src[0] = std::byte{0x11};
   ASSERT_TRUE(c.try_write_blocks(0, span<const std::byte>(src)));
   reloco::array<std::byte, kBs> sink{};
-  for (std::uint64_t l = 1; l <= 4; ++l)   // 4 more blocks push block 0 out
+  for (std::uint64_t l = 1; l <= 4; ++l) // 4 more blocks push block 0 out
     ASSERT_TRUE(c.try_read_blocks(l, span<std::byte>(sink)));
   EXPECT_EQ(disk.writes, 1);
   EXPECT_EQ(disk.mem[0], std::byte{0x11});
@@ -171,17 +172,17 @@ TEST_F(BlockCacheTest, LargeRequestsBypassButStayCoherent) {
   auto c = make();
   reloco::array<std::byte, kBs> src{};
   src[0] = std::byte{0x5A};
-  ASSERT_TRUE(c.try_write_blocks(2, span<const std::byte>(src)));   // dirty in cache
+  ASSERT_TRUE(c.try_write_blocks(2, span<const std::byte>(src))); // dirty in cache
 
-  std::vector<std::byte> big(kBs * 6);   // > 4 slots
+  std::vector<std::byte> big(kBs * 6); // > 4 slots
   ASSERT_TRUE(c.try_read_blocks(0, span<std::byte>(big)));
-  EXPECT_EQ(big[2 * kBs], std::byte{0x5A});   // saw the dirty data
+  EXPECT_EQ(big[2 * kBs], std::byte{0x5A}); // saw the dirty data
   EXPECT_EQ(c.dirty_count(), 0u);
 
   std::vector<std::byte> fill(kBs * 6, std::byte{0x77});
-  ASSERT_TRUE(c.try_write_blocks(0, span<const std::byte>(fill)));   // straight to the device
+  ASSERT_TRUE(c.try_write_blocks(0, span<const std::byte>(fill))); // straight to the device
   reloco::array<std::byte, kBs> one{};
-  ASSERT_TRUE(c.try_read_blocks(2, span<std::byte>(one)));           // must not return stale cache
+  ASSERT_TRUE(c.try_read_blocks(2, span<std::byte>(one))); // must not return stale cache
   EXPECT_EQ(one[0], std::byte{0x77});
 }
 

@@ -78,8 +78,8 @@ namespace structo::arch {
  * directly (like `table_arena`) ignore it.
  */
 struct table_location {
-  std::size_t level{0};   //!< 0 = root.
-  std::uint64_t base{0};  //!< First (table-relative, canonical-bits-stripped) virtual address the table covers.
+  std::size_t level{0};  //!< 0 = root.
+  std::uint64_t base{0}; //!< First (table-relative, canonical-bits-stripped) virtual address the table covers.
 };
 
 /**
@@ -147,8 +147,7 @@ public:
   }
 
   /** @brief The CPU's view of a table; empty if `table` is outside the pool or misaligned. */
-  [[nodiscard]] reloco::span<std::uint64_t> table(Phys table, std::size_t entry_count,
-                                                  table_location = {}) noexcept {
+  [[nodiscard]] reloco::span<std::uint64_t> table(Phys table, std::size_t entry_count, table_location = {}) noexcept {
     const std::uint64_t bytes = static_cast<std::uint64_t>(entry_count) * 8;
     if (table.value < base_.value || !is_pow2(entry_count) || table.value % bytes != 0) {
       return {};

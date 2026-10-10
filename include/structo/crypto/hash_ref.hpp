@@ -124,7 +124,8 @@ private:
   template <typename Tag> struct entries {
     using traits = hash_traits<Tag>;
     using state_type = typename traits::state_type;
-    static_assert(sizeof(state_type) <= operation_storage_size, "backend state exceeds STRUCTO_CRYPTO_OPERATION_STORAGE");
+    static_assert(sizeof(state_type) <= operation_storage_size,
+                  "backend state exceeds STRUCTO_CRYPTO_OPERATION_STORAGE");
     static_assert(alignof(state_type) <= operation_storage_align, "backend state over-aligned");
     static_assert(std::is_nothrow_move_constructible_v<state_type> && std::is_nothrow_destructible_v<state_type>,
                   "backend state must be nothrow movable and destructible");
@@ -208,7 +209,8 @@ public:
   }
 
 private:
-  template <typename Traits> static constexpr auto has_is_supported(int) -> decltype((void)&Traits::is_supported, true) {
+  template <typename Traits>
+  static constexpr auto has_is_supported(int) -> decltype((void)&Traits::is_supported, true) {
     return true;
   }
   template <typename Traits> static constexpr bool has_is_supported(...) { return false; }
@@ -221,8 +223,8 @@ private:
         (void)ctx;
         return traits::try_start(alg);
       } else {
-        return traits::try_start(value_ref<typename traits::context_type>(*static_cast<typename traits::context_type *>(ctx)),
-                                 alg);
+        return traits::try_start(
+            value_ref<typename traits::context_type>(*static_cast<typename traits::context_type *>(ctx)), alg);
       }
     }();
     if (!state)

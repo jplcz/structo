@@ -202,8 +202,7 @@ template <> struct signature_verifier_traits<mbedtls_verifier_tag> {
   using context_type = void;
 
   static reloco::result<void> try_verify(signature_scheme scheme, hash_algorithm alg,
-                                         reloco::span<const std::byte> public_key,
-                                         reloco::span<const std::byte> digest,
+                                         reloco::span<const std::byte> public_key, reloco::span<const std::byte> digest,
                                          reloco::span<const std::byte> signature) noexcept {
     if (digest.size() != digest_size(alg))
       return reloco::unexpected(reloco::error::invalid_argument);
@@ -232,8 +231,8 @@ template <> struct signature_verifier_traits<mbedtls_verifier_tag> {
       mbedtls_pk_rsassa_pss_options opts;
       opts.mgf1_hash_id = md;
       opts.expected_salt_len = MBEDTLS_RSA_SALT_LEN_ANY;
-      rc = mbedtls_pk_verify_ext(MBEDTLS_PK_RSASSA_PSS, &opts, &pk.get(), md, dig, digest.size(), sig,
-                                 signature.size());
+      rc =
+          mbedtls_pk_verify_ext(MBEDTLS_PK_RSASSA_PSS, &opts, &pk.get(), md, dig, digest.size(), sig, signature.size());
       break;
     }
     case signature_scheme::ecdsa_der:

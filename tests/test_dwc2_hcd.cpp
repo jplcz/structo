@@ -162,10 +162,10 @@ struct sim_dwc2 {
   unsigned xacterr_runs = 0; // next runs end with XactErr
   unsigned bblerr_runs = 0;
   bool ahb_error_next = false;
-  unsigned out_naks = 0;       // next OUT data runs (first packet) are NAKed
-  unsigned nyet_next = 0;      // next high-speed bulk OUT packets are accepted but answered NYET
-  unsigned ping_naks = 0;      // next PINGs are answered NAK
-  unsigned nak_at_packet = 0;  // one-shot: the n-th packet (1-based) of the next data run is NAKed
+  unsigned out_naks = 0;      // next OUT data runs (first packet) are NAKed
+  unsigned nyet_next = 0;     // next high-speed bulk OUT packets are accepted but answered NYET
+  unsigned ping_naks = 0;     // next PINGs are answered NAK
+  unsigned nak_at_packet = 0; // one-shot: the n-th packet (1-based) of the next data run is NAKed
 
   // ---- observations ----
   unsigned bad_programming = 0;
@@ -542,7 +542,7 @@ struct sim_dwc2 {
     if (type == 3) {
       if (((v >> 29) & 1u) != ((frame + 1u) & 1u))
         ++bad_programming; // OddFrm must select the next frame
-      return;                // runs from step() in the matching frame
+      return;              // runs from step() in the matching frame
     }
     execute(c);
   }
@@ -894,11 +894,16 @@ protected:
 
   [[nodiscard]] unsigned bulk_mps() const { return hc.dev.bulk_mps; }
   [[nodiscard]] usb_pipe bulk_pipe(unsigned ep, usb_direction d) const {
-    return usb_pipe{udev.address(), static_cast<u8>(ep), d, usb_transfer_type::bulk,
-                    static_cast<std::uint16_t>(bulk_mps()), udev.speed(), 0};
+    return usb_pipe{udev.address(),
+                    static_cast<u8>(ep),
+                    d,
+                    usb_transfer_type::bulk,
+                    static_cast<std::uint16_t>(bulk_mps()),
+                    udev.speed(),
+                    0};
   }
   [[nodiscard]] usb_pipe int_pipe(unsigned interval = 1) const {
-    return usb_pipe{udev.address(), 2, usb_direction::in, usb_transfer_type::interrupt, 8, udev.speed(),
+    return usb_pipe{udev.address(),           2, usb_direction::in, usb_transfer_type::interrupt, 8, udev.speed(),
                     static_cast<u8>(interval)};
   }
   [[nodiscard]] usb_pipe ctl_pipe(u8 mps = 64) const {
@@ -965,11 +970,11 @@ TEST_F(Dwc2Test, StartProgramsController) {
   EXPECT_EQ(hcd.channel_count(), 4u); // min(8 in the core, 4 in MaxTransfers)
   EXPECT_EQ(hc.soft_resets, 1u);
   EXPECT_TRUE(hc.host_mode);
-  EXPECT_NE(hc.gusbcfg & (1u << 29), 0u);        // ForceHstMode
-  EXPECT_EQ(hc.gusbcfg & (1u << 30), 0u);        // not ForceDevMode
-  EXPECT_EQ(hc.gusbcfg & 0x358u, 0u);            // PHY if/select, SRP and HNP bits off for the 8-bit UTMI+ PHY
-  EXPECT_EQ((hc.gusbcfg >> 10) & 0xFu, 9u);      // USBTrdTim
-  EXPECT_EQ(hc.gahbcfg, (1u << 5) | 1u);         // DMAEn | GlblIntrMsk, single bursts
+  EXPECT_NE(hc.gusbcfg & (1u << 29), 0u);   // ForceHstMode
+  EXPECT_EQ(hc.gusbcfg & (1u << 30), 0u);   // not ForceDevMode
+  EXPECT_EQ(hc.gusbcfg & 0x358u, 0u);       // PHY if/select, SRP and HNP bits off for the 8-bit UTMI+ PHY
+  EXPECT_EQ((hc.gusbcfg >> 10) & 0xFu, 9u); // USBTrdTim
+  EXPECT_EQ(hc.gahbcfg, (1u << 5) | 1u);    // DMAEn | GlblIntrMsk, single bursts
   EXPECT_EQ(hc.grxfsiz, 512u);
   EXPECT_EQ(hc.gnptxfsiz, (256u << 16) | 512u);
   EXPECT_EQ(hc.hptxfsiz, (256u << 16) | 768u);
@@ -1393,8 +1398,7 @@ TEST_F(Dwc2Test, ControlStallsAreReportedAndTheEndpointKeepsWorking) {
 
 TEST_F(Dwc2Test, ControlTransfersAtHighSpeed) {
   enumerate(dspeed::hs);
-  const usb_completion c =
-      do_ctl(ctl_pipe(), usb_setup_packet{0x80, 6, 0x0200, 0, 64}, rx.as_span().subspan(0, 64));
+  const usb_completion c = do_ctl(ctl_pipe(), usb_setup_packet{0x80, 6, 0x0200, 0, 64}, rx.as_span().subspan(0, 64));
   ASSERT_TRUE(c.ok());
   EXPECT_EQ(c.actual, 39u);
   EXPECT_EQ(rx[1], 2);

@@ -136,7 +136,9 @@ struct setup_header {
   uint32_t kernel_info_offset = 0;
 
   /** @brief Number of 512-byte real-mode setup sectors; 0 means 4 per the spec. */
-  [[nodiscard]] constexpr uint32_t effective_setup_sects() const noexcept { return setup_sects == 0 ? 4u : setup_sects; }
+  [[nodiscard]] constexpr uint32_t effective_setup_sects() const noexcept {
+    return setup_sects == 0 ? 4u : setup_sects;
+  }
   /** @brief Byte offset in the bzImage file where the protected-mode kernel begins (boot sector + setup). */
   [[nodiscard]] constexpr uint64_t protected_mode_offset() const noexcept {
     return (static_cast<uint64_t>(effective_setup_sects()) + 1) * 512;
@@ -150,7 +152,9 @@ struct setup_header {
   [[nodiscard]] constexpr bool is_relocatable() const noexcept {
     return version >= linux_x86::version(2, 5) && relocatable_kernel != 0;
   }
-  [[nodiscard]] constexpr bool can_load_above_4g() const noexcept { return (xloadflags & xlf_can_be_loaded_above_4g) != 0; }
+  [[nodiscard]] constexpr bool can_load_above_4g() const noexcept {
+    return (xloadflags & xlf_can_be_loaded_above_4g) != 0;
+  }
   /** @brief Physical address to jump to for a 64-bit entry, given where the protected-mode kernel was loaded. */
   [[nodiscard]] constexpr uint64_t entry64(uint64_t loaded_at) const noexcept { return loaded_at + entry64_offset; }
   /** @brief Maximum command line length the kernel accepts (protocol >= 2.06; 255 before). */

@@ -14,8 +14,8 @@
  * | offset | field |
  * |---|---|
  * | 0 | ToC header: `name` u32 (`0xAA640001`), `serial_number` u32, `flags` u64 (bits 32-47: platform flags) |
- * | 16 | ToC entries, 40 bytes each: `uuid` (16 raw bytes), `offset_address` u64 (from the FIP start), `size` u64, `flags` u64 |
- * | ... | an all-zero UUID entry terminates the ToC; payloads follow at their offsets |
+ * | 16 | ToC entries, 40 bytes each: `uuid` (16 raw bytes), `offset_address` u64 (from the FIP start), `size` u64,
+ * `flags` u64 | | ... | an all-zero UUID entry terminates the ToC; payloads follow at their offsets |
  *
  * @code
  * // Read side: why - locate BL31/BL33 inside a FIP blob a boot ROM or BL2 loaded.
@@ -133,7 +133,9 @@ struct toc_header {
   uint32_t serial_number = 0;
   uint64_t flags = 0;
   /** @brief Platform-specific ToC flags (bits 32-47 of `flags`). */
-  [[nodiscard]] constexpr uint16_t platform_flags() const noexcept { return static_cast<uint16_t>((flags >> 32) & 0xFFFF); }
+  [[nodiscard]] constexpr uint16_t platform_flags() const noexcept {
+    return static_cast<uint16_t>((flags >> 32) & 0xFFFF);
+  }
 };
 
 /** @brief One ToC entry together with its payload, a view into the FIP. */
@@ -179,8 +181,9 @@ public:
     if (*offset > fip_.size() || *size > fip_.size() - static_cast<std::size_t>(*offset))
       return fail(error::out_of_bounds); // Also covers offset + size overflow.
     cursor_ += toc_entry_size;
-    return optional<item_type>(item_type(
-        fip_entry{*id, *offset, *size, *flags, fip_.subspan(static_cast<std::size_t>(*offset), static_cast<std::size_t>(*size))}));
+    return optional<item_type>(
+        item_type(fip_entry{*id, *offset, *size, *flags,
+                            fip_.subspan(static_cast<std::size_t>(*offset), static_cast<std::size_t>(*size))}));
   }
 
 private:
@@ -196,7 +199,7 @@ private:
 /** @brief Validated view of a FIP blob. */
 class RELOCO_POINTER fip_reader {
 public:
-    /** @brief Checks the ToC header signature (`0xAA640001`) and that the blob can hold a header. */
+  /** @brief Checks the ToC header signature (`0xAA640001`) and that the blob can hold a header. */
   [[nodiscard]] static result<fip_reader> try_create(span<const std::byte> fip) noexcept {
     auto name = boot_bytes::read_le_at<uint32_t>(fip, 0);
     auto serial = boot_bytes::read_le_at<uint32_t>(fip, 4);
@@ -236,8 +239,8 @@ class toc_writer {
 public:
   toc_writer(span<std::byte> out, uint32_t serial_number = toc_header_serial_number, uint64_t flags = 0) noexcept
       : out_(out) {
-    if (boot_bytes::write_le_at<uint32_t>(out_, 0, toc_header_name) && boot_bytes::write_le_at<uint32_t>(out_, 4, serial_number) &&
-        boot_bytes::write_le_at<uint64_t>(out_, 8, flags))
+    if (boot_bytes::write_le_at<uint32_t>(out_, 0, toc_header_name) &&
+        boot_bytes::write_le_at<uint32_t>(out_, 4, serial_number) && boot_bytes::write_le_at<uint64_t>(out_, 8, flags))
       ok_ = true;
   }
 
@@ -247,8 +250,10 @@ public:
       return unexpected(ok_ ? error::invalid_argument : error::capacity_exceeded);
     if (cursor_ + 2 * toc_entry_size > out_.size())
       return unexpected(error::capacity_exceeded);
-    if (!boot_bytes::write_be_at<uint64_t>(out_, cursor_, id.hi) || !boot_bytes::write_be_at<uint64_t>(out_, cursor_ + 8, id.lo) ||
-        !boot_bytes::write_le_at<uint64_t>(out_, cursor_ + 16, offset) || !boot_bytes::write_le_at<uint64_t>(out_, cursor_ + 24, size) ||
+    if (!boot_bytes::write_be_at<uint64_t>(out_, cursor_, id.hi) ||
+        !boot_bytes::write_be_at<uint64_t>(out_, cursor_ + 8, id.lo) ||
+        !boot_bytes::write_le_at<uint64_t>(out_, cursor_ + 16, offset) ||
+        !boot_bytes::write_le_at<uint64_t>(out_, cursor_ + 24, size) ||
         !boot_bytes::write_le_at<uint64_t>(out_, cursor_ + 32, flags))
       return unexpected(error::capacity_exceeded);
     cursor_ += toc_entry_size;

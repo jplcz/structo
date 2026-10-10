@@ -75,7 +75,7 @@ template <typename Levels = long_mode_4level> struct recursive_pte_format {
   }
 
   [[nodiscard]] static reloco::result<std::uint64_t> make_leaf(phys_type frame, protection p,
-                                                                         std::size_t level) noexcept {
+                                                               std::size_t level) noexcept {
     if (p.is_none()) {
       return reloco::unexpected(reloco::error::invalid_argument);
     }
@@ -100,7 +100,8 @@ template <typename Levels = long_mode_4level> struct recursive_pte_format {
     return bits::addr::set(raw, frame.value >> 12);
   }
 
-  /** Effective protection of a leaf (kernel mirrors the page's access; supervisor execute of user pages is reported off, as with SMEP). */
+  /** Effective protection of a leaf (kernel mirrors the page's access; supervisor execute of user pages is reported
+   * off, as with SMEP). */
   [[nodiscard]] static constexpr protection attrs(std::uint64_t raw, std::size_t) noexcept {
     const bool write = bits::rw::test(raw);
     const bool exec = !bits::xd::test(raw);

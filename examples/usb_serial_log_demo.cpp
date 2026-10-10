@@ -26,11 +26,11 @@
 
 #include "usb_linux_fake.hpp"
 
+#include <csignal>
+#include <cstdlib>
 #include <reloco/array.hpp>
 #include <reloco/span.hpp>
 #include <reloco/string_view.hpp>
-#include <csignal>
-#include <cstdlib>
 
 namespace {
 
@@ -73,7 +73,6 @@ void uart_log_sink::log_impl(const microfmt::log::log_msg &msg) noexcept {
     if (!uart_.try_put_byte(static_cast<std::uint8_t>(c)))
       break;
 }
-
 
 using namespace structo;
 
@@ -287,7 +286,6 @@ int main(int argc, char **argv) {
   ::close(fd);
   return 0;
 }
-
 
 #else
 

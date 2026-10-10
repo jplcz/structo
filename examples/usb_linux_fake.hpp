@@ -41,7 +41,6 @@
 #include <reloco/span.hpp>
 #include <reloco/string_view.hpp>
 
-
 namespace usbfake {
 
 using namespace structo;
@@ -60,7 +59,9 @@ inline void wait_readable(void *fd_ptr) noexcept {
 
 // The only place a raw pointer is handed to the OS: read()/write() on a byte span.
 inline ::ssize_t fd_read(int fd, reloco::span<std::uint8_t> buf) noexcept { return ::read(fd, buf.data(), buf.size()); }
-inline void fd_write(int fd, reloco::span<const std::uint8_t> buf) noexcept { (void)!::write(fd, buf.data(), buf.size()); }
+inline void fd_write(int fd, reloco::span<const std::uint8_t> buf) noexcept {
+  (void)!::write(fd, buf.data(), buf.size());
+}
 
 // The data stage buffer of a transfer as a span.
 inline reloco::span<std::uint8_t> transfer_buf(const hw::usb_transfer &t) noexcept {
@@ -139,25 +140,9 @@ public:
 
 protected:
   device(std::uint16_t vid, std::uint16_t pid) noexcept {
-    dev_desc_ = {{18,
-                                1,
-                                0x00,
-                                0x02,
-                                0,
-                                0,
-                                0,
-                                64,
-                                static_cast<std::uint8_t>(vid),
-                                static_cast<std::uint8_t>(vid >> 8),
-                                static_cast<std::uint8_t>(pid),
-                                static_cast<std::uint8_t>(pid >> 8),
-                                0x00,
-                                0x01,
-                                1,
-                                2,
-                                3,
-                                1}};
-    
+    dev_desc_ = {{18, 1, 0x00, 0x02, 0, 0, 0, 64, static_cast<std::uint8_t>(vid), static_cast<std::uint8_t>(vid >> 8),
+                  static_cast<std::uint8_t>(pid), static_cast<std::uint8_t>(pid >> 8), 0x00, 0x01, 1, 2, 3, 1}};
+
     set_string(1, "structo");
     set_string(3, "0001");
   }
@@ -397,6 +382,5 @@ template <> struct structo::hw::usb_host_traits<usbfake::hcd> {
   }
   static void reset_data_toggle(usbfake::hcd &, const usb_pipe &) noexcept {}
 };
-
 
 #endif // RELOCO_HAS_COROUTINES

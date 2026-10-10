@@ -102,7 +102,8 @@ public:
   }
 
 private:
-  template <typename Traits> static constexpr auto has_is_supported(int) -> decltype((void)&Traits::is_supported, true) {
+  template <typename Traits>
+  static constexpr auto has_is_supported(int) -> decltype((void)&Traits::is_supported, true) {
     return true;
   }
   template <typename Traits> static constexpr bool has_is_supported(...) { return false; }
@@ -115,8 +116,9 @@ private:
       (void)ctx;
       return traits::try_verify(scheme, alg, key, digest, signature);
     } else {
-      return traits::try_verify(value_ref<typename traits::context_type>(*static_cast<typename traits::context_type *>(ctx)),
-                                scheme, alg, key, digest, signature);
+      return traits::try_verify(
+          value_ref<typename traits::context_type>(*static_cast<typename traits::context_type *>(ctx)), scheme, alg,
+          key, digest, signature);
     }
   }
 

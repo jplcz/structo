@@ -201,8 +201,7 @@ public:
   /** @brief Maps blocks [first_lba, first_lba + block_count) of @p parent. Fails with `error::out_of_range` if that
    * does not fit the parent, `error::unsupported_operation` if @p parent is unbound. */
   [[nodiscard]] static result<partition_device> try_create(block_device_ref parent, std::uint64_t first_lba,
-                                                           std::uint64_t block_count,
-                                                           bool read_only = false) noexcept {
+                                                           std::uint64_t block_count, bool read_only = false) noexcept {
     if (!parent)
       return unexpected(error::unsupported_operation);
     const std::uint64_t total = parent.block_count();
@@ -335,7 +334,8 @@ public:
     t.dev_ = dev;
     t.scheme_ = partition_scheme::mbr;
     for (std::size_t i = 0; i < 4; ++i) {
-      auto e = detail::decode_mbr_entry(span<const std::byte>(sector), detail::mbr_entries_offset + i * detail::mbr_entry_size);
+      auto e = detail::decode_mbr_entry(span<const std::byte>(sector),
+                                        detail::mbr_entries_offset + i * detail::mbr_entry_size);
       if (!e)
         return unexpected(error::not_found);
     }
@@ -544,8 +544,8 @@ private:
     while (index_ < table_.gpt_num_entries_) {
       const std::uint32_t idx = index_++;
       array<std::byte, detail::gpt_min_entry_size> raw;
-      const std::uint64_t off = table_.gpt_entries_lba_ * dev.block_size() +
-                                static_cast<std::uint64_t>(idx) * table_.gpt_entry_size_;
+      const std::uint64_t off =
+          table_.gpt_entries_lba_ * dev.block_size() + static_cast<std::uint64_t>(idx) * table_.gpt_entry_size_;
       if (auto r = detail::read_bytes(dev, off, span<std::byte>(raw)); !r)
         return fail(r.error());
       const auto e = span<const std::byte>(raw);
@@ -671,8 +671,8 @@ private:
 
   partition_table table_;
   bool done_ = false;
-  std::uint32_t index_ = 0;        // GPT: next entry index
-  std::uint32_t phase_ = 0;        // MBR: 0 = primary slots, 1 = EBR chain
+  std::uint32_t index_ = 0; // GPT: next entry index
+  std::uint32_t phase_ = 0; // MBR: 0 = primary slots, 1 = EBR chain
   std::uint32_t slot_ = 0;
   std::uint64_t ext_first_ = 0;
   std::uint64_t ext_count_ = 0;

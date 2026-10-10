@@ -121,7 +121,7 @@ struct sim_env {
   unsigned cnr_delay = 3;
   unsigned reset_ms = 10;
   bool reset_stuck = false;
-  bool bypass = false; // ep1 bulk goes through the model's big FIFO (the sim device's loopback is only 8 KiB)
+  bool bypass = false;           // ep1 bulk goes through the model's big FIFO (the sim device's loopback is only 8 KiB)
   std::size_t fail_alloc_at = 0; // 1-based allocation number that fails; 0 = never
 
   // ---- observations ----
@@ -1103,8 +1103,13 @@ protected:
   }
 
   [[nodiscard]] usb_pipe bulk(unsigned ep, usb_direction d, unsigned mps = 64) const {
-    return {udev.address(), static_cast<std::uint8_t>(ep), d, usb_transfer_type::bulk, static_cast<std::uint16_t>(mps),
-            usb_speed::full, 0};
+    return {udev.address(),
+            static_cast<std::uint8_t>(ep),
+            d,
+            usb_transfer_type::bulk,
+            static_cast<std::uint16_t>(mps),
+            usb_speed::full,
+            0};
   }
   void prep(xfer &x, const usb_pipe &p, reloco::span<std::uint8_t> buf) {
     x.pipe = p;

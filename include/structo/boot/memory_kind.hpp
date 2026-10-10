@@ -22,8 +22,8 @@
  * | kind | in `full` | in `free` | Notes |
  * |---|---|---|---|
  * | `usable` | yes | yes | ordinary free RAM |
- * | `bootloader_reclaimable` | yes | no | free once the kernel stops reading bootloader data (page tables, `boot_params`, the memory map itself) |
- * | `acpi_reclaimable` | yes | no | free once ACPI tables were parsed/copied |
+ * | `bootloader_reclaimable` | yes | no | free once the kernel stops reading bootloader data (page tables,
+ * `boot_params`, the memory map itself) | | `acpi_reclaimable` | yes | no | free once ACPI tables were parsed/copied |
  * | `acpi_nvs` | yes | no | firmware sleep state; never free |
  * | `kernel_and_modules` | yes | no | the loaded image, initrd and modules |
  * | `firmware_runtime` | yes | no | UEFI runtime services code/data |

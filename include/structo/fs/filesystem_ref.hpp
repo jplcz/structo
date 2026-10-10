@@ -95,10 +95,10 @@
 
 #include <reloco/array.hpp>
 #include <reloco/error.hpp>
+#include <reloco/expected.hpp>
 #include <reloco/iterator.hpp>
 #include <reloco/lifetime.hpp>
 #include <reloco/optional.hpp>
-#include <reloco/expected.hpp>
 #include <reloco/span.hpp>
 #include <reloco/string_view.hpp>
 
@@ -182,18 +182,16 @@ namespace detail {
 
 template <typename Backend, typename = void> struct has_filesystem_traits : std::false_type {};
 template <typename Backend>
-struct has_filesystem_traits<Backend, std::void_t<decltype(&filesystem_traits<Backend>::try_open),
-                                                  decltype(&filesystem_traits<Backend>::try_open_dir),
-                                                  decltype(&filesystem_traits<Backend>::try_close),
-                                                  decltype(&filesystem_traits<Backend>::try_read),
-                                                  decltype(&filesystem_traits<Backend>::try_read_dir),
-                                                  decltype(&filesystem_traits<Backend>::try_stat),
-                                                  decltype(&filesystem_traits<Backend>::try_fstat)>>
-    : std::true_type {};
+struct has_filesystem_traits<
+    Backend,
+    std::void_t<decltype(&filesystem_traits<Backend>::try_open), decltype(&filesystem_traits<Backend>::try_open_dir),
+                decltype(&filesystem_traits<Backend>::try_close), decltype(&filesystem_traits<Backend>::try_read),
+                decltype(&filesystem_traits<Backend>::try_read_dir), decltype(&filesystem_traits<Backend>::try_stat),
+                decltype(&filesystem_traits<Backend>::try_fstat)>> : std::true_type {};
 
 // Detects an optional static member `T::member`.
 #define STRUCTO_FS_DETECT(member)                                                                                      \
-  template <typename T, typename = void> struct has_##member : std::false_type {};                                    \
+  template <typename T, typename = void> struct has_##member : std::false_type {};                                     \
   template <typename T> struct has_##member<T, std::void_t<decltype(&T::member)>> : std::true_type {};
 
 STRUCTO_FS_DETECT(try_write)
@@ -439,12 +437,11 @@ private:
   }
 
   template <typename Backend>
-  static constexpr vtable s_vtbl{&open_entry<Backend>,   &open_dir_entry<Backend>, &close_entry<Backend>,
-                                 &read_entry<Backend>,   &write_entry<Backend>,    &read_dir_entry<Backend>,
-                                 &stat_entry<Backend>,   &fstat_entry<Backend>,    &truncate_entry<Backend>,
-                                 &sync_entry<Backend>,   &sync_all_entry<Backend>, &mkdir_entry<Backend>,
-                                 &remove_entry<Backend>, &rename_entry<Backend>,   &statfs_entry<Backend>,
-                                 &is_read_only_entry<Backend>};
+  static constexpr vtable s_vtbl{
+      &open_entry<Backend>,     &open_dir_entry<Backend>, &close_entry<Backend>,    &read_entry<Backend>,
+      &write_entry<Backend>,    &read_dir_entry<Backend>, &stat_entry<Backend>,     &fstat_entry<Backend>,
+      &truncate_entry<Backend>, &sync_entry<Backend>,     &sync_all_entry<Backend>, &mkdir_entry<Backend>,
+      &remove_entry<Backend>,   &rename_entry<Backend>,   &statfs_entry<Backend>,   &is_read_only_entry<Backend>};
 
   void *ctx_ = nullptr;
   const vtable *vtbl_ = nullptr;
@@ -540,8 +537,7 @@ public:
 private:
   friend class filesystem_ref;
 
-  file(filesystem_ref fs, fs_handle h, open_flags flags) noexcept
-      : fs_(fs), handle_(h), flags_(flags), active_(true) {}
+  file(filesystem_ref fs, fs_handle h, open_flags flags) noexcept : fs_(fs), handle_(h), flags_(flags), active_(true) {}
 
   void reset() noexcept {
     if (active_)

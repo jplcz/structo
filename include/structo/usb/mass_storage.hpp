@@ -74,7 +74,8 @@ public:
   }
 
   [[nodiscard]] reloco::task<void> write_blocks(std::uint64_t lba, reloco::span<const std::uint8_t> src) noexcept {
-    return transfer_blocks(0x2A, lba, reloco::span<std::uint8_t>(const_cast<std::uint8_t *>(src.data()), src.size()), false);
+    return transfer_blocks(0x2A, lba, reloco::span<std::uint8_t>(const_cast<std::uint8_t *>(src.data()), src.size()),
+                           false);
   }
 
   /** @brief SYNCHRONIZE CACHE(10): flush the device's write cache. */

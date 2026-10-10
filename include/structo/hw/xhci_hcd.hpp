@@ -215,12 +215,12 @@ inline constexpr std::uint32_t trb_ev_port_status_change = 34;
 
 // TRB control bits.
 inline constexpr std::uint32_t trb_cycle = 1u << 0;
-inline constexpr std::uint32_t trb_tc = 1u << 1;     ///< Link: toggle cycle.
-inline constexpr std::uint32_t trb_isp = 1u << 2;    ///< Interrupt on short packet.
+inline constexpr std::uint32_t trb_tc = 1u << 1;  ///< Link: toggle cycle.
+inline constexpr std::uint32_t trb_isp = 1u << 2; ///< Interrupt on short packet.
 inline constexpr std::uint32_t trb_chain = 1u << 4;
-inline constexpr std::uint32_t trb_ioc = 1u << 5;    ///< Interrupt on completion.
-inline constexpr std::uint32_t trb_idt = 1u << 6;    ///< Immediate data (setup stage).
-inline constexpr std::uint32_t trb_bsr = 1u << 9;    ///< Address Device: block set address.
+inline constexpr std::uint32_t trb_ioc = 1u << 5; ///< Interrupt on completion.
+inline constexpr std::uint32_t trb_idt = 1u << 6; ///< Immediate data (setup stage).
+inline constexpr std::uint32_t trb_bsr = 1u << 9; ///< Address Device: block set address.
 inline constexpr std::uint32_t trb_dir_in = 1u << 16;
 
 // Completion codes.
@@ -505,8 +505,8 @@ public:
     const unsigned s = addr_slot_[p.address];
     if (s == 0)
       return;
-    const auto dci = xhci_detail::narrow8(static_cast<unsigned>(p.endpoint) * 2u +
-                                          (p.direction == usb_direction::in ? 1u : 0u));
+    const auto dci =
+        xhci_detail::narrow8(static_cast<unsigned>(p.endpoint) * 2u + (p.direction == usb_direction::in ? 1u : 0u));
     if (endpoint_state *ep = find_ep(slots_[s], dci))
       if (ep->configured)
         ep->toggle_reset_req = true;
@@ -527,7 +527,7 @@ private:
   using trb = xhci_detail::trb;
   using dma_block = usb_dma_block<Env>;
 
-  static constexpr unsigned ring_trbs = 16;     ///< Transfer ring segment: 15 TRBs + Link.
+  static constexpr unsigned ring_trbs = 16; ///< Transfer ring segment: 15 TRBs + Link.
   static constexpr unsigned max_td_trbs = ring_trbs - 2;
   static constexpr unsigned cmd_ring_trbs = 32; ///< Command ring segment.
   static constexpr unsigned evt_ring_trbs = 64; ///< Event ring segment.
@@ -537,7 +537,15 @@ private:
   static_assert(max_slots + 1 <= 32, "the DCBAA must fit one 256-byte aligned block");
 
   enum class xphase : std::uint8_t { queued, waiting_address, active };
-  enum class slot_phase : std::uint8_t { free, need_address, addressing, default_state, addressed, disable_pending, disabling };
+  enum class slot_phase : std::uint8_t {
+    free,
+    need_address,
+    addressing,
+    default_state,
+    addressed,
+    disable_pending,
+    disabling
+  };
   enum class ep_plan : std::uint8_t { none, configure, evaluate, resync, toggle };
   enum class cmd_kind : std::uint8_t {
     none,
@@ -682,7 +690,9 @@ private:
     env_->write32(off, xhci_detail::narrow32(v));
     env_->write32(off + 4, xhci_detail::narrow32(v >> 32));
   }
-  [[nodiscard]] std::size_t portsc_off(unsigned p) const noexcept { return op_ + xhci_detail::op_portsc + 0x10u * (p - 1u); }
+  [[nodiscard]] std::size_t portsc_off(unsigned p) const noexcept {
+    return op_ + xhci_detail::op_portsc + 0x10u * (p - 1u);
+  }
 
   template <typename Pred> [[nodiscard]] static bool spin_until(Pred pred) noexcept {
     for (unsigned i = 0; i < spin_limit; ++i)
@@ -962,9 +972,9 @@ private:
   void fill_endpoint_context(xhci_detail::endpoint_context &c, const endpoint_state &ep) const noexcept {
     using namespace xhci_detail;
     c = endpoint_context{};
-    const std::uint32_t avg = ep.type == ep_type_control ? 8u : (ep.type == ep_type_bulk_in || ep.type == ep_type_bulk_out
-                                                                    ? 1024u
-                                                                    : ep.max_packet);
+    const std::uint32_t avg = ep.type == ep_type_control
+                                  ? 8u
+                                  : (ep.type == ep_type_bulk_in || ep.type == ep_type_bulk_out ? 1024u : ep.max_packet);
     const bool periodic = ep.type == ep_type_interrupt_in || ep.type == ep_type_interrupt_out;
     const std::uint32_t esit = periodic ? ep.max_packet : 0u; // burst 0: one packet per service interval
     c.dw0 = (static_cast<std::uint32_t>(ep.interval) << 16) | (((esit >> 16) & 0xFFu) << 24);
@@ -1478,8 +1488,8 @@ private:
       sc->dw1 = static_cast<std::uint32_t>(sl.port) << 16;
       fill_endpoint_context(*in_ep(sl, 1), e0);
       env_->barrier();
-      issue(cmd_kind::address_device, s, 1, sl.in_ctx.phys(),
-            0, (trb_cmd_address_device << 10) | (sl.addr_bsr ? trb_bsr : 0u) | (s << 24));
+      issue(cmd_kind::address_device, s, 1, sl.in_ctx.phys(), 0,
+            (trb_cmd_address_device << 10) | (sl.addr_bsr ? trb_bsr : 0u) | (s << 24));
       return;
     }
   }

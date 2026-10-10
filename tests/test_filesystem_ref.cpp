@@ -113,8 +113,7 @@ template <> struct structo::fs::filesystem_traits<ram_fs> {
   static reloco::result<void> try_close(ram_fs &f, fs_handle h) noexcept {
     return f.open.erase(h) ? reloco::result<void>{} : reloco::result<void>(reloco::unexpected(error::invalid_argument));
   }
-  static reloco::result<std::size_t> try_read(ram_fs &f, fs_handle h, std::uint64_t off,
-                                              span<std::byte> dst) noexcept {
+  static reloco::result<std::size_t> try_read(ram_fs &f, fs_handle h, std::uint64_t off, span<std::byte> dst) noexcept {
     auto &d = f.nodes[f.open[h].path].data;
     if (off >= d.size())
       return std::size_t{0};
@@ -179,8 +178,9 @@ template <> struct structo::fs::filesystem_traits<ram_fs> {
     return {};
   }
   static reloco::result<void> try_remove(ram_fs &f, string_view path) noexcept {
-    return f.nodes.erase(std::string(path.data(), path.size())) ? reloco::result<void>{}
-                                                                  : reloco::result<void>(reloco::unexpected(error::not_found));
+    return f.nodes.erase(std::string(path.data(), path.size()))
+               ? reloco::result<void>{}
+               : reloco::result<void>(reloco::unexpected(error::not_found));
   }
   static reloco::result<void> try_rename(ram_fs &f, string_view from, string_view to) noexcept {
     auto it = f.nodes.find(std::string(from.data(), from.size()));
@@ -202,7 +202,9 @@ template <> struct structo::fs::filesystem_traits<ro_fs> {
   static reloco::result<fs_handle> try_open(ro_fs &f, string_view p, open_flags fl) noexcept {
     return base::try_open(f.inner, p, fl);
   }
-  static reloco::result<fs_handle> try_open_dir(ro_fs &f, string_view p) noexcept { return base::try_open_dir(f.inner, p); }
+  static reloco::result<fs_handle> try_open_dir(ro_fs &f, string_view p) noexcept {
+    return base::try_open_dir(f.inner, p);
+  }
   static reloco::result<void> try_close(ro_fs &f, fs_handle h) noexcept { return base::try_close(f.inner, h); }
   static reloco::result<std::size_t> try_read(ro_fs &f, fs_handle h, std::uint64_t o, span<std::byte> d) noexcept {
     return base::try_read(f.inner, h, o, d);

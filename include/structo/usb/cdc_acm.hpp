@@ -120,7 +120,8 @@ public:
         co_await tx_kick_.wait();
         continue;
       }
-      hw::usb_completion c = co_await dev_->controller().out(out_, reloco::span<const std::uint8_t>(tx_buf_.as_span().subspan(0, n)));
+      hw::usb_completion c =
+          co_await dev_->controller().out(out_, reloco::span<const std::uint8_t>(tx_buf_.as_span().subspan(0, n)));
       if (c.status == hw::usb_status::stall) {
         auto r = co_await dev_->clear_halt(out_);
         if (!r)

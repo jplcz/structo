@@ -166,9 +166,9 @@ struct ed {
   static constexpr std::uint32_t head_carry = 1u << 1;
   static constexpr std::uint32_t ptr_mask = ~0xFu;
 
-  le32 flags;     ///< FA[0:6] EN[7:10] D[11:12] S[13] K[14] F[15] MPS[16:26]
-  le32 tail_p;    ///< Dummy TD where the list ends.
-  le32 head_p;    ///< Next TD | carry[1] | halted[0].
+  le32 flags;  ///< FA[0:6] EN[7:10] D[11:12] S[13] K[14] F[15] MPS[16:26]
+  le32 tail_p; ///< Dummy TD where the list ends.
+  le32 head_p; ///< Next TD | carry[1] | halted[0].
   le32 next_ed;
 };
 
@@ -178,10 +178,10 @@ struct td {
   static constexpr std::uint32_t dp_out = 1;
   static constexpr std::uint32_t dp_in = 2;
 
-  le32 flags;   ///< R[18] DP[19:20] DI[21:23] T[24:25] EC[26:27] CC[28:31]
-  le32 cbp;     ///< Current buffer pointer (0 = zero-length / transferred completely).
+  le32 flags; ///< R[18] DP[19:20] DI[21:23] T[24:25] EC[26:27] CC[28:31]
+  le32 cbp;   ///< Current buffer pointer (0 = zero-length / transferred completely).
   le32 next_td;
-  le32 be;      ///< Last byte of the buffer.
+  le32 be; ///< Last byte of the buffer.
 };
 
 /** @brief Host controller communications area: 256 bytes, 256-byte aligned. */
@@ -468,8 +468,8 @@ public:
 
     const std::size_t edi = res_ed_base + ri;
     ohci::ed *e = ed_at(edi);
-    std::uint32_t flags = p.address | (static_cast<std::uint32_t>(p.endpoint) << 7) |
-                          (static_cast<std::uint32_t>(p.max_packet) << 16);
+    std::uint32_t flags =
+        p.address | (static_cast<std::uint32_t>(p.endpoint) << 7) | (static_cast<std::uint32_t>(p.max_packet) << 16);
     if (p.speed == usb_speed::low)
       flags |= ohci::ed::low_speed;
     e->flags.set(flags);
@@ -587,7 +587,9 @@ private:
   }
 
   [[nodiscard]] ohci::hcca *hcca_at() noexcept { return sched_.template at<ohci::hcca>(hcca_off); }
-  [[nodiscard]] ohci::ed *ed_at(std::size_t i) noexcept { return sched_.template at<ohci::ed>(ed_off + i * sizeof(ohci::ed)); }
+  [[nodiscard]] ohci::ed *ed_at(std::size_t i) noexcept {
+    return sched_.template at<ohci::ed>(ed_off + i * sizeof(ohci::ed));
+  }
   [[nodiscard]] std::uint32_t ed_phys(std::size_t i) const noexcept {
     return static_cast<std::uint32_t>(sched_.phys_at(ed_off + i * sizeof(ohci::ed)));
   }
@@ -697,7 +699,8 @@ private:
       std::size_t off = 0;
       for (std::size_t k = 0; k < n_data; ++k) {
         const std::size_t len = t.length - off < chunk ? t.length - off : chunk;
-        put_td(ri, n++, r.in ? ohci::td::dp_in : ohci::td::dp_out, r.in, tog, len != 0 ? r.bounce.phys_at(off) : 0, len);
+        put_td(ri, n++, r.in ? ohci::td::dp_in : ohci::td::dp_out, r.in, tog, len != 0 ? r.bounce.phys_at(off) : 0,
+               len);
         tog = tog != ((packets(len, len, r.in, r.mps) & 1u) != 0);
         off += len;
       }

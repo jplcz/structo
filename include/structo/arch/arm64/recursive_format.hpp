@@ -61,14 +61,13 @@
 namespace structo::arch::arm64 {
 
 /** 4 KiB granule, 48-bit VA, four levels (L0 table-only, L1 1 GiB, L2 2 MiB, L3 4 KiB). */
-using levels_4k_48bit = page_table_levels<structo::page_4k, 48, page_table_level<9, 39, false>,
-                                          page_table_level<9, 30, true>, page_table_level<9, 21, true>,
-                                          page_table_level<9, 12, true>>;
+using levels_4k_48bit =
+    page_table_levels<structo::page_4k, 48, page_table_level<9, 39, false>, page_table_level<9, 30, true>,
+                      page_table_level<9, 21, true>, page_table_level<9, 12, true>>;
 
 /** MAIR layout that `recursive_stage1_format` assumes by default. Program `MAIR_ELx` with `value`. */
 struct default_mair {
-  static constexpr std::uint64_t value =
-      0x00ull | (0x04ull << 8) | (0x44ull << 16) | (0xbbull << 24) | (0xffull << 32);
+  static constexpr std::uint64_t value = 0x00ull | (0x04ull << 8) | (0x44ull << 16) | (0xbbull << 24) | (0xffull << 32);
 
   /** Attribute index for a memory type. */
   [[nodiscard]] static constexpr std::uint64_t index_of(cache_mode c) noexcept {
@@ -142,7 +141,7 @@ struct recursive_stage1_format {
   [[nodiscard]] static constexpr std::uint64_t make_self(phys_type root) noexcept { return make_table(root); }
 
   [[nodiscard]] static reloco::result<std::uint64_t> make_leaf(phys_type frame, protection req,
-                                                                         std::size_t level) noexcept {
+                                                               std::size_t level) noexcept {
     const protection p = req.template enforce_policy<Policy>();
     if (req.is_none()) {
       return reloco::unexpected(reloco::error::invalid_argument);
@@ -211,8 +210,8 @@ struct recursive_stage1_format {
 
   /** Break-before-make is required unless only AP, PXN/UXN or AF change. */
   [[nodiscard]] static constexpr bool needs_bbm(std::uint64_t old_raw, std::uint64_t new_raw) noexcept {
-    constexpr std::uint64_t relaxed = (std::uint64_t{3} << 6) | (std::uint64_t{1} << 10) | (std::uint64_t{1} << 53) |
-                                      (std::uint64_t{1} << 54);
+    constexpr std::uint64_t relaxed =
+        (std::uint64_t{3} << 6) | (std::uint64_t{1} << 10) | (std::uint64_t{1} << 53) | (std::uint64_t{1} << 54);
     return ((old_raw ^ new_raw) & ~relaxed) != 0;
   }
 

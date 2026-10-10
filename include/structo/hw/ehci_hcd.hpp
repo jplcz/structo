@@ -146,10 +146,10 @@ inline constexpr std::uint32_t tok_bytes_shift = 16;
 inline constexpr std::uint32_t tok_bytes_mask = 0x7FFF;
 inline constexpr std::uint32_t tok_dt = 1u << 31;
 
-inline constexpr std::uint32_t qh_h = 1u << 15;       ///< Head of reclamation list.
-inline constexpr std::uint32_t qh_dtc = 1u << 14;     ///< Data toggle comes from the qTD.
+inline constexpr std::uint32_t qh_h = 1u << 15;   ///< Head of reclamation list.
+inline constexpr std::uint32_t qh_dtc = 1u << 14; ///< Data toggle comes from the qTD.
 inline constexpr std::uint32_t qh_eps_high = 2u << 12;
-inline constexpr std::uint32_t qh_rl_shift = 28;      ///< NAK count reload.
+inline constexpr std::uint32_t qh_rl_shift = 28; ///< NAK count reload.
 inline constexpr std::uint32_t qh_mult_1 = 1u << 30;
 
 inline constexpr std::size_t frame_list_entries = 1024;

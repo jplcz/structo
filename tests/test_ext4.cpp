@@ -21,9 +21,9 @@ RELOCO_BEGIN_UNSAFE_BUFFER_USAGE
 namespace {
 
 using namespace structo::fs;
-using structo::hw::block_device_ref;
 using reloco::error;
 using reloco::span;
+using structo::hw::block_device_ref;
 
 struct ram_disk {
   std::vector<std::byte> mem;
@@ -193,9 +193,9 @@ TEST_F(Ext4Test, MountRefusesUnsupportedFeaturesAndDirtyJournal) {
     block_device_ref dev(d);
     return ext4_filesystem::try_mount(dev, span<std::byte>(scratch)).error();
   };
-  EXPECT_EQ(with_incompat(0x04, 0), error::invalid_state);            // needs_recovery
-  EXPECT_EQ(with_incompat(0x10, 0), error::unsupported_operation);    // meta_bg
-  EXPECT_EQ(with_incompat(0, 0x80), error::unsupported_operation);    // inline_data
+  EXPECT_EQ(with_incompat(0x04, 0), error::invalid_state);         // needs_recovery
+  EXPECT_EQ(with_incompat(0x10, 0), error::unsupported_operation); // meta_bg
+  EXPECT_EQ(with_incompat(0, 0x80), error::unsupported_operation); // inline_data
 }
 
 TEST_F(Ext4Test, ReadsSmallFilesAndPaths) {

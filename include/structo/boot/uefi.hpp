@@ -97,18 +97,27 @@ struct guid {
   return g;
 }
 
-inline constexpr guid acpi_20_table_guid = {0x8868e871, 0xe4f1, 0x11d3, {0xbc, 0x22, 0x00, 0x80, 0xc7, 0x3c, 0x88, 0x81}};
-inline constexpr guid acpi_10_table_guid = {0xeb9d2d30, 0x2d88, 0x11d3, {0x9a, 0x16, 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d}};
-inline constexpr guid smbios_table_guid = {0xeb9d2d31, 0x2d88, 0x11d3, {0x9a, 0x16, 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d}};
-inline constexpr guid smbios3_table_guid = {0xf2fd1544, 0x9794, 0x4a2c, {0x99, 0x2e, 0xe5, 0xbb, 0xcf, 0x20, 0xe3, 0x94}};
+inline constexpr guid acpi_20_table_guid = {
+    0x8868e871, 0xe4f1, 0x11d3, {0xbc, 0x22, 0x00, 0x80, 0xc7, 0x3c, 0x88, 0x81}};
+inline constexpr guid acpi_10_table_guid = {
+    0xeb9d2d30, 0x2d88, 0x11d3, {0x9a, 0x16, 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d}};
+inline constexpr guid smbios_table_guid = {
+    0xeb9d2d31, 0x2d88, 0x11d3, {0x9a, 0x16, 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4d}};
+inline constexpr guid smbios3_table_guid = {
+    0xf2fd1544, 0x9794, 0x4a2c, {0x99, 0x2e, 0xe5, 0xbb, 0xcf, 0x20, 0xe3, 0x94}};
 /** @brief The flattened devicetree configuration table (`EFI_DTB_TABLE_GUID`), used on arm/arm64/riscv. */
 inline constexpr guid dtb_table_guid = {0xb1b621d5, 0xf19c, 0x41a5, {0x83, 0x0b, 0xd9, 0x15, 0x2c, 0x69, 0xaa, 0xe0}};
-inline constexpr guid memory_attributes_table_guid = {0xdcfa911d, 0x26eb, 0x469f, {0xa2, 0x20, 0x38, 0xb7, 0xdc, 0x46, 0x12, 0x20}};
-inline constexpr guid rng_protocol_guid = {0x3152bca5, 0xeade, 0x433d, {0x86, 0x2e, 0xc0, 0x1c, 0xdc, 0x29, 0x1f, 0x44}};
+inline constexpr guid memory_attributes_table_guid = {
+    0xdcfa911d, 0x26eb, 0x469f, {0xa2, 0x20, 0x38, 0xb7, 0xdc, 0x46, 0x12, 0x20}};
+inline constexpr guid rng_protocol_guid = {
+    0x3152bca5, 0xeade, 0x433d, {0x86, 0x2e, 0xc0, 0x1c, 0xdc, 0x29, 0x1f, 0x44}};
 /** @brief The Linux initrd media GUID (`LINUX_EFI_INITRD_MEDIA_GUID`), used by the EFI stub's initrd loading. */
-inline constexpr guid linux_initrd_media_guid = {0x5568e427, 0x68fc, 0x4f3d, {0xac, 0x74, 0xca, 0x55, 0x52, 0x31, 0xcc, 0x68}};
-inline constexpr guid graphics_output_protocol_guid = {0x9042a9de, 0x23dc, 0x4a38, {0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a}};
-inline constexpr guid loaded_image_protocol_guid = {0x5b1b31a1, 0x9562, 0x11d2, {0x8e, 0x3f, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b}};
+inline constexpr guid linux_initrd_media_guid = {
+    0x5568e427, 0x68fc, 0x4f3d, {0xac, 0x74, 0xca, 0x55, 0x52, 0x31, 0xcc, 0x68}};
+inline constexpr guid graphics_output_protocol_guid = {
+    0x9042a9de, 0x23dc, 0x4a38, {0x96, 0xfb, 0x7a, 0xde, 0xd0, 0x80, 0x51, 0x6a}};
+inline constexpr guid loaded_image_protocol_guid = {
+    0x5b1b31a1, 0x9562, 0x11d2, {0x8e, 0x3f, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b}};
 
 // ============================================================================
 // Status codes
@@ -282,7 +291,8 @@ public:
 
   /** @brief Validates @p descriptor_size (`>= 40`, and a multiple of 8 as the spec's 8-byte alignment implies)
    * and that @p map is a whole number of descriptors. */
-  [[nodiscard]] static result<memory_map_reader> try_create(span<const std::byte> map, std::size_t descriptor_size) noexcept {
+  [[nodiscard]] static result<memory_map_reader> try_create(span<const std::byte> map,
+                                                            std::size_t descriptor_size) noexcept {
     if (descriptor_size < memory_descriptor_min_size || descriptor_size % 8 != 0)
       return unexpected(error::invalid_argument);
     if (map.size() % descriptor_size != 0)
@@ -325,7 +335,8 @@ private:
 /** @brief Folds every descriptor of @p reader into @p map (`boot_memory_map`-shaped: needs
  * `try_add(memory_kind, base, size)`). */
 template <typename Map>
-[[nodiscard]] result<void> try_fill_memory_map(memory_map_reader reader, Map &map, bool boot_services_exited = true) noexcept {
+[[nodiscard]] result<void> try_fill_memory_map(memory_map_reader reader, Map &map,
+                                               bool boot_services_exited = true) noexcept {
   for (auto d : reader) {
     if (!d)
       return unexpected(d.error());
@@ -394,7 +405,8 @@ public:
   using item_type = result<config_table_entry>;
 
   /** @brief @p pointer_bits is 32 or 64 (the firmware's `UINTN` width). */
-  [[nodiscard]] static result<config_table_reader> try_create(span<const std::byte> table, unsigned pointer_bits = 64) noexcept {
+  [[nodiscard]] static result<config_table_reader> try_create(span<const std::byte> table,
+                                                              unsigned pointer_bits = 64) noexcept {
     if (pointer_bits != 32 && pointer_bits != 64)
       return unexpected(error::invalid_argument);
     const std::size_t stride = pointer_bits == 64 ? 24 : 20;
@@ -472,9 +484,13 @@ struct gop_mode_info {
   uint32_t pixels_per_scan_line = 0;
 
   /** @brief Whether the mode exposes a linear framebuffer (`blt_only` modes do not). */
-  [[nodiscard]] constexpr bool has_linear_framebuffer() const noexcept { return pixel_format != gop_pixel_format::blt_only; }
+  [[nodiscard]] constexpr bool has_linear_framebuffer() const noexcept {
+    return pixel_format != gop_pixel_format::blt_only;
+  }
   /** @brief Bytes per scan line; every non-`blt_only` GOP format is 32 bits per pixel. */
-  [[nodiscard]] constexpr uint64_t pitch_bytes() const noexcept { return static_cast<uint64_t>(pixels_per_scan_line) * 4; }
+  [[nodiscard]] constexpr uint64_t pitch_bytes() const noexcept {
+    return static_cast<uint64_t>(pixels_per_scan_line) * 4;
+  }
 };
 
 [[nodiscard]] inline result<gop_mode_info> try_decode_gop_mode_info(span<const std::byte> info) noexcept {

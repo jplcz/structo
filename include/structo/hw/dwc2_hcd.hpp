@@ -499,7 +499,8 @@ public:
     return {};
   }
 
-  /** @brief Withdraws `t`; its channel and memory are recycled once the channel halted. Never touches `t` afterwards. */
+  /** @brief Withdraws `t`; its channel and memory are recycled once the channel halted. Never touches `t` afterwards.
+   */
   void cancel(usb_transfer &t) noexcept {
     table_slot *slot = table_.find(t);
     if (!slot)
@@ -558,8 +559,8 @@ private:
     bool running = false;  ///< A run was armed and its halt has not been processed yet.
     bool deferred = false; ///< NAKed: re-arm once the frame number changed.
     bool ctl = false;
-    bool in = false;       ///< Direction of the data stage.
-    bool cur_in = false;   ///< Direction of the current run.
+    bool in = false;     ///< Direction of the data stage.
+    bool cur_in = false; ///< Direction of the current run.
     bool status_in = false;
     bool hs = false;
     bool ls = false;
@@ -763,8 +764,8 @@ private:
     r.deferred = false;
 
     const bool periodic = r.type == usb_transfer_type::interrupt;
-    std::uint32_t chr = r.mps | (std::uint32_t{r.ep} << dwc2::chr_epnum_shift) |
-                        (r.cur_in ? dwc2::chr_epdir_in : 0u) | (r.ls ? dwc2::chr_lspddev : 0u) |
+    std::uint32_t chr = r.mps | (std::uint32_t{r.ep} << dwc2::chr_epnum_shift) | (r.cur_in ? dwc2::chr_epdir_in : 0u) |
+                        (r.ls ? dwc2::chr_lspddev : 0u) |
                         (static_cast<std::uint32_t>(r.type) << dwc2::chr_eptype_shift) | dwc2::chr_mc_one |
                         (std::uint32_t{r.addr} << dwc2::chr_devaddr_shift);
     if (periodic && (((rd(dwc2::reg_hfnum) + 1u) & 1u) != 0))
@@ -773,9 +774,9 @@ private:
     wr(ch_reg(c, dwc2::hc_hcint), 0xFFFF'FFFFu);
     wr(ch_reg(c, dwc2::hc_hcintmsk), dwc2::hci_chhltd | dwc2::hci_ahberr);
     wr(ch_reg(c, dwc2::hc_hcsplt), 0);
-    wr(ch_reg(c, dwc2::hc_hctsiz),
-       static_cast<std::uint32_t>(r.prog_len) | (static_cast<std::uint32_t>(pkts) << dwc2::tsiz_pktcnt_shift) |
-           (pid << dwc2::tsiz_pid_shift) | (r.ping_run ? dwc2::tsiz_dopng : 0u));
+    wr(ch_reg(c, dwc2::hc_hctsiz), static_cast<std::uint32_t>(r.prog_len) |
+                                       (static_cast<std::uint32_t>(pkts) << dwc2::tsiz_pktcnt_shift) |
+                                       (pid << dwc2::tsiz_pid_shift) | (r.ping_run ? dwc2::tsiz_dopng : 0u));
     wr(ch_reg(c, dwc2::hc_hcdma), static_cast<std::uint32_t>(phys));
     env_->barrier();
     r.running = true;
