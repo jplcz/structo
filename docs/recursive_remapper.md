@@ -1,57 +1,67 @@
 # Early remapper with the self-referencing page-table trick
 
-Headers: `arch/recursive_remapper.hpp`, `arch/protection.hpp`, `arch/page_table_memory.hpp`,
-`arch/x86/recursive_format.hpp`, `arch/arm64/recursive_format.hpp`.
+Headers: `arch/recursive_remapper.hpp`, `arch/protection.hpp`, `arch/page_table_memory.hpp`, and the
+last-level formats `arch/{x86,arm64,arm,riscv}/recursive_format.hpp` (+ shared `arch/vmsa_recursive_format.hpp`).
 
-A bootstrap tool: it edits the *live* page tables without a direct map of physical memory,
-by reaching every table through one root slot that points back at the root.
+The remapper owns **one last-level page table** that maps *itself* as an ordinary page. The table is
+then visible at a known virtual address, so the remapper edits its own entries with plain loads and stores
+- no direct map of physical memory needed. The caller builds all levels above it.
 
 ```cpp
 using namespace structo::arch;
 
-// Page-table format: x86-64, 4 levels. (AArch64: arm64::recursive_stage1_format<>.)
-using format = x86::recursive_pte_format<>;
+// Last-level format: x86 PAE / long mode (512 entries, 4 KiB pages). Other formats:
+//   x86::recursive_pte32_format, arm64::recursive_stage1_format<Granule, Tag, Regime, Policy>,
+//   arm::lpae::recursive_stage1_format<>, arm::short_descriptor::recursive_small_page_format<>,
+//   riscv::recursive_pte_format<Svpbmt>.
+using format = x86::recursive_pte_format;
 using phys = format::phys_type;
 
-// Bootstrap table pool: caller storage + the physical address of its first word
-// (4 KiB aligned). Only for early boot; a running kernel supplies its own allocator
-// with the same three members (try_allocate_table / free_table / table).
-alignas(4096) static std::uint64_t pool[512 * 64];
-table_arena<phys> arena(reloco::span<std::uint64_t>(pool, 512 * 64), phys{0x8010'0000});
-
-// TLB hook: invalidates by page through the trait layer; `complete()` is the barrier
-// (ARM: dsb ish; isb). Use no_tlb while the MMU is still off.
+// TLB hook: invalidates by page through the trait layer; Barrier::complete() would be
+// `dsb ish; isb` on ARM. no_tlb does nothing (MMU off / tests).
 using tlb = tlb_binding<x86::tlb_tag>;
+using remapper = recursive_remapper<format, tlb>;
 
-// Window: converts a window virtual address into a pointer. identity_window
-// reinterprets the address, which is right once the new root is live.
-using remapper = recursive_remapper<format, table_arena<phys>, tlb, identity_window>;
+// One page that becomes the last-level table. `view` is how the CPU can write it right now
+// (identity mapping); `table_phys` is its physical address (page aligned).
+// 0xFFFF'FFFF'C000'0000 is the VA where this table's 2 MiB span starts (span aligned);
+// 3 is the slot that maps the table itself, so the table appears at base + 3 * 4096.
+auto m = remapper::try_initialize(view, table_phys, 0xFFFF'FFFF'C000'0000, 3);
 
-// Creates the root and points its slot 510 at itself. Slot 510 (and the whole 512 GiB
-// it covers) is now the window and cannot be mapped for anything else.
-auto m = remapper::try_create(arena, 510);
+// The caller links table_phys from its upper-level tables and activates them (CR3 / TTBR / satp).
 
-// ... load m->root() into CR3 ...
+// Map 16 KiB read/write, non-executable, write-back. map_flags::replace would overwrite
+// existing pages instead of failing with already_exists.
+(void)m->try_map(0xFFFF'FFFF'C001'0000, phys{0x20'0000}, 16 << 10, protection::kernel_data());
 
-// Map 4 MiB read/execute for the kernel. The remapper picks 2 MiB blocks where the
-// address and size allow, 4 KiB pages otherwise. `no_huge` avoids 1 GiB blocks on CPUs
-// without Page1GB; `replace` would overwrite existing leaves; `no_large` forces 4 KiB.
-(void)m->try_map(0xFFFF'8000'0000'0000, phys{0x20'0000}, 4 << 20,
-                 protection::kernel_text(), map_flags::no_huge);
-
-// Flip data to read-only (frames are kept). Fails with not_found over holes.
-(void)m->try_protect(0xFFFF'8000'0000'0000, 4 << 20, protection::kernel_rodata());
-
-// Query: physical address, effective (legalized) protection, block size, level.
-auto q = m->query(0xFFFF'8000'0000'1000);
+// Make it read/execute (frames kept), then ask what is mapped there.
+(void)m->try_protect(0xFFFF'FFFF'C001'0000, 16 << 10, protection::kernel_text());
+auto q = m->query(0xFFFF'FFFF'C001'1234); // physical address, effective protection, page size
 ```
+
+## Supported formats
+
+| Format | Entry | Entries/table | Page |
+|---|---|---|---|
+| `x86::recursive_pte_format` (PAE, 4/5-level) | 64-bit | 512 | 4 KiB |
+| `x86::recursive_pte32_format` (i386) | 32-bit | 1024 | 4 KiB |
+| `arm64::recursive_stage1_format<page_4k/16k/64k, Tag, Regime>` | 64-bit | 512 / 2048 / 8192 | 4 / 16 / 64 KiB |
+| `arm::lpae::recursive_stage1_format<>` | 64-bit | 512 | 4 KiB |
+| `arm::short_descriptor::recursive_small_page_format<>` | 32-bit | 256 (1 KiB table) | 4 KiB |
+| `riscv::recursive_pte_format<Svpbmt>` (Sv39/48/57) | 64-bit | 512 | 4 KiB |
+
+Stage 2 / NPT / EPT / G-stage are not covered: their tables are walked in the guest-physical space,
+which the CPU cannot use to reach them.
 
 ## Protection flags
 
-`protection` combines `kprot` (privileged access), `uprot` (unprivileged access), `scope`
-(global / per address space), `cache_mode` and `security_state`. Only cross-category
-`operator|` exists, so `kprot::write | uprot::read | cache_mode::uncached` compiles and
-`kprot::read | kprot::write` does not.
+`protection` combines `kprot` (privileged access), `uprot` (unprivileged access), `scope`, `cache_mode` and
+`security_state`. Only cross-category `operator|` exists (`kprot::write | uprot::read` compiles,
+`kprot::read | kprot::write` does not). Every format *legalizes* the request into the nearest encoding that
+is never more permissive; accessed/dirty (`A`/`AF`/`D`) are always set. The per-format rules and the few
+documented exceptions (no NX on i386, single XN on LPAE / ARMv7 short descriptors) are at the top of each
+format header. Unsupported requests (e.g. `write_combining` on x86, a non-default memory type on RISC-V
+without Svpbmt) fail with `unsupported_operation` instead of being weakened.
 
 ```cpp
 // Kernel RW with user read-only, device memory type.
@@ -61,29 +71,35 @@ protection p = protection{}.with_kernel(kprot::write).with_user(uprot::read).wit
 protection q = protection::kernel_data().with_kernel(kprot::write_exec).enforce_policy<mmu_policy<true>>();
 ```
 
-Each format legalizes the request internally to the nearest encoding that is **never more
-permissive**. Kernel and user attributes need not be representable independently:
+## Memory attributes (MAIR)
 
-| Architecture | Rule |
-|---|---|
-| x86-64 | One US, RW and XD bit. User-visible: write needs user *and* kernel write, exec follows `uexec`; otherwise kernel bits. XD set whenever not executable (`EFER.NXE`). |
-| AArch64 EL1&0 | AP[2:1] + PXN + UXN. Kernel read implied; "kernel RW + user RO" becomes RO/RO; user write is downgraded to read when the kernel is read-only; user pages are non-global. `mmu_policy<Wxn, Uwxn>` applies WXN/UWXN. |
-| AArch64 flat (EL2/EL3) | Single XN bit, AP[1]=RES1, no user access (`invalid_argument`). |
+`arch/mair.hpp` builds `MAIR_ELx` (AArch64) and `MAIR0`/`MAIR1` (ARM LPAE) values; `mair_layout` tells the
+AArch64/LPAE formats which slot holds which `cache_mode` (the default is `default_mair`).
 
-Accessed/dirty (`A`, `AF`, `D`) are always set. Unsupported requests fail instead of being
-silently weakened: `write_combining` on x86 with the reset PAT, `secure` on a non-secure format.
+```cpp
+// Eight 8-bit slots; descriptors pick one through AttrIndx[2:0].
+constexpr mair_value mair = mair_value{}
+    .set<0>(mair_attr::device_nGnRnE())                                    // strongly ordered MMIO
+    .set<1>(mair_attr::normal(mair_cache::non_cacheable))                  // uncached / write-combining RAM
+    .set<2>(mair_attr::normal(mair_cache::write_back, mair_alloc::read_write)); // regular RAM
+
+// Slots for: write_back, write_through, uncached, write_combining, device, device_ordered.
+// Write-through has no slot of its own here, so it is pointed at the write-back slot.
+using layout = mair_layout<mair.raw, 2, 2, 1, 1, 0, 0>;
+using format = arm64::recursive_stage1_format<page_4k, arm64::stage1_ns_tag<page_4k>, vmsa_regime::el1_el0,
+                                              default_mmu_policy, layout>;
+
+// AArch64: write mair.raw to MAIR_EL1.  ARM LPAE: MAIR0 = mair.lo(), MAIR1 = mair.hi().
+```
 
 ## Notes
 
-- Every table descriptor is also a valid page descriptor (it is used as the last-level entry
-  of a window walk). The formats guarantee this: on AArch64 `make_table` carries AF=1,
-  write-back, kernel-only, PXN/UXN. On x86 the self entry is supervisor-only and XD, which
-  makes the whole window kernel-only and non-executable.
-- Each table must be one granule long (`static_assert`), so the 16K/64K granules and enlarged
-  roots are not supported by this remapper.
-- **RISC-V cannot use the trick** (a pointer PTE at the last level is invalid); use a direct map.
-- No demotion: `try_unmap`/`try_protect` need ranges aligned to existing blocks. Empty tables
-  are not reclaimed. A failed `try_map` is rolled back.
-- AArch64 changes that alter anything other than AP/PXN/UXN/AF use break-before-make
-  (`flush` + `complete` between clearing and rewriting the entry).
-- Not thread safe. On SMP, x86 and RISC-V need an IPI shootdown in the `Tlb` type you pass in.
+- The self entry is a normal kernel read/write non-executable leaf; the slot is reserved (`invalid_argument`).
+- The table must fit in one page. For ARM short-descriptor (1 KiB table) the caller owns the whole 4 KiB page.
+- `try_initialize` clears the table; `recursive_remapper(table_phys, base, self, window)` adopts one that already
+  holds the self entry.
+- ARM changes other than AP/PXN/UXN/AF use break-before-make (clear, flush, barrier, write). RISC-V formats
+  request a flush after validating an entry (`flush_on_map`).
+- `Window` converts the window VA to a CPU view (default: the VA is the pointer). Not thread safe; on SMP,
+  x86/RISC-V need an IPI shootdown in the `Tlb` you pass in.
+- Blocks, promotion/demotion and the upper levels are the caller's job.

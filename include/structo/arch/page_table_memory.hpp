@@ -5,12 +5,12 @@
 
 /** @file page_table_memory.hpp
  * @brief `structo::arch::table_arena<Phys>`: a small, allocation-free
- * page-table memory provider for `page_mapper` (see `page_mapper.hpp`),
+ * page-table memory provider for page-table builders,
  * carving tables out of one caller-supplied, physically-contiguous region.
  *
- * ## The "table memory" contract `page_mapper` expects
+ * ## The "table memory" contract a page-table builder expects
  *
- * Any type with these three members can back a `page_mapper`; `table_arena`
+ * Any type with these members can serve as table memory; `table_arena`
  * is merely the ready-made one for bootloaders / early kernels / tests.
  *
  * @code
@@ -27,8 +27,7 @@
  *
  *   // The CPU's view of a table: the entries as 64-bit words. An empty span means
  *   // "not a table this provider knows" and makes the mapper report invalid_state.
- *   // `where` says which level/VA range the table covers (ignore it if you can address physical memory).
- *   reloco::span<std::uint64_t> table(phys_type table, std::size_t entry_count, table_location where) noexcept;
+ *   reloco::span<std::uint64_t> table(phys_type table, std::size_t entry_count) noexcept;
  * };
  * @endcode
  *
@@ -37,7 +36,7 @@
  * Intended for the window before a real physical allocator exists (early
  * boot, bootloader, unit tests). A running kernel/hypervisor should implement
  * the contract above on top of its own page allocator (e.g. `buddy_allocator`)
- * and the direct map, and hand *that* to `page_mapper`.
+ * and the direct map, and use *that* instead.
  *
  * @code
  * // Caller storage: any memory the CPU can write that the MMU will later read
@@ -71,16 +70,6 @@
 #include <cstdint>
 
 namespace structo::arch {
-
-/**
- * @brief Where a table sits in the tree, passed to `table()` so providers that reach tables *by path*
- * (see `recursive_table_memory`) can compute the table's address. Providers that map physical memory
- * directly (like `table_arena`) ignore it.
- */
-struct table_location {
-  std::size_t level{0};  //!< 0 = root.
-  std::uint64_t base{0}; //!< First (table-relative, canonical-bits-stripped) virtual address the table covers.
-};
 
 /**
  * @brief Bootstrap table provider over one caller-supplied region (no heap, bump + per-size free lists).
@@ -147,7 +136,7 @@ public:
   }
 
   /** @brief The CPU's view of a table; empty if `table` is outside the pool or misaligned. */
-  [[nodiscard]] reloco::span<std::uint64_t> table(Phys table, std::size_t entry_count, table_location = {}) noexcept {
+  [[nodiscard]] reloco::span<std::uint64_t> table(Phys table, std::size_t entry_count) noexcept {
     const std::uint64_t bytes = static_cast<std::uint64_t>(entry_count) * 8;
     if (table.value < base_.value || !is_pow2(entry_count) || table.value % bytes != 0) {
       return {};

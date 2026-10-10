@@ -4,37 +4,36 @@
 #pragma once
 
 /** @file x86/recursive_format.hpp
- * @brief `x86::recursive_pte_format<Levels>`: x86-64 paging format for `recursive_remapper`.
+ * @brief Last-level (PTE) formats of x86 paging for `recursive_remapper`.
  *
- * ## Protection legalization (x86 has one XD bit, one US bit, one RW bit)
+ * - `x86::recursive_pte_format`: 64-bit entries, 512 per table. Identical for PAE, 4-level and 5-level
+ *   long mode (the PTE layout does not change).
+ * - `x86::recursive_pte32_format`: classic 32-bit non-PAE paging, 32-bit entries, 1024 per table.
  *
- * The request is turned into the nearest encoding that is never more permissive:
- *  - user-visible (`user != none`): US=1; writable only if user may write *and* the kernel
- *    may write (or has no stated access); executable follows `uexec`;
- *  - otherwise: US=0; RW follows `kwrite`, executable follows `kexec`;
- *  - read is always implied; XD is set whenever not executable (requires `EFER.NXE=1`);
- *  - accessed and dirty are always set (bootloader policy, avoids hardware A/D updates);
- *  - `scope::global` sets G (needs `CR4.PGE`);
+ * Both map 4 KiB pages. Nested paging (NPT/EPT) is not covered: its tables are walked in the guest-physical
+ * space, which the CPU cannot use to reach them.
+ *
+ * ## Protection legalization (one US, one RW, one XD bit)
+ *
+ *  - user-visible (`user != none`): US=1; writable only if the user may write *and* the kernel may write
+ *    (or has no stated access); executable follows `uexec`;
+ *  - otherwise US=0, RW follows `kwrite`, executable follows `kexec`;
+ *  - read is always implied; XD is set whenever not executable (needs `EFER.NXE`);
+ *  - accessed and dirty are always set; `scope::global` sets G (needs `CR4.PGE`);
  *  - memory types use the reset PAT: write-back, write-through, UC- (`uncached`), UC (`device*`);
- *    `write_combining` needs a custom PAT and fails with `unsupported_operation`;
- *  - `security_state::secure` is not an x86 concept (`unsupported_operation`).
+ *    `write_combining` and `security_state::secure` fail with `unsupported_operation`.
  *
- * ## Self entry
- *
- * `make_self` is present+writable, **supervisor-only and XD**: since permissions are the AND
- * of every level, this makes the entire recursive window kernel-only and non-executable even
- * though ordinary table entries (US=1, RW=1, XD=0) allow user mappings beneath them.
+ * **32-bit non-PAE exception:** the CPU has no NX bit, so every readable page is executable; the request's
+ * execute bits are ignored and `attrs()` reports execute as allowed. Physical addresses must be below 4 GiB.
  *
  * @code
- * // 4-level long mode (use long_mode_5level for LA57).
- * using format = structo::arch::x86::recursive_pte_format<structo::arch::x86::long_mode_4level>;
+ * using format = structo::arch::x86::recursive_pte_format;   // PAE / x86-64
+ * using format32 = structo::arch::x86::recursive_pte32_format; // i386 without PAE
  * @endcode
  */
 
-#include <structo/arch/page_table_traits.hpp>
 #include <structo/arch/protection.hpp>
 #include <structo/arch/pte_field.hpp>
-#include <structo/arch/x86/page_table_traits.hpp>
 #include <structo/arch/x86/pte.hpp>
 
 #include <reloco/error.hpp>
@@ -45,37 +44,13 @@
 
 namespace structo::arch::x86 {
 
-template <typename Levels = long_mode_4level> struct recursive_pte_format {
-  using levels = Levels;
-  using phys_type = typename page_table_entry_traits<pte_tag>::phys_type;
+namespace detail {
 
-  static_assert(Levels::leaf_page_traits::page_shift == 12, "x86 pages are 4 KiB");
+// Shared encode/decode on the 64-bit view of an x86 PTE. `Nx` tells whether XD exists.
+template <bool Nx> struct recursive_pte_codec {
+  using bits = pte_bits;
 
-  [[nodiscard]] static constexpr bool is_present(std::uint64_t raw) noexcept { return bits::is_present(raw); }
-  [[nodiscard]] static constexpr bool is_leaf(std::uint64_t raw, std::size_t) noexcept { return bits::is_leaf(raw); }
-  [[nodiscard]] static constexpr phys_type table_addr(std::uint64_t raw) noexcept {
-    return phys_type{bits::addr::get(raw) << 12};
-  }
-  [[nodiscard]] static constexpr phys_type frame_addr(std::uint64_t raw, std::size_t) noexcept {
-    return table_addr(raw);
-  }
-
-  [[nodiscard]] static constexpr std::uint64_t make_table(phys_type child) noexcept {
-    std::uint64_t raw = bits::present::set(0, 1);
-    raw = bits::rw::set(raw, 1);
-    raw = bits::us::set(raw, 1);
-    return bits::addr::set(raw, child.value >> 12);
-  }
-
-  [[nodiscard]] static constexpr std::uint64_t make_self(phys_type root) noexcept {
-    std::uint64_t raw = bits::present::set(0, 1);
-    raw = bits::rw::set(raw, 1);
-    raw = bits::xd::set(raw, 1);
-    return bits::addr::set(raw, root.value >> 12);
-  }
-
-  [[nodiscard]] static reloco::result<std::uint64_t> make_leaf(phys_type frame, protection p,
-                                                               std::size_t level) noexcept {
+  [[nodiscard]] static reloco::result<std::uint64_t> encode(std::uint64_t frame, protection p) noexcept {
     if (p.is_none()) {
       return reloco::unexpected(reloco::error::invalid_argument);
     }
@@ -89,52 +64,82 @@ template <typename Levels = long_mode_4level> struct recursive_pte_format {
     std::uint64_t raw = bits::present::set(0, 1);
     raw = bits::rw::set_bit(raw, write);
     raw = bits::us::set_bit(raw, user);
-    raw = bits::pwt::set_bit(raw, p.cache() == cache_mode::write_through || p.cache() == cache_mode::device ||
-                                      p.cache() == cache_mode::device_ordered);
+    raw = bits::pwt::set_bit(raw, p.cache() == cache_mode::write_through || p.is_device());
     raw = bits::pcd::set_bit(raw, p.cache() == cache_mode::uncached || p.is_device());
     raw = bits::accessed::set(raw, 1);
     raw = bits::dirty::set(raw, 1);
-    raw = bits::ps_or_pat::set_bit(raw, level != Levels::level_count - 1);
     raw = bits::global::set_bit(raw, p.is_global());
-    raw = bits::xd::set_bit(raw, !exec);
-    return bits::addr::set(raw, frame.value >> 12);
+    if constexpr (Nx) {
+      raw = bits::xd::set_bit(raw, !exec);
+    }
+    return bits::addr::set(raw, frame >> 12);
   }
 
-  /** Effective protection of a leaf (kernel mirrors the page's access; supervisor execute of user pages is reported
-   * off, as with SMEP). */
-  [[nodiscard]] static constexpr protection attrs(std::uint64_t raw, std::size_t) noexcept {
+  [[nodiscard]] static protection decode(std::uint64_t raw) noexcept {
     const bool write = bits::rw::test(raw);
-    const bool exec = !bits::xd::test(raw);
+    const bool exec = !Nx || !bits::xd::test(raw);
     protection p;
     p = p.with_kernel(write ? kprot::write : kprot::read);
     if (bits::us::test(raw)) {
-      p = p.with_user(write ? uprot::write : uprot::read);
-      if (exec) {
-        p = p.with_user(write ? uprot::write_exec : uprot::read_exec);
-      }
+      p = p.with_user(write ? (exec ? uprot::write_exec : uprot::write) : (exec ? uprot::read_exec : uprot::read));
     } else if (exec) {
       p = p.with_kernel(write ? kprot::write_exec : kprot::read_exec);
     }
     p = p.with_scope(bits::global::test(raw) ? scope::global : scope::per_address_space);
     const bool wt = bits::pwt::test(raw);
     const bool cd = bits::pcd::test(raw);
-    p = p.with_cache(cd ? (wt ? cache_mode::device : cache_mode::uncached)
-                        : (wt ? cache_mode::write_through : cache_mode::write_back));
-    return p;
+    return p.with_cache(cd ? (wt ? cache_mode::device : cache_mode::uncached)
+                           : (wt ? cache_mode::write_through : cache_mode::write_back));
   }
+};
 
-  /** x86 allows changing a live entry's permissions, memory type and frame without break-before-make. */
-  [[nodiscard]] static constexpr bool needs_bbm(std::uint64_t, std::uint64_t) noexcept { return false; }
+} // namespace detail
 
-  /** Sign-extends bit `va_bits-1` (canonical form). */
-  [[nodiscard]] static constexpr std::uint64_t canonicalize(std::uint64_t low) noexcept {
-    constexpr std::uint64_t mask = (std::uint64_t{1} << Levels::va_bits) - 1;
-    low &= mask;
-    return (low >> (Levels::va_bits - 1)) & 1 ? (low | ~mask) : low;
+/** 64-bit PTE (PAE, long mode 4/5-level). */
+struct recursive_pte_format {
+  using word = std::uint64_t;
+  using phys_type = typename page_table_entry_traits<pte_tag>::phys_type;
+  static constexpr std::size_t entry_count = 512;
+  static constexpr std::uint64_t page_size = 4096;
+  static constexpr bool flush_on_map = false;
+
+  [[nodiscard]] static constexpr bool is_present(word raw) noexcept { return detail::pte_bits::is_present(raw); }
+  [[nodiscard]] static constexpr phys_type frame_addr(word raw) noexcept {
+    return phys_type{detail::pte_bits::addr::get(raw) << 12};
   }
+  [[nodiscard]] static reloco::result<word> make_leaf(phys_type frame, protection p) noexcept {
+    return detail::recursive_pte_codec<true>::encode(frame.value, p);
+  }
+  [[nodiscard]] static protection attrs(word raw) noexcept { return detail::recursive_pte_codec<true>::decode(raw); }
+  /** x86 permits changing a live entry (permissions, memory type, frame) without break-before-make. */
+  [[nodiscard]] static constexpr bool needs_bbm(word, word) noexcept { return false; }
+};
 
-private:
-  using bits = detail::pte_bits;
+/** 32-bit non-PAE PTE. */
+struct recursive_pte32_format {
+  using word = std::uint32_t;
+  using phys_type = typename page_table_entry_traits<pte_tag>::phys_type;
+  static constexpr std::size_t entry_count = 1024;
+  static constexpr std::uint64_t page_size = 4096;
+  static constexpr bool flush_on_map = false;
+
+  [[nodiscard]] static constexpr bool is_present(word raw) noexcept { return (raw & 1u) != 0; }
+  [[nodiscard]] static constexpr phys_type frame_addr(word raw) noexcept {
+    return phys_type{static_cast<std::uint64_t>(raw & 0xFFFF'F000u)};
+  }
+  [[nodiscard]] static reloco::result<word> make_leaf(phys_type frame, protection p) noexcept {
+    if (frame.value >> 32 != 0) {
+      return reloco::unexpected(reloco::error::out_of_range);
+    }
+    auto r = detail::recursive_pte_codec<false>::encode(frame.value, p);
+    if (!r) {
+      return reloco::unexpected(r.error());
+    }
+    const std::uint64_t raw = *r;
+    return static_cast<word>(raw);
+  }
+  [[nodiscard]] static protection attrs(word raw) noexcept { return detail::recursive_pte_codec<false>::decode(raw); }
+  [[nodiscard]] static constexpr bool needs_bbm(word, word) noexcept { return false; }
 };
 
 } // namespace structo::arch::x86
