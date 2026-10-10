@@ -34,6 +34,8 @@
  * @endcode
  */
 
+#include <structo/memory_pressure.hpp>
+
 #include <cstdint>
 #include <type_traits>
 
@@ -109,16 +111,10 @@ struct decay_pressure_config {
   return inactive < total / 100 * cfg.inactive_target_percent + (total % 100) * cfg.inactive_target_percent / 100;
 }
 
-/** Memory-pressure urgency 0..256: 0 when free >= `wm_high`, 256 when free <= `wm_low`, linear in between. */
+/** Urgency 0..256 (memory_pressure.hpp): 0 when free >= `wm_high`, 256 when free <= `wm_low`, linear between. */
 [[nodiscard]] constexpr std::uint32_t decay_urgency(std::uint64_t free_pages, std::uint64_t wm_low,
                                                     std::uint64_t wm_high) noexcept {
-  if (free_pages >= wm_high) {
-    return 0;
-  }
-  if (free_pages <= wm_low || wm_high <= wm_low) {
-    return 256;
-  }
-  return static_cast<std::uint32_t>(256 * (wm_high - free_pages) / (wm_high - wm_low));
+  return pressure_urgency(free_pages, memory_watermarks{wm_low, wm_low, wm_high});
 }
 
 /**
