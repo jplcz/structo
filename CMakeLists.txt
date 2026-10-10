@@ -367,6 +367,9 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_sched_world_handoff.cpp
         tests/test_phys_translator.cpp
         tests/test_region_set.cpp
+        tests/test_memory_segment_map.cpp
+        tests/test_snapshot_domain.cpp
+        tests/test_memory_segment_lookup.cpp
         tests/test_early_region_allocator.cpp
         tests/test_sg_list.cpp
         tests/test_sg_translation.cpp
