@@ -372,6 +372,7 @@ if(JPLCZ_STRUCTO_BUILD_TESTS)
         tests/test_memory_segment_lookup.cpp
         tests/test_page_decay.cpp
         tests/test_memory_window.cpp
+        tests/test_page_index_range.cpp
         tests/test_early_region_allocator.cpp
         tests/test_sg_list.cpp
         tests/test_sg_translation.cpp
