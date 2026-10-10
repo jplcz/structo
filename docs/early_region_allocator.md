@@ -43,7 +43,7 @@ if (!page_table_mem) { /* handle page_table_mem.error() */ }
 
 // Once the real page allocator exists, seed it from what's left:
 for (auto &region : early->regions()) {
-  // buddy_allocator::init() each region, or feed region_set-size chunks in
+  // buddy_allocator::free_n() each region, or feed region_set-size chunks in
 }
 ```
 
@@ -73,7 +73,7 @@ for (auto &region : early->regions()) {
   name, forwarded straight to the internal `region_set`.
 - `regions()` returns the allocator's own, private `region_set&` (not
   the seed it was built from), for handing the now-partially-carved set
-  on to `buddy_allocator::init()`.
+  on to `buddy_allocator::free_n()`.
 
 See also: [`region_set.md`](region_set.md),
 [`boot_memory_map.md`](boot_memory_map.md),

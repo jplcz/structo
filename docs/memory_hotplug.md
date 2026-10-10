@@ -109,8 +109,7 @@ void boot_add_ram(std::uint64_t first_pfn, std::uint64_t count, seg_tag tag) {
   (void)g_hotplug.add({segments::pfn_type{first_pfn}, count, tag, descs});
 }
 
-// Then give the usable pages to the buddy allocator. init() is for the very first range only:
-// it clears all free lists.
+// Then give the usable pages to the buddy allocator with free_n() (see below).
 ```
 
 ## Allocation path (buddy)
@@ -122,9 +121,9 @@ the map; `is_same_zone` keeps blocks inside one segment.
 using buddy_t = buddy_allocator<pfn_free_list, page_t, 10>;
 buddy_t g_buddy;
 
-// First range: init() carves it into maximal aligned blocks and clears the lists.
+// Every range, first or hot-added: free_n() carves it into maximal aligned blocks.
 auto first = os_traits::from_pfn(first_pfn);                     // handle for the first page
-(void)g_buddy.init(page_t::from_os_page(*first), count);
+g_buddy.free_n(page_t::from_os_page(*first), count);
 
 // Normal operation: allocate/free pages, page math through page_t.
 auto blk = g_buddy.allocate(2);                                   // 4 pages
@@ -159,8 +158,7 @@ void memory_hot_add(std::uint64_t first_pfn, std::uint64_t count, seg_tag tag) {
   auto r = g_hotplug.add({segments::pfn_type{first_pfn}, count, tag, descs});
   if (!r) { free_descriptors(descs); return; }
 
-  // 3. Hand the usable pages to the buddy allocator. init() is not for this (it clears the lists);
-  //    free_n() "frees" an arbitrary range into maximal aligned blocks. It never merges across
+  // 3. Hand the usable pages to the buddy allocator. free_n() "frees" an arbitrary range into maximal aligned blocks. It never merges across
   //    segments, so a hot-added segment adjacent to an old one stays separate: expected.
   auto start = os_traits::from_pfn(first_pfn + reserved_prefix_pages);
   g_buddy.free_n(page_t::from_os_page(*start), count - reserved_prefix_pages);
@@ -179,6 +177,10 @@ disconnector never works on the whole segment at once. It walks the segment with
 window** (for example 32 MiB, or one buddy `MaxOrder` block): only pages inside the window are
 isolated and migrated, so the rest of the segment keeps serving allocations and the system is not
 starved of memory while the disconnect runs.
+
+`structo/memory_window.hpp` provides the walk (see [memory_window.md](memory_window.md)): PFN-aligned
+windows over the descriptor array with bounds-checked access, so the loop below needs no manual
+index arithmetic.
 
 Everything the disconnector wins goes to its **private list** (a `pfn_free_list` owned by the
 disconnector, not linked into the buddy). Pages parked there are not free, not in the page cache
@@ -215,19 +217,17 @@ std::error_code memory_hot_remove(std::uint64_t first_pfn) {
   pfn_free_list mine;
   constexpr std::uint64_t window_pages = 8192;                      // 32 MiB at 4 KiB pages
 
-  // Slide a window over the segment. Only the window is isolated at a time, so the rest of the
-  // segment keeps serving allocations while this (slow) loop runs.
-  for (std::uint64_t lo = seg.first.value; lo < seg.end_value(); lo += window_pages) {
-    const std::uint64_t hi = std::min(lo + window_pages, seg.end_value()) - 1;   // inclusive
-
+  // Slide a window over the segment (structo/memory_window.hpp, see memory_window.md). Only the window
+  // is isolated at a time, so the rest of the segment keeps serving allocations during this slow loop.
+  structo::page_window_walker<page> walker(seg, window_pages);
+  for (auto &w : walker) {
     // 1. Isolate the window: the allocator free path must divert PG_ISOLATED pages (and never
     //    put them back on a free list); they end up on 'mine' instead.
-    for (std::uint64_t pfn = lo; pfn <= hi; ++pfn)
-      seg.pages[pfn - seg.first.value].flags.fetch_or(PG_ISOLATED);
+    for (auto &wp : w.walk()) wp.page().flags.fetch_or(PG_ISOLATED);
 
     // 2. Claim the free blocks of the window out of the buddy, largest first, into 'mine'.
     for (std::size_t order = 10; ; --order) {
-      buddy_t::physical_constraint c{lo, hi, std::uint64_t{1} << order, 0};
+      buddy_t::physical_constraint c{w.first_pfn(), w.end_pfn() - 1, std::uint64_t{1} << order, 0};
       while (auto b = g_buddy.allocate_constrained(std::size_t{1} << order, c))
         mine.push_back(b->get_os_page());
       if (order == 0) break;
@@ -236,16 +236,15 @@ std::error_code memory_hot_remove(std::uint64_t first_pfn) {
     // 3. Migrate what is still in use. This is the slow part: dirty pages need write-back, a page may
     //    be locked or temporarily pinned. Retry the pass with back-off until the window is empty or
     //    the deadline passes; cancel/timeout rolls everything back.
-    while (!window_empty(seg, lo, hi)) {
-      for (std::uint64_t pfn = lo; pfn <= hi; ++pfn) {
-        page &p = seg.pages[pfn - seg.first.value];
-        switch (migrate_page(p)) {                                  // see below
-        case migrate_result::moved:     mine.push_back(os_handle(p)); break;  // old page is empty now
+    while (!window_empty(w)) {
+      for (auto &wp : w.walk()) {
+        switch (migrate_page(wp.page())) {                          // see below
+        case migrate_result::moved:     mine.push_back(os_handle(wp.page())); break;  // old page is empty now
         case migrate_result::retry:     break;                      // look again next pass
-        case migrate_result::permanent: rollback(seg, mine, lo, hi); return busy;
+        case migrate_result::permanent: rollback(seg, mine, w); return busy;
         }
       }
-      if (cancelled() || deadline_passed()) { rollback(seg, mine, lo, hi); return busy; }
+      if (cancelled() || deadline_passed()) { rollback(seg, mine, w); return busy; }
       sleep_backoff();
     }
   }
@@ -466,8 +465,7 @@ What changes compared to the hotplug guide:
   freed, so every `page *` stays valid forever. The pinned/unpinned distinction disappears:
   `pfn_to_page`, `with_page` and `try_get_page` all behave the same, and you may cache descriptor
   pointers anywhere (page cache, mappings, DMA lists) without any pinning rule.
-- **Page cache and buddy allocator** need nothing extra. Boot: `buddy.init()` for the first range and
-  `free_n()` for the rest; `is_same_zone` still keeps blocks inside one segment.
+- **Page cache and buddy allocator** need nothing extra. Boot: `buddy.free_n()` for every range; `is_same_zone` still keeps blocks inside one segment.
 - **Hot-add later?** If you may need it on some configurations, keep the code written against
   `memory_segment_lookup<Source>` and change only the Source (`static_segment_source` ->
   `hotplug_segment_source`). Nothing else in the OS has to change; only pointer-lifetime rules
@@ -508,7 +506,6 @@ Do not call two writers concurrently without that lock; there is no fallback.
   a disk read stalls the removal (and any later hot-add, which waits to reuse the previous slot).
 - **Updates are serialized** by the domain mutex. Do not call `add()`/`remove()` from a context that
   holds a read guard.
-- `buddy_allocator::init()` clears all free lists. Use it once at boot and `free_n()` for everything
-  added later.
+- `buddy_allocator::free_n()` seeds the allocator at boot and for everything added later.
 
 See also [hotplug_decay_integration.md](hotplug_decay_integration.md) for a queue-based, cache-centric VM.

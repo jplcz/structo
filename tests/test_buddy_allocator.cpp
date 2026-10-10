@@ -132,8 +132,7 @@ TEST_F(BuddyAllocatorTest, InitCarvingPerfectPowerOfTwo) {
   test_allocator allocator;
 
   // Initialize with exactly 1024 pages (Order 10)
-  auto init_res = allocator.init(test_page::from_os_page(0), 1024);
-  ASSERT_TRUE(init_res.has_value());
+  allocator.free_n(test_page::from_os_page(0), 1024);
 
   EXPECT_TRUE(mock_ram[0].is_free);
   EXPECT_EQ(mock_ram[0].buddy_order, 10);
@@ -152,8 +151,7 @@ TEST_F(BuddyAllocatorTest, InitCarvingUnalignedSize) {
   // Order 4 (16 pages) at PFN 0
   // Order 1 (2 pages)  at PFN 16
   // Order 0 (1 page)   at PFN 18
-  auto init_res = allocator.init(test_page::from_os_page(0), 19);
-  ASSERT_TRUE(init_res.has_value());
+  allocator.free_n(test_page::from_os_page(0), 19);
 
   EXPECT_TRUE(mock_ram[0].is_free);
   EXPECT_EQ(mock_ram[0].buddy_order, 4);
@@ -167,7 +165,7 @@ TEST_F(BuddyAllocatorTest, InitCarvingUnalignedSize) {
 
 TEST_F(BuddyAllocatorTest, PowerOfTwoSplitAndCoalesce) {
   test_allocator allocator;
-  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 16)); // 16 pages = Order 4
+  allocator.free_n(test_page::from_os_page(0), 16); // 16 pages = Order 4
 
   // Allocate Order 2 (4 pages).
   // Splits Order 4 -> Order 3 (PFN 8) & Order 3 (PFN 0).
@@ -197,7 +195,7 @@ TEST_F(BuddyAllocatorTest, PowerOfTwoSplitAndCoalesce) {
 
 TEST_F(BuddyAllocatorTest, ExactPageAllocation_BinaryDecomposition) {
   test_allocator allocator;
-  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 16)); // Order 4 pool
+  allocator.free_n(test_page::from_os_page(0), 16); // Order 4 pool
 
   // Ask for exactly 5 pages. 5 in binary is 101.
   // Closest bounding order is 3 (8 pages).
@@ -230,7 +228,7 @@ TEST_F(BuddyAllocatorTest, ExactPageAllocation_BinaryDecomposition) {
 
 TEST_F(BuddyAllocatorTest, ExactPageFree_BinaryDecomposition) {
   test_allocator allocator;
-  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 16));
+  allocator.free_n(test_page::from_os_page(0), 16);
 
   auto p = allocator.allocate_n(5).value();
 
@@ -244,7 +242,7 @@ TEST_F(BuddyAllocatorTest, ExactPageFree_BinaryDecomposition) {
 
 TEST_F(BuddyAllocatorTest, OutOfMemoryConditions) {
   test_allocator allocator;
-  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 4)); // Only 4 pages (Order 2)
+  allocator.free_n(test_page::from_os_page(0), 4); // Only 4 pages (Order 2)
 
   // Try to allocate more than total capacity
   auto oom_res1 = allocator.allocate(3); // Order 3 (8 pages)
@@ -263,30 +261,13 @@ TEST_F(BuddyAllocatorTest, OutOfMemoryConditions) {
   EXPECT_EQ(oom_res3.error(), error::allocation_failed);
 }
 
-TEST_F(BuddyAllocatorTest, ZoneBoundaryProtection) {
-  test_allocator allocator;
-
-  // Set up a zone boundary exactly in the middle of our 16 pages
-  for (size_t i = 8; i < 16; i++) {
-    mock_ram[i].zone_id = 1;
-  }
-
-  // Passing 16 pages to Init.
-  // Init will try to group all 16 pages into Order 4.
-  // The try_add(16) check inside OS traits MUST intercept this because
-  // the block crosses from Zone 0 to Zone 1!
-  auto init_res = allocator.init(test_page::from_os_page(0), 16);
-  EXPECT_FALSE(init_res.has_value());
-  EXPECT_EQ(init_res.error(), error::security_violation);
-}
-
 // ============================================================================
 // Constrained Allocation (DMA / Hardware strict requirements)
 // ============================================================================
 
 TEST_F(BuddyAllocatorTest, Constrained_AlignmentAndLowPfn) {
   test_allocator allocator;
-  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 1024));
+  allocator.free_n(test_page::from_os_page(0), 1024);
 
   // Constraint: Must be at least PFN 5, but aligned to an 8-page boundary.
   // Expectation: The math should push the start_pfn from 5 to 8.
@@ -323,7 +304,7 @@ TEST_F(BuddyAllocatorTest, Constrained_AlignmentAndLowPfn) {
 
 TEST_F(BuddyAllocatorTest, Constrained_BoundaryCrossingPrevention) {
   test_allocator allocator;
-  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 1024));
+  allocator.free_n(test_page::from_os_page(0), 1024);
 
   // Constraint: Start at least at PFN 14. Do NOT cross a 16-page boundary.
   test_allocator::physical_constraint c;
@@ -354,7 +335,7 @@ TEST_F(BuddyAllocatorTest, Constrained_BoundaryCrossingPrevention) {
 
 TEST_F(BuddyAllocatorTest, Constrained_HighPfnRejection) {
   test_allocator allocator;
-  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 1024));
+  allocator.free_n(test_page::from_os_page(0), 1024);
 
   // First, artificially consume the first 1000 pages so the free list only has high memory
   auto block_res = allocator.allocate_n(1000);
@@ -384,7 +365,7 @@ TEST_F(BuddyAllocatorTest, Constrained_HighPfnRejection) {
 
 TEST_F(BuddyAllocatorTest, Constrained_ExactFitNoPadding) {
   test_allocator allocator;
-  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 16));
+  allocator.free_n(test_page::from_os_page(0), 16);
 
   // Constraint: We want 16 pages, aligned to 1 page, starting at PFN 0.
   // This exactly matches the root buddy block. Front padding = 0. Back padding = 0.
@@ -413,7 +394,7 @@ TEST_F(BuddyAllocatorTest, Constrained_ExactFitNoPadding) {
 
 TEST_F(BuddyAllocatorTest, AllocateUpTo_ExactFit) {
   test_allocator allocator;
-  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 1024));
+  allocator.free_n(test_page::from_os_page(0), 1024);
 
   // We have plenty of memory (1024 pages).
   // Requesting 13 pages should succeed exactly via the allocate_n fast path.
@@ -433,7 +414,7 @@ TEST_F(BuddyAllocatorTest, AllocateUpTo_FragmentedFallback) {
   // Initialize with exactly 15 pages.
   // This physically cannot form an Order 4 block (16 pages).
   // It will be carved into: Order 3 (8 pages), Order 2 (4 pages), Order 1 (2 pages), Order 0 (1 page).
-  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 15));
+  allocator.free_n(test_page::from_os_page(0), 15);
 
   // Request 10 pages.
   // allocate_n(10) bounds to Order 4, which is empty, so it fails.
@@ -465,7 +446,7 @@ TEST_F(BuddyAllocatorTest, AllocateUpTo_FragmentedFallback) {
 
 TEST_F(BuddyAllocatorTest, AllocateUpTo_OutOfMemory) {
   test_allocator allocator;
-  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 4)); // Only 4 pages available
+  allocator.free_n(test_page::from_os_page(0), 4); // Only 4 pages available
 
   // Consume all 4 pages
   auto consume = allocator.allocate_up_to(4);
@@ -481,7 +462,7 @@ TEST_F(BuddyAllocatorTest, AllocateUpTo_OutOfMemory) {
 
 TEST_F(BuddyAllocatorTest, AllocateUpTo_InvalidArguments) {
   test_allocator allocator;
-  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 1024));
+  allocator.free_n(test_page::from_os_page(0), 1024);
 
   // Asking for 0 pages is logically invalid
   auto zero_res = allocator.allocate_up_to(0);
@@ -495,7 +476,7 @@ TEST_F(BuddyAllocatorTest, AllocateUpTo_InvalidArguments) {
 
 TEST_F(BuddyAllocatorTest, ReserveSplitsContainingBlockDownToExactPage) {
   test_allocator allocator;
-  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 16)); // Order 4 pool
+  allocator.free_n(test_page::from_os_page(0), 16); // Order 4 pool
 
   // Reserve PFN 10, deep inside the single Order 4 (16-page) free block.
   auto res = allocator.reserve(test_page::from_os_page(10));
@@ -523,7 +504,7 @@ TEST_F(BuddyAllocatorTest, ReserveSplitsContainingBlockDownToExactPage) {
 
 TEST_F(BuddyAllocatorTest, ReserveOfAnAlreadyAlignedOrderZeroBlock) {
   test_allocator allocator;
-  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 2)); // Single Order 1 block
+  allocator.free_n(test_page::from_os_page(0), 2); // Single Order 1 block
 
   auto res = allocator.reserve(test_page::from_os_page(0));
   ASSERT_TRUE(res.has_value());
@@ -538,7 +519,7 @@ TEST_F(BuddyAllocatorTest, ReserveOfAnAlreadyAlignedOrderZeroBlock) {
 
 TEST_F(BuddyAllocatorTest, ReserveFailsOnAlreadyAllocatedPage) {
   test_allocator allocator;
-  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 16));
+  allocator.free_n(test_page::from_os_page(0), 16);
 
   auto allocated = allocator.allocate(2); // Consumes PFN 0..3
   ASSERT_TRUE(allocated.has_value());
@@ -550,9 +531,9 @@ TEST_F(BuddyAllocatorTest, ReserveFailsOnAlreadyAllocatedPage) {
 
 TEST_F(BuddyAllocatorTest, ReserveFailsOutsideManagedRegion) {
   test_allocator allocator;
-  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 16));
+  allocator.free_n(test_page::from_os_page(0), 16);
 
-  // PFN 100 was never handed to init() at all.
+  // PFN 100 was never handed to free_n() at all.
   auto res = allocator.reserve(test_page::from_os_page(100));
   EXPECT_FALSE(res.has_value());
   EXPECT_EQ(res.error(), error::invalid_state);
@@ -560,7 +541,7 @@ TEST_F(BuddyAllocatorTest, ReserveFailsOutsideManagedRegion) {
 
 TEST_F(BuddyAllocatorTest, ReservedPageCanBeFreedBackNormally) {
   test_allocator allocator;
-  ASSERT_TRUE(allocator.init(test_page::from_os_page(0), 16));
+  allocator.free_n(test_page::from_os_page(0), 16);
 
   ASSERT_TRUE(allocator.reserve(test_page::from_os_page(10)).has_value());
 
@@ -570,6 +551,73 @@ TEST_F(BuddyAllocatorTest, ReservedPageCanBeFreedBackNormally) {
 
   EXPECT_TRUE(mock_ram[0].is_free);
   EXPECT_EQ(mock_ram[0].buddy_order, 4);
+}
+
+TEST_F(BuddyAllocatorTest, ClaimRangeTakesOnlyFreePagesInsideRange) {
+  test_allocator allocator;
+  allocator.free_n(test_page::from_os_page(0), 1024);
+  // Make page 100 busy: it must not be claimed.
+  ASSERT_TRUE(allocator.reserve(test_page::from_os_page(100)).has_value());
+
+  size_t runs = 0, total = 0;
+  reloco::array<uint32_t, MOCK_MEM_PAGES> seen{};
+  auto claimed = allocator.claim_range(64, 191, [&](test_page first, size_t n) {
+    ++runs;
+    total += n;
+    for (size_t i = 0; i < n; ++i)
+      ++seen[first.pfn() + i];
+  });
+  EXPECT_EQ(claimed, 127u); // 128 pages in range minus the busy one
+  EXPECT_EQ(total, 127u);
+  EXPECT_GE(runs, 2u);
+  for (uint64_t pfn = 0; pfn < 1024; ++pfn) {
+    const bool in = pfn >= 64 && pfn <= 191 && pfn != 100;
+    EXPECT_EQ(seen[pfn], in ? 1u : 0u) << pfn;
+  }
+
+  // Everything outside the range is still allocatable; claimed pages are not free anymore.
+  EXPECT_EQ(allocator.claim_range(64, 191, [](test_page, size_t) {}), 0u);
+  EXPECT_FALSE(mock_ram[64].is_free);
+  EXPECT_TRUE(mock_ram[0].is_free);
+}
+
+TEST_F(BuddyAllocatorTest, ClaimedRunsCanBeReturnedWithFreeN) {
+  test_allocator allocator;
+  allocator.free_n(test_page::from_os_page(0), 1024);
+  reloco::array<test_page, 16> runs{};
+  reloco::array<size_t, 16> sizes{};
+  size_t count = 0;
+  ASSERT_EQ(allocator.claim_range(300, 349, [&](test_page f, size_t n) {
+    runs[count] = f;
+    sizes[count++] = n;
+  }), 50u);
+  // Abort path: return the runs only after claim_range has finished.
+  for (size_t i = 0; i < count; ++i)
+    allocator.free_n(runs[i], sizes[i]);
+  // After returning everything, the allocator heals back into one maximal block.
+  EXPECT_TRUE(mock_ram[0].is_free);
+  EXPECT_EQ(mock_ram[0].buddy_order, 10);
+}
+
+TEST_F(BuddyAllocatorTest, ClaimRangeEmptyOrInverted) {
+  test_allocator allocator;
+  allocator.free_n(test_page::from_os_page(0), 64);
+  EXPECT_EQ(allocator.claim_range(10, 5, [](test_page, size_t) { FAIL(); }), 0u);
+  EXPECT_EQ(allocator.claim_range(500, 600, [](test_page, size_t) { FAIL(); }), 0u);
+}
+
+TEST_F(BuddyAllocatorTest, FreeCountTracksAllocFreeAndClaim) {
+  test_allocator allocator;
+  allocator.free_n(test_page::from_os_page(0), 1024);
+  EXPECT_EQ(allocator.free_count(), 1024u);
+  ASSERT_TRUE(allocator.reserve(test_page::from_os_page(100)).has_value());
+  EXPECT_EQ(allocator.free_count(), 1023u);
+  EXPECT_EQ(allocator.claim_range(0, 1023, [](test_page, size_t) {}, 100), 100u);
+  EXPECT_EQ(allocator.free_count(), 923u);
+  EXPECT_EQ(allocator.claim_range(0, 1023, [](test_page, size_t) {}), 923u);
+  EXPECT_EQ(allocator.free_count(), 0u);
+  allocator.free_n(test_page::from_os_page(0), 64);
+  EXPECT_EQ(allocator.free_count(), 64u);
 }
 
 } // namespace

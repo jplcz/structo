@@ -315,7 +315,7 @@ TEST_F(MemorySegmentMapOsTraits, BuddyAllocatorOverSegment) {
   buddy_allocator<pfn_free_list, pv, 8> buddy;
   auto start = bos_traits::from_pfn(0x1000);
   ASSERT_TRUE(start.has_value());
-  ASSERT_TRUE(buddy.init(pv::from_os_page(*start), 256).has_value());
+  buddy.free_n(pv::from_os_page(*start), 256);
   auto a = buddy.allocate(3);
   ASSERT_TRUE(a.has_value());
   EXPECT_EQ(a->pfn() % 8, 0u);

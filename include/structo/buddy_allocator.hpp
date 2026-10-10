@@ -147,61 +147,6 @@ public:
   constexpr buddy_allocator() noexcept = default;
 
   /**
-   * @brief Initializes the allocator, carving the memory region into
-   * maximally aligned power-of-two blocks.
-   */
-  [[nodiscard]] result<void> init(page_type start, size_t num_pages) noexcept {
-    if (start.is_null() || num_pages == 0) {
-      return unexpected(error::invalid_argument);
-    }
-
-    for (size_t i = 0; i <= MaxOrder; i++) {
-      free_areas_[i].clear();
-    }
-
-    page_type current = start;
-    size_t remaining = num_pages;
-
-    while (remaining > 0) {
-      size_t order = MaxOrder;
-
-      // Find the largest properly-aligned order that fits
-      while (order > 0) {
-        size_t block_pages = size_t{1} << order;
-        bool is_aligned = (current.pfn() % block_pages) == 0;
-        bool fits = (remaining >= block_pages);
-
-        if (is_aligned && fits) {
-          break;
-        }
-        order--;
-      }
-
-      if (order > 0) {
-        auto zone_check = current.try_add((size_t{1} << order) - 1);
-        if (!zone_check) {
-          return unexpected(zone_check.error());
-        }
-      }
-
-      current.set_buddy_order(static_cast<uint16_t>(order));
-      current.set_buddy_free(true);
-      free_areas_[order].push_front(current.get_os_page());
-
-      remaining -= (size_t{1} << order);
-
-      if (remaining > 0) {
-        auto next_res = current.try_add(size_t{1} << order);
-        if (!next_res)
-          return unexpected(next_res.error());
-        current = *next_res;
-      }
-    }
-
-    return {};
-  }
-
-  /**
    * @brief Allocates a contiguous physical block of 2^order pages.
    */
   [[nodiscard]] result<page_type> allocate(size_t order) noexcept {
@@ -219,7 +164,7 @@ public:
     }
 
     // Pop the block and mark it as allocated
-    page_type block = page_type::from_os_page(free_areas_[current_order].pop_front());
+    page_type block = page_type::from_os_page(list_pop(current_order));
     block.set_buddy_free(false);
 
     // Split the block down to the requested size
@@ -233,7 +178,7 @@ public:
       page_type buddy = *buddy_res;
       buddy.set_buddy_order(static_cast<uint16_t>(current_order));
       buddy.set_buddy_free(true);
-      free_areas_[current_order].push_front(buddy.get_os_page());
+      list_push(current_order, buddy.get_os_page());
     }
 
     block.set_buddy_order(static_cast<uint16_t>(order));
@@ -263,7 +208,7 @@ public:
       }
 
       // Merge them
-      free_areas_[order].remove(buddy.get_os_page());
+      list_remove(order, buddy.get_os_page());
       buddy.set_buddy_free(false);
 
       if (buddy.pfn() < p.pfn()) {
@@ -274,7 +219,7 @@ public:
 
     p.set_buddy_order(static_cast<uint16_t>(order));
     p.set_buddy_free(true);
-    free_areas_[order].push_front(p.get_os_page());
+    list_push(order, p.get_os_page());
   }
 
   /**
@@ -298,7 +243,7 @@ public:
     if (current_order > MaxOrder)
       return unexpected(error::allocation_failed);
 
-    page_type block = page_type::from_os_page(free_areas_[current_order].pop_front());
+    page_type block = page_type::from_os_page(list_pop(current_order));
     block.set_buddy_free(false);
 
     // Standard split down to the bounding 'order'
@@ -311,7 +256,7 @@ public:
       page_type buddy = *buddy_res;
       buddy.set_buddy_order(static_cast<uint16_t>(current_order));
       buddy.set_buddy_free(true);
-      free_areas_[current_order].push_front(buddy.get_os_page());
+      list_push(current_order, buddy.get_os_page());
     }
 
     // Exact Page Splitting: Trim the tail!
@@ -333,7 +278,7 @@ public:
         // We only need the first half. Free the second half back to the system.
         buddy.set_buddy_order(static_cast<uint16_t>(chunk_order));
         buddy.set_buddy_free(true);
-        free_areas_[chunk_order].push_front(buddy.get_os_page());
+        list_push(chunk_order, buddy.get_os_page());
       } else {
         // The first half is fully consumed. Mark it, and shift focus to the second half.
         current_chunk.set_buddy_order(static_cast<uint16_t>(chunk_order));
@@ -405,7 +350,7 @@ public:
    * all let the allocator pick *which* physical pages to hand back,
    * `reserve()` lets the caller demand one specific, already-known
    * physical page. This is the common need when a page is discovered
-   * to already be in use strictly *after* `init()` has already carved
+   * to already be in use strictly *after* `free_n()` has already carved
    * the whole region into free blocks assuming it was available --
    * e.g. a firmware/bootloader-reserved region only enumerated from
    * ACPI/UEFI tables once the buddy allocator for the whole zone has
@@ -414,7 +359,7 @@ public:
    * @return `error::invalid_state` if @p p is not currently free --
    * either because it is already allocated/reserved, or because it
    * does not lie within any block this allocator currently tracks at
-   * all (e.g. outside the managed region, or never passed to `init()`).
+   * all (e.g. outside the managed region, or never passed to `free_n()`).
    */
   [[nodiscard]] result<void> reserve(page_type p) noexcept {
     RELOCO_ASSERT(!p.is_null(), "buddy_allocator: Attempted to reserve a null page");
@@ -436,7 +381,7 @@ public:
         // half does *not* contain `p` goes straight back to the free
         // list at its own (smaller) order, and the half that *does*
         // contain `p` is narrowed into on the next iteration.
-        free_areas_[order].remove(block.get_os_page());
+        list_remove(order, block.get_os_page());
         block.set_buddy_free(false);
 
         page_type current = block;
@@ -453,12 +398,12 @@ public:
             // `p` is in the lower half; the upper half is untouched.
             buddy.set_buddy_order(static_cast<uint16_t>(current_order));
             buddy.set_buddy_free(true);
-            free_areas_[current_order].push_front(buddy.get_os_page());
+            list_push(current_order, buddy.get_os_page());
           } else {
             // `p` is in the upper half; the lower half is untouched.
             current.set_buddy_order(static_cast<uint16_t>(current_order));
             current.set_buddy_free(true);
-            free_areas_[current_order].push_front(current.get_os_page());
+            list_push(current_order, current.get_os_page());
             current = buddy;
           }
         }
@@ -532,7 +477,7 @@ public:
 
           // WE FOUND A MATCH!
           // Remove this massive block from the free list
-          free_areas_[order].remove(block.get_os_page());
+          list_remove(order, block.get_os_page());
           block.set_buddy_free(false);
 
           // Carve out the front padding and return it to the buddy system
@@ -563,6 +508,80 @@ public:
 
     // No block in any order satisfies the hardware constraints
     return unexpected(error::allocation_failed);
+  }
+
+  /**
+   * @brief Opportunistically claims every page that is free *right now* inside `[low_pfn, high_pfn]` (inclusive).
+   *
+   * Used to drain a memory window while offlining memory: each free block that overlaps the range is removed
+   * from the free lists, the part outside the range goes straight back to the allocator, and the part inside is
+   * handed to `sink(page_type first, size_t count)` as an exact contiguous run that the caller now owns (it can
+   * return it with `free_n`, e.g. when the offlining is aborted, but only after `claim_range` returns: the sink must
+   * not free into this allocator, or the pages would be claimed again). Pages that are not free at the time of the
+   * call are simply not claimed; call again later (or after migrating pages) to pick up more. Never fails.
+   *
+   * `max_pages` caps the total claimed (e.g. a balloon inflating by N pages: pass the whole PFN span and N).
+   *
+   * @return Number of pages handed to `sink`.
+   */
+  template <typename Sink>
+  size_t claim_range(uint64_t low_pfn, uint64_t high_pfn, Sink &&sink, size_t max_pages = SIZE_MAX) noexcept {
+    if (low_pfn > high_pfn || max_pages == 0) {
+      return 0;
+    }
+    size_t claimed = 0;
+    for (size_t order = MaxOrder + 1; order-- > 0;) {
+      while (true) {
+        // Find one free block of this order that overlaps the range; the list is edited after the scan.
+        bool found = false;
+        page_type block{};
+        for (auto os_page : free_areas_[order]) {
+          page_type candidate = page_type::from_os_page(os_page);
+          const uint64_t first = candidate.pfn();
+          const uint64_t last = first + (uint64_t{1} << order) - 1;
+          if (first <= high_pfn && last >= low_pfn) {
+            block = candidate;
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          break;
+        }
+
+        list_remove(order, block.get_os_page());
+        block.set_buddy_free(false);
+
+        const uint64_t block_first = block.pfn();
+        const uint64_t block_last = block_first + (uint64_t{1} << order) - 1;
+        const uint64_t in_first = block_first > low_pfn ? block_first : low_pfn;
+        uint64_t in_last = block_last < high_pfn ? block_last : high_pfn;
+        if (in_last - in_first + 1 > max_pages - claimed) {
+          in_last = in_first + (max_pages - claimed) - 1;
+        }
+
+        // Parts outside the range return to the allocator (they may merge with free neighbours).
+        const size_t front = static_cast<size_t>(in_first - block_first);
+        const size_t back = static_cast<size_t>(block_last - in_last);
+        const size_t inside = static_cast<size_t>(in_last - in_first + 1);
+        auto run = block.try_add(front).value();
+        if (front > 0) {
+          free_n(block, front);
+        }
+        if (back > 0) {
+          free_n(run.try_add(inside).value(), back);
+        }
+
+        run.set_buddy_order(0);
+        run.set_buddy_free(false);
+        sink(run, inside);
+        claimed += inside;
+        if (claimed >= max_pages) {
+          return claimed;
+        }
+      }
+    }
+    return claimed;
   }
 
   /** @brief A page range returned by a successful buddy allocation. */
@@ -603,7 +622,7 @@ public:
     // Scan downwards for the largest surviving block
     while (true) {
       if (!free_areas_[order].empty()) {
-        page_type block = page_type::from_os_page(free_areas_[order].pop_front());
+        page_type block = page_type::from_os_page(list_pop(order));
         block.set_buddy_free(false);
         block.set_buddy_order(static_cast<uint16_t>(order));
 
@@ -619,7 +638,23 @@ public:
     return unexpected(error::allocation_failed);
   }
 
+  /** @brief Number of pages currently sitting in the free lists (O(1), maintained on every list edit). */
+  [[nodiscard]] size_t free_count() const noexcept { return free_pages_; }
+
 private:
+  void list_push(size_t order, os_page_type p) noexcept {
+    free_areas_[order].push_front(p);
+    free_pages_ += size_t{1} << order;
+  }
+  void list_remove(size_t order, os_page_type p) noexcept {
+    free_areas_[order].remove(p);
+    free_pages_ -= size_t{1} << order;
+  }
+  os_page_type list_pop(size_t order) noexcept {
+    free_pages_ -= size_t{1} << order;
+    return free_areas_[order].pop_front();
+  }
+
   [[nodiscard]] static result<size_t> pages_to_order(size_t num_pages) noexcept {
     if (num_pages == 0)
       return unexpected(error::invalid_argument);
@@ -634,6 +669,7 @@ private:
   }
 
   reloco::array<free_list_type, MaxOrder + 1> free_areas_{};
+  size_t free_pages_ = 0;
 };
 
 } // namespace structo

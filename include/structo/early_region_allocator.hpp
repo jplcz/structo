@@ -41,7 +41,7 @@
  *
  * // Once the real page allocator exists, seed it from what's left:
  * for (auto &region : early->regions()) {
- *   // buddy_allocator::init() each region, or feed region_set-size chunks in
+ *   // buddy_allocator::free_n() each region, or feed region_set-size chunks in
  * }
  * @endcode
  */
