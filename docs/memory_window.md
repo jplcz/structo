@@ -19,7 +19,8 @@ windows from a segment's page-descriptor array, and every access to a descriptor
 - `page_window_walker<Page>`: a `reloco::iterator_adaptor` yielding one `page_window<Page>` per step. It is
   usable in a range-for and composes with `.take(n)`, `.map(f)`, ... from `reloco/iterator.hpp`.
 - `page_window<Page>`: PFN range `[first_pfn(), end_pfn())` plus the descriptor `pages()` span for it, with
-  `contains(pfn)`, `index_of(pfn)`, `page_at(pfn)` (empty when outside) and `walk()`.
+  `contains(pfn)`, `index_of(pfn)`, `page_at(pfn)` (empty when outside), `range()` (a `pfn_range`), `walk()`,
+  `walk(range)` (only a sub-range) and `pending(done)` (the sub-ranges not covered by `done`).
 - `window_page_iterator<Page>` (from `walk()`): yields `window_page<Page>` = `{pfn, page()}` for every
   descriptor of the window.
 
@@ -77,10 +78,31 @@ guard. The disconnector only needs the descriptor span, which stays valid until 
 runs its quiesce callback; do not keep the guard while migrating. See the removal sequence in
 [memory_hotplug.md](memory_hotplug.md).
 
-**Buddy allocator.** Use `w.first_pfn()` and `w.end_pfn() - 1` (inclusive) as the `physical_constraint` limits of
-`allocate_constrained`, largest order first, to move the window's free blocks to the disconnector's private list.
-Because windows are aligned, a free block never crosses a window boundary if `window_pages` is a multiple of the
-allocator's largest block.
+**Buddy allocator.** Drain the window with `buddy_allocator::claim_range` and skip what it took with
+`pfn_range_log` + `pending()`:
+
+```cpp
+// 'done' remembers PFN runs that are already dealt with; touching runs merge, so a few entries suffice.
+// It does not own memory: give it storage that is not on the kernel stack (a member of the offline job
+// object, a static, or an early allocation). 64 entries = 1 KiB; add() returns false when full and that
+// run is just revisited by the walker.
+structo::pfn_range_log done{reloco::span<structo::pfn_range>(job.run_storage)};
+// The sink must not free into the buddy (the pages would be claimed again); recording runs is fine.
+// claim_range(low, high_inclusive, sink): takes every page that is free right now; never fails.
+g_buddy.claim_range(w.first_pfn(), w.end_pfn() - 1, [&](page_t first, std::size_t count) {
+  done.add(structo::pfn_range::from_count(first.pfn(), count));                       // remember the run
+  disconnector_list.push(first, count);                                               // now owned by us
+});
+
+// Only inspect pages that were NOT claimed: pending() yields the window minus 'done', walk(r) visits them.
+auto todo = w.pending(done.runs());
+for (auto r : todo) for (auto &wp : w.walk(r)) migrate_or_retry(wp.page());
+```
+
+Opportunistic frees later (a retry pass that finds more free pages) call `claim_range` again over the same
+window and `done.add()` the new runs; the next `pending()` shrinks accordingly. Wrap ranges in
+[`page_index_range`](page_index_range.md) operations (`subtract`, `merge`) for anything more elaborate. A virtio
+balloon can use the same call with the `max_pages` argument to take exactly N pages.
 
 **Page cache and mappings.** Migration of each in-use page happens under the page cache / address-space locks as
 described in the hotplug guide; the walker only tells you which pages to visit. A retry pass is another

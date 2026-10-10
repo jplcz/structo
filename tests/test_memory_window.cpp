@@ -81,6 +81,37 @@ TEST(MemoryWindow, FromSegmentAndZeroWindow) {
   EXPECT_FALSE(empty.next().has_value());
 }
 
+TEST(MemoryWindowDone, LogMergesAndPendingSkipsDoneRuns) {
+  std::vector<structo::pfn_range> storage(4);
+  structo::pfn_range_log log{reloco::span<structo::pfn_range>(storage)};
+  EXPECT_TRUE(log.add({110, 120}));
+  EXPECT_TRUE(log.add({120, 130})); // touches: merged
+  EXPECT_TRUE(log.add({150, 160}));
+  ASSERT_EQ(log.size(), 2u);
+  EXPECT_TRUE(log.covers(125));
+  EXPECT_FALSE(log.covers(140));
+
+  std::vector<wpage> pages(100);
+  structo::page_window<wpage> w(100, reloco::span<wpage>{pages.data(), pages.size()});
+  std::vector<structo::pfn_range> got;
+  auto pend = w.pending(log.runs());
+  for (auto r : pend)
+    got.push_back(r);
+  ASSERT_EQ(got.size(), 3u);
+  EXPECT_EQ(got[0], (structo::pfn_range{100, 110}));
+  EXPECT_EQ(got[1], (structo::pfn_range{130, 150}));
+  EXPECT_EQ(got[2], (structo::pfn_range{160, 200}));
+
+  std::uint64_t visited = 0;
+  auto walk = w.walk(got[1]);
+  for (auto &wp : walk) {
+    EXPECT_GE(wp.pfn, 130u);
+    EXPECT_LT(wp.pfn, 150u);
+    ++visited;
+  }
+  EXPECT_EQ(visited, 20u);
+}
+
 } // namespace
 
 RELOCO_END_UNSAFE_BUFFER_USAGE

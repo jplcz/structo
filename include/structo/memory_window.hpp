@@ -26,6 +26,9 @@
  * @endcode
  */
 
+#include <structo/page_index_range.hpp>
+
+#include <reloco/array.hpp>
 #include <reloco/iterator.hpp>
 #include <reloco/optional.hpp>
 #include <reloco/span.hpp>
@@ -35,6 +38,100 @@
 #include <functional>
 
 namespace structo {
+
+using pfn_range = page_index_range<std::uint64_t>;
+
+/**
+ * Log of PFN runs that are already dealt with (for example the runs `buddy_allocator::claim_range` handed to its
+ * sink). Touching or overlapping runs are merged, so a window usually needs only a few entries.
+ *
+ * The log does not own its storage: it works inside a caller-provided `reloco::span<pfn_range>`, so the memory can
+ * live in a per-disconnector object, a static, or an early allocation instead of on a (small) kernel stack.
+ * `add` returns false when the storage is full; the run is then simply not remembered and the walker will look
+ * at those pages again.
+ */
+class pfn_range_log {
+public:
+  explicit pfn_range_log(reloco::span<pfn_range> storage) noexcept : storage_(storage) {}
+
+  bool add(pfn_range r) noexcept {
+    if (r.empty()) {
+      return true;
+    }
+    for (std::size_t i = 0; i < count_; ++i) {
+      if (storage_[i].mergeable(r)) {
+        r = storage_[i].merge(r);
+        storage_[i] = storage_[--count_];
+        i = static_cast<std::size_t>(-1); // restart: the merged run may now touch others
+      }
+    }
+    if (count_ == storage_.size()) {
+      return false;
+    }
+    storage_[count_++] = r;
+    return true;
+  }
+
+  [[nodiscard]] bool covers(std::uint64_t pfn) const noexcept {
+    for (std::size_t i = 0; i < count_; ++i) {
+      if (storage_[i].contains(pfn)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** The remembered runs (unordered). Valid until the next `add`/`clear`. */
+  [[nodiscard]] reloco::span<const pfn_range> runs() const noexcept {
+    // span::first() is lifetime-bound to the span member itself; build the view over the storage directly.
+    return reloco::span<const pfn_range>(storage_.data(), count_);
+  }
+  [[nodiscard]] std::size_t size() const noexcept { return count_; }
+  void clear() noexcept { count_ = 0; }
+
+private:
+  reloco::span<pfn_range> storage_;
+  std::size_t count_{0};
+};
+
+/** Yields the sub-ranges of `window` not covered by any of `done` (the pages still to inspect). */
+class pending_pfn_iterator : public reloco::iterator_adaptor<pending_pfn_iterator, pfn_range> {
+public:
+  using item_type = pfn_range;
+
+  pending_pfn_iterator(pfn_range window, reloco::span<const pfn_range> done) noexcept
+      : cursor_(window.first()), end_(window.end()), done_(done) {}
+
+  [[nodiscard]] reloco::optional<pfn_range> next_impl() noexcept {
+    // Step over done runs that cover the cursor (repeat: a run may end inside another).
+    for (bool moved = true; moved;) {
+      moved = false;
+      for (const auto &d : done_) {
+        if (d.contains(cursor_)) {
+          cursor_ = d.end();
+          moved = true;
+        }
+      }
+    }
+    if (cursor_ >= end_) {
+      return reloco::nullopt;
+    }
+    std::uint64_t stop = end_;
+    for (const auto &d : done_) {
+      if (!d.empty() && d.first() > cursor_ && d.first() < stop) {
+        stop = d.first();
+      }
+    }
+    const pfn_range piece{cursor_, stop};
+    cursor_ = stop;
+    return piece;
+  }
+
+private:
+  std::uint64_t cursor_;
+  std::uint64_t end_;
+  reloco::span<const pfn_range> done_;
+};
 
 /** One descriptor of a window together with its PFN. */
 template <typename Page> struct window_page {
@@ -97,8 +194,25 @@ public:
     return reloco::optional<std::reference_wrapper<Page>>(std::ref(pages_[*i]));
   }
 
+  /** PFN range `[first_pfn, end_pfn)` of the window. */
+  [[nodiscard]] pfn_range range() const noexcept { return {first_pfn_, end_pfn()}; }
+
   /** Iterator over every descriptor of the window with its PFN (a `reloco::iterator_adaptor`). */
   [[nodiscard]] window_page_iterator<Page> walk() const noexcept { return {first_pfn_, pages_}; }
+
+  /** Like `walk()` but only for `r` (which must lie inside the window; otherwise the iterator is empty). */
+  [[nodiscard]] window_page_iterator<Page> walk(pfn_range r) const noexcept {
+    auto part = r.slice(pages_, first_pfn_);
+    if (!part) {
+      return {first_pfn_, reloco::span<Page>{}};
+    }
+    return {r.first(), *part};
+  }
+
+  /** PFN sub-ranges of this window that are not in `done`; feed each to `walk(range)`. */
+  [[nodiscard]] pending_pfn_iterator pending(reloco::span<const pfn_range> done) const noexcept {
+    return {range(), done};
+  }
 
 private:
   std::uint64_t first_pfn_{0};

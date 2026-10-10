@@ -225,19 +225,23 @@ std::error_code memory_hot_remove(std::uint64_t first_pfn) {
     //    put them back on a free list); they end up on 'mine' instead.
     for (auto &wp : w.walk()) wp.page().flags.fetch_or(PG_ISOLATED);
 
-    // 2. Claim the free blocks of the window out of the buddy, largest first, into 'mine'.
-    for (std::size_t order = 10; ; --order) {
-      buddy_t::physical_constraint c{w.first_pfn(), w.end_pfn() - 1, std::uint64_t{1} << order, 0};
-      while (auto b = g_buddy.allocate_constrained(std::size_t{1} << order, c))
-        mine.push_back(b->get_os_page());
-      if (order == 0) break;
-    }
+    // 2. Claim every page of the window that is free right now into 'mine'. claim_range never fails; it
+    //    hands each contiguous run to the sink. The sink must not free into the
+    //    buddy; recording runs in 'done' is fine and lets step 3 look only at the rest of the window.
+    // 'done' remembers runs already on 'mine'. Its storage is NOT on the stack: 'run_storage' is a member of
+    // the per-offline job object (or a static / early allocation), e.g. reloco::array<pfn_range, 64> = 1 KiB.
+    structo::pfn_range_log done{reloco::span<structo::pfn_range>(job.run_storage)};
+    g_buddy.claim_range(w.first_pfn(), w.end_pfn() - 1, [&](page_t first, std::size_t count) {
+      done.add(structo::pfn_range::from_count(first.pfn(), count)); // fine inside the sink: it never frees
+      mine.push_back(first.get_os_page());                          // (or push the whole run; list-specific)
+    });
 
     // 3. Migrate what is still in use. This is the slow part: dirty pages need write-back, a page may
     //    be locked or temporarily pinned. Retry the pass with back-off until the window is empty or
     //    the deadline passes; cancel/timeout rolls everything back.
     while (!window_empty(w)) {
-      for (auto &wp : w.walk()) {
+      auto todo = w.pending(done.runs());                           // window minus the runs already claimed
+      for (auto r : todo) for (auto &wp : w.walk(r)) {
         switch (migrate_page(wp.page())) {                          // see below
         case migrate_result::moved:     mine.push_back(os_handle(wp.page())); break;  // old page is empty now
         case migrate_result::retry:     break;                      // look again next pass
