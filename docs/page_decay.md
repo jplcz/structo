@@ -170,3 +170,5 @@ void page_touched_active(page &p) {
 
 See also [hotplug_decay_integration.md](hotplug_decay_integration.md) for a queue-based, cache-centric VM, and
 [page_queue_scan.md](page_queue_scan.md) for walking the active/inactive queue with the lock dropped per page.
+
+See also: [page_queue.md](page_queue.md) for the intrusive queues and `splice`.

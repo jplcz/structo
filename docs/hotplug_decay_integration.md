@@ -231,3 +231,5 @@ Rules that keep the disconnector and the page daemon from fighting each other:
 - [ ] Implement `evacuate` per state, and the private offline queue.
 - [ ] Update totals and watermarks on hot-add and hot-remove; wake memory waiters after hot-add.
 - [ ] Make sure no code path keeps an unpinned page pointer across a sleep (device lookups, debug tools).
+
+See also: [page_queue.md](page_queue.md) for the intrusive queues and `splice`.

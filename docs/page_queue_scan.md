@@ -91,3 +91,5 @@ and a reclaim pass, or one scan per CPU/NUMA node worker). Rules:
   isolation, free paths) must also skip marker descriptors.
 - **Lock type:** any object with `lock()`/`unlock()`; a try-lock based daemon can pass a wrapper whose
   `lock()` spins or sleeps as your kernel requires.
+
+See also: [page_queue.md](page_queue.md) for the container that provides `scan_ops()`.
